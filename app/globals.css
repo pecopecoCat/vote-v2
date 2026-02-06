@@ -24,3 +24,147 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 下部ナビのセーフエリア（iPhoneホームインジケーター等） */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* 検索窓：ブラウザ標準の×を非表示（自作のクリアボタンのみ表示） */
+.search-header-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* 黒ベタ内テキスト（375px基準の相対指定） */
+.vote-card-question-text {
+  font-family: var(--font-noto-sans-jp), sans-serif;
+  font-weight: 700;
+  /* 20px @ 375px → 5.333vw */
+  font-size: clamp(14px, 5.333vw, 28px);
+  line-height: 1.4;
+  /* 日本語の禁則に近い改行（句読点が行頭に来ない等） */
+  line-break: strict;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+/* A/B 回答テキスト */
+.vote-card-option-text {
+  font-family: var(--font-noto-sans-jp), sans-serif;
+}
+
+/* パーセント表示：数字 Lato 14px Bold #191919、% は 12px */
+.vote-card-percent-number {
+  font-family: var(--font-lato), sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #191919;
+}
+.vote-card-percent-symbol {
+  font-family: var(--font-lato), sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #191919;
+}
+
+/* カードフッター：2択回答数・コメント数（Lato Bold 15px #191919） */
+.vote-card-footer-count {
+  font-family: var(--font-lato), sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #191919;
+}
+
+/* ブックマークON時：アイコンを #FFE100 に（mask で形状を切り抜き） */
+.bookmark-icon-bookmarked {
+  display: inline-block;
+  background-color: #FFE100;
+  -webkit-mask: url("/icons/bookmark.svg") no-repeat center / contain;
+  mask: url("/icons/bookmark.svg") no-repeat center / contain;
+}
+
+/* タブ（急上昇・新着・myTimeline）：Noto Sans JP・bold・中央揃え */
+.feed-tab-label {
+  font-family: var(--font-noto-sans-jp), sans-serif;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* コンパクトカード用の質問テキスト（1.5倍＝21px） */
+.vote-card-compact-question {
+  font-family: var(--font-noto-sans-jp), sans-serif;
+  font-weight: 700;
+  font-size: 21px;
+  line-height: 1.35;
+}
+
+/* VOTEカード背景パターン */
+.vote-pattern-geometric {
+  background-color: #e8e8e8;
+  background-image:
+    linear-gradient(135deg, #1e3a5f 0%, transparent 25%),
+    linear-gradient(225deg, #5b9bd5 0%, transparent 20%),
+    linear-gradient(315deg, #e8a0bf 0%, transparent 25%),
+    linear-gradient(45deg, #f4d03f 0%, transparent 30%),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 8px,
+      rgba(255, 255, 255, 0.15) 8px,
+      rgba(255, 255, 255, 0.15) 10px
+    );
+}
+
+.vote-pattern-pink-blue {
+  background: linear-gradient(180deg, #ff6b8a 0%, #c77dff 50%, #7dd3fc 100%);
+  position: relative;
+}
+.vote-pattern-pink-blue::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.25) 0%, transparent 15%),
+    radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.2) 0%, transparent 12%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 0%, transparent 20%);
+}
+
+.vote-pattern-blue-cyan {
+  background: linear-gradient(180deg, #3b82f6 0%, #22d3ee 100%);
+  position: relative;
+}
+.vote-pattern-blue-cyan::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 30% 40%, rgba(255, 255, 255, 0.2) 0%, transparent 18%),
+    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.15) 0%, transparent 15%),
+    radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 25%);
+}
+
+.vote-pattern-yellow-loops {
+  background-color: #fef08a;
+  position: relative;
+}
+.vote-pattern-yellow-loops::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20 Q40 10 60 20 Q70 40 60 60 Q40 70 20 60 Q10 40 20 20' stroke='rgba(255,255,255,0.6)' stroke-width='2' fill='none'/%3E%3Cpath d='M30 30 Q50 25 65 35 Q75 50 65 65 Q50 75 30 65 Q20 50 30 30' stroke='rgba(255,255,255,0.5)' stroke-width='1.5' fill='none'/%3E%3Cpath d='M15 45 Q35 35 55 45 Q65 55 45 65 Q25 55 15 45' stroke='rgba(255,255,255,0.4)' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  opacity: 0.9;
+}
+
+.vote-pattern-orange-purple {
+  background: linear-gradient(180deg, #f97316 0%, #c084fc 50%, #6366f1 100%);
+  position: relative;
+}
+.vote-pattern-orange-purple::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.12) 0%, transparent 35%),
+    radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 25%);
+}

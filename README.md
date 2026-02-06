@@ -1,5 +1,21 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## 他の人に見せるには
+
+**おすすめ: Vercel にデプロイ（無料・URL を共有できる）**
+
+1. このフォルダを **GitHub** にプッシュする（まだなら `git init` → リポジトリ作成 → push）
+2. [Vercel](https://vercel.com) にログイン（GitHub 連携が簡単）
+3. 「Add New Project」→ このリポジトリを選択 → **Deploy**
+4. 数分で `https://○○○.vercel.app` のような URL が発行されるので、そのリンクを共有する
+
+※ ブックマーク・コレクション・投票結果などはブラウザの localStorage を使っているため、**同じ URL を開いた人ごとに別のデータ**になります（デモ・プレビュー用として問題ありません）。
+
+**ローカルで試すだけなら**
+
+- 同じ Wi‑Fi 内の相手: `npm run dev` で起動し、PC の IP アドレスでアクセス（例: `http://192.168.1.10:3000`）
+- 離れた相手: [ngrok](https://ngrok.com) などでローカルを一時的に公開する方法もあります
+
 ## Getting Started
 
 First, run the development server:
