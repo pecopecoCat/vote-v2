@@ -7,6 +7,7 @@ import AppHeader from "../../components/AppHeader";
 import VoteCard from "../../components/VoteCard";
 import VoteCardCompact from "../../components/VoteCardCompact";
 import VoteCardMini from "../../components/VoteCardMini";
+import CardOptionsModal from "../../components/CardOptionsModal";
 import RecommendedTags from "../../components/RecommendedTags";
 import CommentInput from "../../components/CommentInput";
 import {
@@ -23,6 +24,7 @@ import {
   addVote as persistVote,
   addComment as persistComment,
   getMergedCounts,
+  getCardIdsUserCommentedOn,
   type VoteComment,
 } from "../../data/voteCardActivity";
 import type { VoteCardData } from "../../data/voteCards";
@@ -78,6 +80,7 @@ export default function CommentsPage() {
   });
   const [activity, setActivity] = useState<ReturnType<typeof getActivity>>(() => getActivity(id));
   const [resolved, setResolved] = useState(!id.startsWith("created-"));
+  const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id.startsWith("created-")) return;
@@ -107,6 +110,7 @@ export default function CommentsPage() {
 
   const bottomCards = relatedCards.length > 0 ? relatedCards : fallbackCards;
   const bottomSectionTitle = relatedCards.length > 0 ? "関連VOTE" : "新着";
+  const commentedCardIds = useMemo(() => getCardIdsUserCommentedOn(), [activity]);
 
   const backgroundUrl = card ? backgroundForCard(card, id) : CARD_BACKGROUND_IMAGES[0];
   const merged = card ? getMergedCounts(card.countA ?? 0, card.countB ?? 0, card.commentCount ?? 0, activity) : { countA: 0, countB: 0, commentCount: 0 };
@@ -161,6 +165,7 @@ export default function CommentsPage() {
             commentCount={merged.commentCount}
             selectedSide={activity.userSelectedOption}
             userIconUrl="/default-avatar.png"
+            hasCommented={commentedCardIds.includes(id)}
             onVote={handleVote}
           />
         </div>
@@ -220,11 +225,14 @@ export default function CommentsPage() {
                     creator={related.creator}
                     cardId={relatedId}
                     bookmarked={related.bookmarked ?? false}
+                    hasCommented={commentedCardIds.includes(relatedId)}
                     initialSelectedOption={relActivity.userSelectedOption ?? null}
                     onVote={(cid, option) => {
                       persistVote(cid, option);
                       setActivity(getActivity(id));
                     }}
+                    onMoreClick={setCardOptionsCardId}
+                    visibility={related.visibility}
                   />
                 );
               })}
@@ -235,6 +243,13 @@ export default function CommentsPage() {
 
       {/* ページ下：コメント入力（送信で登録され、コメント数・一覧に反映） */}
       <CommentInput cardId={id} onCommentSubmit={handleCommentSubmit} />
+
+      {cardOptionsCardId != null && (
+        <CardOptionsModal
+          cardId={cardOptionsCardId}
+          onClose={() => setCardOptionsCardId(null)}
+        />
+      )}
     </div>
   );
 }

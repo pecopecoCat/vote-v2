@@ -14,10 +14,11 @@ export default function FeedTabs({
   isLoggedIn = false,
 }: FeedTabsProps) {
   return (
-    <nav
-      className="feed-tab-label sticky top-[64px] z-30 flex justify-center gap-6 border-b border-gray-200 bg-[#F1F1F1] px-[5.333vw] pt-[14.4px] pb-0"
-      aria-label="フィード切り替え"
-    >
+    <div className="sticky top-[64px] z-30 w-full min-w-0">
+      <nav
+        className="feed-tab-label flex w-full justify-center gap-6 border-b border-gray-200 bg-[#F1F1F1] px-[5.333vw] pt-[14.4px] pb-0"
+        aria-label="フィード切り替え"
+      >
       <button
         type="button"
         onClick={() => onSelect("trending")}
@@ -71,6 +72,7 @@ export default function FeedTabs({
         )}
       </button>
     </nav>
+    </div>
   );
 }
 

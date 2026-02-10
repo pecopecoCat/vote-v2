@@ -4,7 +4,9 @@
  */
 
 const STORAGE_KEY = "vote_collections";
+const PINNED_STORAGE_KEY = "vote_pinned_collection_ids";
 const EVENT_NAME = "vote_collections_updated";
+export const PINNED_UPDATED_EVENT = "vote_pinned_collections_updated";
 
 export type CollectionVisibility = "member" | "public" | "private";
 
@@ -113,18 +115,85 @@ export function toggleCardInCollection(collectionId: string, cardId: string): vo
   save(cols);
 }
 
-/** 新規コレクション作成 */
-export function createCollection(name: string): Collection {
+/** 新規コレクション作成（名前必須、色・公開設定はオプション） */
+export function createCollection(
+  name: string,
+  options?: { color?: string; visibility?: CollectionVisibility }
+): Collection {
   const cols = load();
   const id = `col-${Date.now()}`;
   const newCol: Collection = {
     id,
-    name,
-    color: "#E5E7EB",
-    visibility: "public",
+    name: name.trim() || "新しいコレクション",
+    color: options?.color ?? "#87CEEB",
+    visibility: options?.visibility ?? "public",
     cardIds: [],
   };
   cols.push(newCol);
   save(cols);
   return newCol;
+}
+
+/** コレクションを更新（名前・色・公開設定） */
+export function updateCollection(
+  id: string,
+  updates: { name?: string; color?: string; visibility?: CollectionVisibility }
+): void {
+  const cols = load();
+  const col = cols.find((c) => c.id === id);
+  if (!col) return;
+  if (updates.name !== undefined) col.name = updates.name.trim() || col.name;
+  if (updates.color !== undefined) col.color = updates.color;
+  if (updates.visibility !== undefined) col.visibility = updates.visibility;
+  save(cols);
+}
+
+/** コレクションを削除 */
+export function deleteCollection(id: string): void {
+  const cols = load().filter((c) => c.id !== id);
+  save(cols);
+  const pinned = getPinnedCollectionIds().filter((pid) => pid !== id);
+  if (pinned.length < getPinnedCollectionIds().length) savePinnedIds(pinned);
+}
+
+function loadPinnedIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(PINNED_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.map((id) => String(id)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePinnedIds(ids: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PINNED_STORAGE_KEY, JSON.stringify(ids));
+  } catch {
+    // ignore
+  }
+}
+
+/** 検索画面にピン留めしたコレクションID一覧 */
+export function getPinnedCollectionIds(): string[] {
+  return loadPinnedIds();
+}
+
+/** コレクションがピン留めされているか */
+export function isPinnedCollection(collectionId: string): boolean {
+  return loadPinnedIds().includes(collectionId);
+}
+
+/** ピン留めをトグル（検索画面にピン留め） */
+export function togglePinnedCollection(collectionId: string): void {
+  const current = loadPinnedIds();
+  const has = current.includes(collectionId);
+  const next = has ? current.filter((id) => id !== collectionId) : [...current, collectionId];
+  savePinnedIds(next);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(PINNED_UPDATED_EVENT));
+  }
 }

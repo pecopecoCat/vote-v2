@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
+import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 import { getCollections } from "../../data/collections";
 import { CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
@@ -34,6 +35,8 @@ function CreateFormContent() {
   );
   const [selectedCollectionId, setSelectedCollectionId] = useState("");
   const [collectionOpen, setCollectionOpen] = useState(false);
+  const [visibility, setVisibility] = useState<"public" | "private">("public");
+  const [useVotePeriod, setUseVotePeriod] = useState(false);
 
   const [startYear, setStartYear] = useState(CURRENT_YEAR);
   const [startMonth, setStartMonth] = useState(new Date().getMonth() + 1);
@@ -77,6 +80,7 @@ function CreateFormContent() {
       commentCount: 0,
       tags,
       createdAt: now,
+      visibility,
     });
     router.push("/");
   }, [
@@ -87,6 +91,7 @@ function CreateFormContent() {
     optionB,
     hashtagQuery,
     selectedBackgroundUrl,
+    visibility,
   ]);
 
   return (
@@ -105,24 +110,30 @@ function CreateFormContent() {
         }
       />
 
-      <main className="mx-auto max-w-lg space-y-5 px-[5.333vw] pb-8 pt-4">
-        {/* 2択の質問（80文字）* */}
+      <main className="mx-auto max-w-lg space-y-[30px] px-[5.333vw] pb-8 pt-4">
+        {/* 2択の質問（80文字）* - タップで質問入力画面へ */}
         <section>
           <h2 className="mb-1 text-sm font-bold text-gray-900">
             2択の質問（80文字） <span className="text-red-600">*</span>
           </h2>
-          <div className="relative rounded-xl bg-white p-4">
-            <textarea
-              value={question}
-              onChange={(e) => setQuestion(e.target.value.slice(0, QUESTION_MAX))}
-              placeholder="例) 朝ご飯は、"
-              className="min-h-[80px] w-full resize-none border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
-              maxLength={QUESTION_MAX}
-            />
+          <button
+            type="button"
+            onClick={() =>
+              router.push(`/create?q=${encodeURIComponent(question)}`)
+            }
+            className="relative flex min-h-[80px] w-full flex-col items-start rounded-xl bg-white p-4 text-left shadow-none outline-none"
+          >
+            <span
+              className={`min-h-[52px] w-full resize-none text-sm outline-none placeholder:text-gray-400 ${
+                question ? "text-gray-900" : "text-gray-400"
+              }`}
+            >
+              {question || "例) 朝ご飯は、"}
+            </span>
             <span className="absolute bottom-2 right-2 text-gray-300" aria-hidden>
               <ImageIcon className="h-5 w-5" />
             </span>
-          </div>
+          </button>
           <p className={`mt-1 text-xs ${question.length > QUESTION_MAX ? "text-red-600" : "text-gray-500"}`}>
             {question.length}/{QUESTION_MAX}
           </p>
@@ -177,7 +188,7 @@ function CreateFormContent() {
               className="min-h-[80px] w-full resize-none border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
             />
           </div>
-          <div className="mt-3">
+          <div className="mt-[10px]">
             <Checkbox
               checked={noComments}
               onChange={setNoComments}
@@ -204,7 +215,7 @@ function CreateFormContent() {
         {/* 背景デザイン（画像から選択）・黄縁2倍・内側白縁・チェックはみ出しOK・シャドウ画像参考・画像切れ防止 */}
         <section>
           <h2 className="mb-2 text-sm font-bold text-gray-900">背景デザイン</h2>
-          <div className="flex gap-3 overflow-x-auto pb-2 pr-2 pt-2">
+          <div className="flex gap-1.5 overflow-x-auto pb-2 pr-2 pt-2">
             {CARD_BACKGROUND_IMAGES.map((url) => (
               <button
                 key={url}
@@ -232,9 +243,46 @@ function CreateFormContent() {
           </div>
         </section>
 
-        {/* 投票期間（年・月・日） */}
+        {/* 公開設定：みんな / リンクを知ってる人だけ */}
+        <section>
+          <h2 className="mb-2 text-sm font-bold text-gray-900">公開設定</h2>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setVisibility("public")}
+              className={`flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-colors ${
+                visibility === "public"
+                  ? "border-[#FFE100] bg-[#FFE100]/20 text-gray-900"
+                  : "border-gray-200 bg-white text-gray-600"
+              }`}
+            >
+              みんなに公開
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisibility("private")}
+              className={`flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-colors ${
+                visibility === "private"
+                  ? "border-[#FFE100] bg-[#FFE100]/20 text-gray-900"
+                  : "border-gray-200 bg-white text-gray-600"
+              }`}
+            >
+              リンクを知っている人だけ
+            </button>
+          </div>
+        </section>
+
+        {/* 投票期間（チェックで設定するか選択・年・月・日） */}
         <section>
           <h2 className="mb-2 text-sm font-bold text-gray-900">投票期間</h2>
+          <div className="mb-3">
+            <Checkbox
+              checked={useVotePeriod}
+              onChange={setUseVotePeriod}
+              label="投票期間を設定する"
+            />
+          </div>
+          {useVotePeriod && (
           <div className="space-y-3 rounded-xl bg-white p-4">
             <div>
               <p className="mb-1 text-xs text-gray-600">開始期間</p>
@@ -307,6 +355,7 @@ function CreateFormContent() {
               </div>
             </div>
           </div>
+          )}
         </section>
 
         {/* コレクション（自分のコレクションをプルダウン・画像デザイン・黄丸に矢印アイコン） */}
@@ -371,18 +420,11 @@ function CreateFormContent() {
         </section>
       </main>
 
-      {/* 固定フッター: VOTEを作成（角丸R10・シャドウY2ぼかし0） */}
+      {/* 固定フッター: VOTEを作成 */}
       <div className="fixed bottom-14 left-0 right-0 z-10 mx-auto max-w-lg px-[5.333vw] pb-2 pt-2">
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          className={`flex h-12 w-full items-center justify-center rounded-[10px] font-bold shadow-[0_2px_0_0_rgba(0,0,0,0.08)] ${
-            canSubmit ? "bg-[#FFE100] text-gray-900" : "bg-gray-200 text-gray-400"
-          }`}
-        >
+        <Button variant="createVote" type="button" onClick={handleSubmit} disabled={!canSubmit}>
           VOTEを作成
-        </button>
+        </Button>
       </div>
 
       <BottomNav activeId="add" />

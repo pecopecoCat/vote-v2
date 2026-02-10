@@ -35,44 +35,42 @@ export default function NotificationTabs({
 
       {/* タブバー：上マージン120%(12px→14.4px)、下マージン95%(12px→11.4px)。黄ラインは境界に */}
       {isLoggedIn && (
-        <nav className="flex bg-white" aria-label="お知らせタブ">
-          <button
-            type="button"
-            onClick={() => onTabChange("activity")}
-            className={`flex flex-1 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-              effectiveTab === "activity" ? "text-gray-900" : "text-gray-500"
-            }`}
-          >
-            <span className="flex-1" aria-hidden />
-            <span className="relative inline-block">
-              アクティビティ
+        <div className="w-full min-w-0">
+          <nav className="flex w-full bg-white" aria-label="お知らせタブ">
+            <button
+              type="button"
+              onClick={() => onTabChange("activity")}
+              className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
+                effectiveTab === "activity" ? "text-gray-900" : "text-gray-500"
+              }`}
+            >
+              <span className="flex-1" aria-hidden />
+              <span className="inline-block">アクティビティ</span>
               {effectiveTab === "activity" && (
                 <span
-                  className="absolute -bottom-[11.4px] left-0 right-0 h-[3px] w-full bg-[#FFE100]"
+                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
                   aria-hidden
                 />
               )}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onTabChange("announcements")}
-            className={`flex flex-1 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-              effectiveTab === "announcements" ? "text-gray-900" : "text-gray-500"
-            }`}
-          >
-            <span className="flex-1" aria-hidden />
-            <span className="relative inline-block">
-              運営からのお知らせ
+            </button>
+            <button
+              type="button"
+              onClick={() => onTabChange("announcements")}
+              className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
+                effectiveTab === "announcements" ? "text-gray-900" : "text-gray-500"
+              }`}
+            >
+              <span className="flex-1" aria-hidden />
+              <span className="inline-block">運営からのお知らせ</span>
               {effectiveTab === "announcements" && (
                 <span
-                  className="absolute -bottom-[11.4px] left-0 right-0 h-[3px] w-full bg-[#FFE100]"
+                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
                   aria-hidden
                 />
               )}
-            </span>
-          </button>
-        </nav>
+            </button>
+          </nav>
+        </div>
       )}
 
       {/* コンテンツ（グレー上のpadding 150%: 16px→24px） */}

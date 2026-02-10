@@ -30,6 +30,14 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
+/* Safariでタブバーが左寄せにならないよう全幅を確保 */
+nav[aria-label="検索タブ"] button,
+nav[aria-label="お知らせタブ"] button,
+nav[aria-label="マイページタブ"] button {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
 /* 検索窓：ブラウザ標準の×を非表示（自作のクリアボタンのみ表示） */
 .search-header-input::-webkit-search-cancel-button {
   -webkit-appearance: none;
@@ -84,11 +92,31 @@ body {
   mask: url("/icons/bookmark.svg") no-repeat center / contain;
 }
 
+/* コメント済み時：コメントアイコンを #FFE100 に */
+.comment-icon-commented {
+  display: inline-block;
+  background-color: #FFE100;
+  -webkit-mask: url("/icons/comment.svg") no-repeat center / contain;
+  mask: url("/icons/comment.svg") no-repeat center / contain;
+}
+
 /* タブ（急上昇・新着・myTimeline）：Noto Sans JP・bold・中央揃え */
 .feed-tab-label {
   font-family: var(--font-noto-sans-jp), sans-serif;
   font-weight: 700;
   text-align: center;
+}
+
+/* ボタン：Noto Sans JP Bold（日本語ラベル用） */
+.btn-font {
+  font-family: var(--font-noto-sans-jp), sans-serif;
+  font-weight: 700;
+}
+
+/* マイページお気に入りタグ：Noto Sans JP Regular 13px #191919 */
+.profile-favorite-tag {
+  font-family: var(--font-noto-sans-jp), sans-serif;
+  font-weight: 400;
 }
 
 /* コンパクトカード用の質問テキスト（1.5倍＝21px） */

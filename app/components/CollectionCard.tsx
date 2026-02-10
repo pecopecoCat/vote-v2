@@ -60,7 +60,7 @@ export default function CollectionCard({
           </p>
         </div>
       ) : (
-        <p className={`text-sm font-semibold text-gray-900 ${showPin ? "pr-12" : ""}`}>{title}</p>
+        <p className={`text-sm font-bold text-white ${showPin ? "pr-12" : ""}`}>{title}</p>
       )}
     </article>
   );

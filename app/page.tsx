@@ -9,6 +9,7 @@ import CollectionCard from "./components/CollectionCard";
 import BottomNav from "./components/BottomNav";
 import FeedTabs from "./components/FeedTabs";
 import BookmarkCollectionModal from "./components/BookmarkCollectionModal";
+import CardOptionsModal from "./components/CardOptionsModal";
 import type { CurrentUser } from "./components/VoteCard";
 import type { FeedTabId } from "./components/FeedTabs";
 import type { VoteCardData } from "./data/voteCards";
@@ -22,6 +23,7 @@ import {
   getAllActivity,
   addVote as persistVote,
   getMergedCounts,
+  getCardIdsUserCommentedOn,
   type CardActivity,
 } from "./data/voteCardActivity";
 import { getCollections, getCollectionsUpdatedEventName } from "./data/collections";
@@ -60,6 +62,7 @@ export default function Home() {
   const [collections, setCollections] = useState(() => getCollections());
   const [activity, setActivity] = useState<Record<string, CardActivity>>({});
   const [modalCardId, setModalCardId] = useState<string | null>(null);
+  const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
 
   useEffect(() => {
     setActivity(getAllActivity());
@@ -72,11 +75,19 @@ export default function Home() {
     return () => window.removeEventListener(eventName, handler);
   }, []);
 
+  const commentedCardIds = useMemo(() => getCardIdsUserCommentedOn(), [activity]);
+
   const allCards = useMemo(() => {
     const created = getCreatedVotes();
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
     return [...created, ...seedWithId];
   }, []);
+
+  /** 公開カードのみ（private はリンクを知ってる人だけ＝一覧には出さない） */
+  const publicCards = useMemo(
+    () => allCards.filter((c) => c.visibility !== "private"),
+    [allCards]
+  );
 
   const bookmarkedIds = useMemo(() => {
     const set = new Set<string>();
@@ -87,9 +98,9 @@ export default function Home() {
   const cardsForTab = useMemo(() => {
     switch (activeTab) {
       case "trending":
-        return sortByTrending(allCards);
+        return sortByTrending(publicCards);
       case "new":
-        return sortByNewest(allCards);
+        return sortByNewest(publicCards);
       case "myTimeline": {
         return allCards
           .filter((card) => bookmarkedIds.has(card.id ?? ""))
@@ -98,9 +109,9 @@ export default function Home() {
           );
       }
       default:
-        return allCards;
+        return publicCards;
     }
-  }, [activeTab, bookmarkedIds, allCards]);
+  }, [activeTab, bookmarkedIds, allCards, publicCards]);
 
   return (
     <div className="min-h-screen bg-[#F1F1F1]">
@@ -158,6 +169,7 @@ export default function Home() {
                 currentUser={demoCurrentUser}
                 cardId={cardId}
                 bookmarked={bookmarkedIds.has(cardId)}
+                hasCommented={commentedCardIds.includes(cardId)}
                 initialSelectedOption={act?.userSelectedOption ?? null}
                 onVote={(id, option) => {
                   persistVote(id, option);
@@ -175,6 +187,8 @@ export default function Home() {
                   });
                 }}
                 onBookmarkClick={setModalCardId}
+                onMoreClick={setCardOptionsCardId}
+                visibility={card.visibility}
               />
             );
           })}
@@ -202,6 +216,13 @@ export default function Home() {
           cardId={modalCardId}
           onClose={() => setModalCardId(null)}
           onCollectionsUpdated={() => setCollections(getCollections())}
+        />
+      )}
+
+      {cardOptionsCardId != null && (
+        <CardOptionsModal
+          cardId={cardOptionsCardId}
+          onClose={() => setCardOptionsCardId(null)}
         />
       )}
     </div>

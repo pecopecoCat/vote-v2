@@ -53,6 +53,12 @@ export interface VoteCardProps {
   initialSelectedOption?: "A" | "B" | null;
   /** 投票時に親へ通知（cardId と A/B） */
   onVote?: (cardId: string, option: "A" | "B") => void;
+  /** public: みんな見れる / private: リンクを知ってる人だけ（非公開バッジ表示） */
+  visibility?: "public" | "private";
+  /** 自分がコメント済みの場合 true（コメントアイコンを #FFE100 で表示） */
+  hasCommented?: boolean;
+  /** 3点リーダー（その他）タップ時（cardId を渡してモーダル表示用） */
+  onMoreClick?: (cardId: string) => void;
 }
 
 const patternClasses: Record<VoteCardPattern, string> = {
@@ -83,6 +89,9 @@ export default function VoteCard({
   onBookmarkClick,
   initialSelectedOption = null,
   onVote,
+  visibility,
+  hasCommented = false,
+  onMoreClick,
 }: VoteCardProps) {
   const patternClass = patternClasses[patternType];
   const useImage = Boolean(backgroundImageUrl);
@@ -140,10 +149,15 @@ export default function VoteCard({
   const showResult = selectedOption !== null;
 
   return (
-    <article className="w-full overflow-visible rounded-[2rem] bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
-      {/* 背景付きエリア（375px基準: 左右20px=5.333vw, 上50px=13.333vw, 質問〜A 30px, A〜B 15px, B〜下 20px） */}
+    <article className="relative w-full overflow-visible rounded-[18px] bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
+      {visibility === "private" && (
+        <span className="absolute right-3 top-3 z-10 rounded-full bg-gray-800/80 px-2.5 py-1 text-xs font-medium text-white">
+          非公開
+        </span>
+      )}
+      {/* 背景付きエリア（白エリア左右padding 80%=4.27vw） */}
       <div
-        className={`relative min-h-[100px] rounded-t-[2rem] bg-gray-200 bg-cover bg-center bg-no-repeat px-[5.333vw] pb-[5.333vw] pt-[13.333vw] ${!useImage ? patternClass : ""}`}
+        className={`relative min-h-[100px] rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat px-[4.27vw] pb-[5.333vw] pt-[13.333vw] ${!useImage ? patternClass : ""}`}
         style={
           useImage
             ? { backgroundImage: `url(${backgroundImageUrl})` }
@@ -195,15 +209,15 @@ export default function VoteCard({
                   <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#E63E48] py-3.5 text-base font-bold text-white">
                     A
                   </span>
-                  <div className="vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-xl bg-white py-3.5 pl-4 pr-12">
+                  <div className="vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-xl bg-white py-3.5 pl-4 pr-[20px]">
                     <div
-                      className="absolute inset-y-0 left-0 overflow-hidden rounded-r-xl bg-[#fce4ec] transition-[width] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+                      className={`absolute inset-y-0 left-0 overflow-hidden bg-[#fce4ec] transition-[width] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${displayPercentA >= 100 ? "rounded-r-xl" : ""}`}
                       style={{ width: `${displayPercentA}%` }}
                     />
-                    <span className="relative z-10 truncate font-semibold text-[#CF0606]">
+                    <span className="relative z-10 min-w-0 truncate font-semibold text-[#CF0606]">
                       {optionA}
                     </span>
-                    <span className="relative z-10 ml-auto mr-12 flex shrink-0 items-baseline">
+                    <span className="relative z-10 ml-auto flex min-w-[3rem] shrink-0 items-baseline justify-end">
                       <span className="vote-card-percent-number">{percentA}</span>
                       <span className="vote-card-percent-symbol">%</span>
                     </span>
@@ -220,15 +234,15 @@ export default function VoteCard({
                   <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#3273E3] py-3.5 text-base font-bold text-white">
                     B
                   </span>
-                  <div className="vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-xl bg-white py-3.5 pl-4 pr-12">
+                  <div className="vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-xl bg-white py-3.5 pl-4 pr-[20px]">
                     <div
-                      className="absolute inset-y-0 left-0 overflow-hidden rounded-r-xl bg-[#e3f2fd] transition-[width] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+                      className={`absolute inset-y-0 left-0 overflow-hidden bg-[#e3f2fd] transition-[width] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${displayPercentB >= 100 ? "rounded-r-xl" : ""}`}
                       style={{ width: `${displayPercentB}%` }}
                     />
-                    <span className="relative z-10 truncate font-semibold text-[#1F77D4]">
+                    <span className="relative z-10 min-w-0 truncate font-semibold text-[#1F77D4]">
                       {optionB}
                     </span>
-                    <span className="relative z-10 ml-auto mr-12 flex shrink-0 items-baseline">
+                    <span className="relative z-10 ml-auto flex min-w-[3rem] shrink-0 items-baseline justify-end">
                       <span className="vote-card-percent-number">{percentB}</span>
                       <span className="vote-card-percent-symbol">%</span>
                     </span>
@@ -245,8 +259,10 @@ export default function VoteCard({
         </div>
       </div>
 
-      {/* フッター（アイコン行の下0.6em） */}
-      <div className="flex items-center gap-4 border-t border-gray-100 px-[5.333vw] pt-[2.73vw] pb-[0.6em]">
+      {/* フッター（タグあり時は下0.36em、タグなし時は下2倍の0.72em） */}
+      <div
+        className={`flex items-center gap-4 border-t border-gray-100 px-[4.27vw] pt-[2.73vw] ${tags.length > 0 ? "pb-[0.36em]" : "pb-[0.72em]"}`}
+      >
         <span className="flex items-center gap-1" aria-label="2択回答数">
           <img src="/icons/votemark.svg" alt="" className="h-4 w-4 scale-110" />
           <span className="vote-card-footer-count">{displayTotal}</span>
@@ -257,18 +273,26 @@ export default function VoteCard({
             className="flex items-center gap-1 hover:opacity-80"
             aria-label={`コメント ${commentCount}件、コメントページへ`}
           >
-            <img src="/icons/comment.svg" alt="" className="h-4 w-4 scale-110" />
+            {hasCommented ? (
+              <span className="comment-icon-commented h-4 w-4 scale-110" aria-hidden />
+            ) : (
+              <img src="/icons/comment.svg" alt="" className="h-4 w-4 scale-110" />
+            )}
             <span className="vote-card-footer-count">{commentCount}</span>
           </Link>
         ) : (
           <span className="flex items-center gap-1" aria-label="コメント数">
-            <img src="/icons/comment.svg" alt="" className="h-4 w-4 scale-110" />
+            {hasCommented ? (
+              <span className="comment-icon-commented h-4 w-4 scale-110" aria-hidden />
+            ) : (
+              <img src="/icons/comment.svg" alt="" className="h-4 w-4 scale-110" />
+            )}
             <span className="vote-card-footer-count">{commentCount}</span>
           </span>
         )}
         <button
           type="button"
-          className="ml-auto text-gray-400 hover:text-gray-600"
+          className="flex items-center justify-center text-gray-400 hover:text-gray-600"
           aria-label={isBookmarked ? "ブックマークを外す" : "ブックマーク"}
           onClick={() => {
             if (cardId != null && onBookmarkClick) {
@@ -281,27 +305,31 @@ export default function VoteCard({
           }}
         >
           {isBookmarked ? (
-            <span className="bookmark-icon-bookmarked h-5 w-5 scale-110" aria-hidden />
+            <span className="bookmark-icon-bookmarked h-[18px] w-[15px]" aria-hidden />
           ) : (
             <img
               src="/icons/bookmark.svg"
               alt=""
-              className="h-5 w-5 scale-110 opacity-40"
+              className="h-[18px] w-[15px] opacity-40"
             />
           )}
         </button>
         <button
           type="button"
-          className="text-gray-400 hover:text-gray-600"
+          className="ml-auto flex items-center justify-center text-gray-400 hover:text-gray-600"
           aria-label="その他"
+          onClick={(e) => {
+            e.preventDefault();
+            if (cardId != null && onMoreClick) onMoreClick(cardId);
+          }}
         >
           <MoreIcon className="h-5 w-5" />
         </button>
       </div>
 
-      {/* タグ（タグブロックの下0.6em） */}
+      {/* タグ（タグブロックの下0.78em＝0.6em×1.3） */}
       {tags.length > 0 && (
-        <div className={`flex flex-wrap gap-2 px-[5.333vw] ${!readMoreText ? "pb-[0.6em]" : ""}`}>
+        <div className={`flex flex-wrap gap-2 px-[4.27vw] ${!readMoreText ? "pb-[0.78em]" : ""}`}>
           {tags.map((tag) => (
             <Link
               key={tag}
@@ -314,16 +342,16 @@ export default function VoteCard({
         </div>
       )}
 
-      {/* 続きを読む（タグとの間は80%の高さ＝0.8em、本文は2行まで表示） */}
+      {/* 続きを読む（タグとの間0.8em、下側padding 1.3倍） */}
       {readMoreText && (
-        <div className="px-[5.333vw] pt-[0.8em] pb-[0.8em]">
+        <div className="px-[4.27vw] pt-[0.8em] pb-[1.04em]">
           <p
             className={`text-[14px] text-gray-600 ${!readMoreExpanded ? "line-clamp-2" : ""}`}
           >
             {readMoreExpanded ? readMoreText : readMoreText}
           </p>
-          <div className="mt-[1.6vw] border-t border-[#E5E7EB] pt-[1.6vw] pb-[1.6vw] -mx-[5.333vw]">
-            <div className="px-[5.333vw] text-center">
+          <div className="mt-[1.6vw] border-t border-[#E5E7EB] pt-[1.6vw] pb-[2.08vw] -mx-[4.27vw]">
+            <div className="px-[4.27vw] text-center">
               <button
                 type="button"
                 className="text-[14px] font-medium text-gray-600 hover:underline"

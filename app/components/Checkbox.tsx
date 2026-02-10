@@ -31,9 +31,9 @@ export default function Checkbox({
   return (
     <label
       htmlFor={id}
-      className={`inline-flex cursor-pointer items-center gap-2.5 ${disabled ? "cursor-not-allowed opacity-60" : ""} ${className}`}
+      className={`inline-flex cursor-pointer items-center gap-[6px] ${disabled ? "cursor-not-allowed opacity-60" : ""} ${className}`}
     >
-      <span className="relative h-6 w-6 shrink-0">
+      <span className="relative h-[14px] w-[14px] shrink-0">
         <input
           type="checkbox"
           id={id}
@@ -45,7 +45,7 @@ export default function Checkbox({
         />
         <span
           role="presentation"
-          className={`flex h-6 w-6 items-center justify-center rounded-lg border-2 transition-colors ${
+          className={`flex h-[14px] w-[14px] items-center justify-center rounded border transition-colors ${
             checked
               ? "border-[#FFE100] bg-[#FFE100]"
               : "border-gray-300 bg-white"
@@ -56,17 +56,17 @@ export default function Checkbox({
               src="/icons/icon_check.svg"
               alt=""
               className="shrink-0"
-              style={{ width: "8px", height: "5.6px" }}
+              style={{ width: "10px", height: "7px" }}
               width={10}
               height={7}
             />
           ) : (
-            <span className="h-[5.6px] w-[8px]" aria-hidden />
+            <span className="h-0 w-0" aria-hidden />
           )}
         </span>
       </span>
       {label != null && (
-        <span className="select-none text-gray-900" style={{ fontSize: "15px" }}>{label}</span>
+        <span className="select-none text-gray-900" style={{ fontSize: "11pt" }}>{label}</span>
       )}
     </label>
   );

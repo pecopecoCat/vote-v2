@@ -32,9 +32,9 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
           <img
             src={isActive ? srcOn : src}
             alt=""
-            className="h-6 w-6 shrink-0"
-            width={24}
-            height={24}
+            className="h-[22px] w-[22px] shrink-0"
+            width={22}
+            height={22}
             aria-hidden
           />
         );

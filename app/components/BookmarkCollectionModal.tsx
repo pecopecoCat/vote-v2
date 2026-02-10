@@ -3,17 +3,14 @@
 import {
   getCollections,
   toggleCardInCollection,
+  removeCardFromCollection,
   createCollection,
   getCollectionsUpdatedEventName,
   type Collection,
 } from "../data/collections";
 import { useEffect, useState } from "react";
-
-const VISIBILITY_LABEL: Record<string, string> = {
-  member: "メンバー限定",
-  public: "公開",
-  private: "非公開",
-};
+import Button from "./Button";
+import CollectionSettingsModal from "./CollectionSettingsModal";
 
 interface BookmarkCollectionModalProps {
   cardId: string | null;
@@ -27,7 +24,7 @@ export default function BookmarkCollectionModal({
   onCollectionsUpdated,
 }: BookmarkCollectionModalProps) {
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [newCollectionName, setNewCollectionName] = useState("");
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   useEffect(() => {
     setCollections(getCollections());
@@ -50,17 +47,27 @@ export default function BookmarkCollectionModal({
     onCollectionsUpdated?.();
   };
 
-  const handleCreate = () => {
-    const name = newCollectionName.trim() || "新しいコレクション";
-    createCollection(name);
-    setNewCollectionName("");
+  const handleSaveNewCollection = (name: string, color: string, visibility: "public" | "private" | "member") => {
+    createCollection(name, { color, visibility });
     setCollections(getCollections());
     onCollectionsUpdated?.();
+    setShowSettingsModal(false);
   };
 
   if (cardId == null) return null;
 
   const isInCollection = (c: Collection) => c.cardIds.includes(cardId);
+  /** ALL = どのコレクションにも含まれていない状態 */
+  const isInAll = !collections.some((c) => c.cardIds.includes(cardId));
+
+  const handleSelectAll = () => {
+    if (!cardId) return;
+    collections.forEach((col) => {
+      if (col.cardIds.includes(cardId)) removeCardFromCollection(col.id, cardId);
+    });
+    setCollections(getCollections());
+    onCollectionsUpdated?.();
+  };
 
   return (
     <>
@@ -69,23 +76,49 @@ export default function BookmarkCollectionModal({
         aria-hidden
         onClick={onClose}
       />
-      <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-hidden rounded-t-2xl bg-white shadow-lg">
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+      <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white shadow-lg">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
+          <div />
           <span className="text-lg font-bold text-gray-900">Bookmark</span>
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center text-blue-600"
-            aria-label="閉じる"
-            onClick={onClose}
-          >
-            <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-            </svg>
-          </button>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className="flex h-10 w-10 items-center justify-center text-blue-600"
+              aria-label="閉じる"
+              onClick={onClose}
+            >
+              <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+              </svg>
+            </button>
+          </div>
         </div>
-        <div className="max-h-[calc(85vh-120px)] overflow-y-auto">
+        <div className="max-h-[calc(85vh-120px)] overflow-y-auto px-5">
+          {/* ALL（コレクションに含まれない） */}
+          <ul className="divide-y divide-gray-100">
+            <li>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between py-3 text-left text-gray-900"
+                onClick={handleSelectAll}
+              >
+                <span className="text-sm font-medium">ALL</span>
+                {isInAll ? (
+                  <span className="text-blue-600" aria-hidden>
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                  </span>
+                ) : (
+                  <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full bg-gray-200" aria-hidden>
+                    <img src="/icons/icon_plus.svg" alt="" className="h-[10px] w-[10px]" width={10} height={10} />
+                  </span>
+                )}
+              </button>
+            </li>
+          </ul>
           {/* コレクション一覧 */}
-          <div className="border-b border-gray-100 bg-gray-50 px-4 py-2">
+          <div className="border-b border-gray-100 bg-gray-50 px-0 py-2">
             <span className="text-sm font-medium text-gray-600">コレクション</span>
           </div>
           <ul className="divide-y divide-gray-100">
@@ -93,7 +126,7 @@ export default function BookmarkCollectionModal({
               <li key={col.id}>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between px-4 py-3 text-left text-gray-900"
+                  className="flex w-full items-center justify-between py-3 text-left text-gray-900"
                   onClick={() => handleToggle(col.id)}
                 >
                   <span className="flex items-center gap-2">
@@ -110,10 +143,8 @@ export default function BookmarkCollectionModal({
                       </svg>
                     </span>
                   ) : (
-                    <span className="text-gray-400" aria-hidden>
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
+                    <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full bg-gray-200" aria-hidden>
+                      <img src="/icons/icon_plus.svg" alt="" className="h-[10px] w-[10px]" width={10} height={10} />
                     </span>
                   )}
                 </button>
@@ -121,16 +152,19 @@ export default function BookmarkCollectionModal({
             ))}
           </ul>
         </div>
-        <div className="border-t border-gray-100 p-4">
-          <button
-            type="button"
-            className="w-full rounded-xl border border-gray-200 bg-white py-3 text-sm font-medium text-gray-900"
-            onClick={handleCreate}
-          >
+        <div className="border-t border-gray-100 p-5">
+          <Button variant="outline" className="w-full" onClick={() => setShowSettingsModal(true)}>
             新しいコレクションを追加
-          </button>
+          </Button>
         </div>
       </div>
+
+      {showSettingsModal && (
+        <CollectionSettingsModal
+          onClose={() => setShowSettingsModal(false)}
+          onSave={handleSaveNewCollection}
+        />
+      )}
     </>
   );
 }

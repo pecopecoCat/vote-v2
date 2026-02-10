@@ -48,6 +48,7 @@ function normalizeCard(raw: unknown): VoteCardData | null {
     createdAt: typeof o.createdAt === "string" ? o.createdAt : undefined,
     backgroundImageUrl: typeof o.backgroundImageUrl === "string" ? o.backgroundImageUrl : undefined,
     id: typeof o.id === "string" ? o.id : undefined,
+    visibility: o.visibility === "private" ? "private" : "public",
   };
 }
 
@@ -72,6 +73,16 @@ export function getCreatedVotes(): VoteCardData[] {
 export function addCreatedVote(card: VoteCardData): void {
   const list = getCreatedVotes();
   list.unshift(card);
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    // ignore
+  }
+}
+
+/** 作ったVOTEを削除（cardId = card.id ?? card.question） */
+export function deleteCreatedVote(cardId: string): void {
+  const list = getCreatedVotes().filter((c) => (c.id ?? c.question) !== cardId);
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
   } catch {

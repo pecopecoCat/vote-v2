@@ -19,6 +19,8 @@ export interface VoteCardData {
   backgroundImageUrl?: string;
   /** 一意ID（作成カードの識別・ブックマーク用） */
   id?: string;
+  /** public: みんな見れる / private: リンクを知ってる人だけ見れる（擬似） */
+  visibility?: "public" | "private";
 }
 
 export const voteCardsData: VoteCardData[] = [

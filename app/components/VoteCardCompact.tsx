@@ -31,6 +31,11 @@ export interface VoteCardCompactProps {
   hideTags?: boolean;
   /** mini: 個別ページ用（左右padding2倍・フッター下padding1.8倍） */
   variant?: "default" | "mini";
+  /** 自分がコメント済みの場合 true（コメントアイコンを #FFE100 で表示） */
+  hasCommented?: boolean;
+  /** 3点リーダー（その他）タップ時（cardId を渡してモーダル表示用） */
+  onMoreClick?: (cardId: string) => void;
+  cardId?: string;
 }
 
 export default function VoteCardCompact({
@@ -50,6 +55,9 @@ export default function VoteCardCompact({
   onVote,
   hideTags = false,
   variant = "default",
+  hasCommented = false,
+  onMoreClick,
+  cardId,
 }: VoteCardCompactProps) {
   const useImage = Boolean(backgroundImageUrl);
   const patternClass = patternClasses[patternType];
@@ -60,9 +68,9 @@ export default function VoteCardCompact({
   const isMini = variant === "mini";
 
   return (
-    <article className="w-full overflow-hidden rounded-[2rem] bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
+    <article className="w-full overflow-hidden rounded-[18px] bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
       <div
-        className={`relative min-h-[72px] rounded-t-[2rem] bg-gray-200 bg-cover bg-center bg-no-repeat pb-3 pt-5 ${isMini ? "px-[5.333vw]" : "pl-3 pr-10"} ${!useImage ? patternClass : ""}`}
+        className={`relative min-h-[72px] rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat pb-3 pt-5 ${isMini ? "px-[5.333vw]" : "pl-3 pr-10"} ${!useImage ? patternClass : ""}`}
         style={
           useImage ? { backgroundImage: `url(${backgroundImageUrl})` } : undefined
         }
@@ -114,16 +122,16 @@ export default function VoteCardCompact({
                   A
                 </span>
                 <div
-                  className={`vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-lg bg-white py-2 pl-3 ${selectedSide === "A" ? "pr-12" : "pr-[4%]"}`}
+                  className={`vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-lg bg-white py-2 pl-3 ${selectedSide === "A" ? "pr-14" : "pr-[4%]"}`}
                 >
                   <div
-                    className="absolute inset-y-0 left-0 overflow-hidden rounded-r-lg bg-[#fce4ec]"
+                    className={`absolute inset-y-0 left-0 overflow-hidden bg-[#fce4ec] ${percentA >= 100 ? "rounded-r-lg" : ""}`}
                     style={{ width: `${percentA}%` }}
                   />
                   <span className="relative z-10 truncate text-sm font-semibold text-[#CF0606]">
                     {optionA}
                   </span>
-                  <span className={`relative z-10 ml-auto flex shrink-0 items-baseline ${selectedSide === "A" ? "mr-12" : ""}`}>
+                  <span className={`relative z-10 ml-auto flex min-w-[2.5rem] shrink-0 items-baseline justify-end ${selectedSide === "A" ? "mr-5" : ""}`}>
                     <span className="vote-card-percent-number">{percentA}</span>
                     <span className="vote-card-percent-symbol">%</span>
                   </span>
@@ -145,16 +153,16 @@ export default function VoteCardCompact({
                   B
                 </span>
                 <div
-                  className={`vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-lg bg-white py-2 pl-3 ${selectedSide === "B" ? "pr-12" : "pr-[4%]"}`}
+                  className={`vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-lg bg-white py-2 pl-3 ${selectedSide === "B" ? "pr-14" : "pr-[4%]"}`}
                 >
                   <div
-                    className="absolute inset-y-0 left-0 overflow-hidden rounded-r-lg bg-[#e3f2fd]"
+                    className={`absolute inset-y-0 left-0 overflow-hidden bg-[#e3f2fd] ${percentB >= 100 ? "rounded-r-lg" : ""}`}
                     style={{ width: `${percentB}%` }}
                   />
                   <span className="relative z-10 truncate text-sm font-semibold text-[#1F77D4]">
                     {optionB}
                   </span>
-                  <span className={`relative z-10 ml-auto flex shrink-0 items-baseline ${selectedSide === "B" ? "mr-12" : ""}`}>
+                  <span className={`relative z-10 ml-auto flex min-w-[2.5rem] shrink-0 items-baseline justify-end ${selectedSide === "B" ? "mr-5" : ""}`}>
                     <span className="vote-card-percent-number">{percentB}</span>
                     <span className="vote-card-percent-symbol">%</span>
                   </span>
@@ -180,17 +188,26 @@ export default function VoteCardCompact({
           <span className="vote-card-footer-count">{displayTotal}</span>
         </span>
         <span className="flex items-center gap-1" aria-label="コメント数">
-          <img src="/icons/comment.svg" alt="" className="h-4 w-4 scale-110" />
+          {hasCommented ? (
+            <span className="comment-icon-commented h-4 w-4 scale-110" aria-hidden />
+          ) : (
+            <img src="/icons/comment.svg" alt="" className="h-4 w-4 scale-110" />
+          )}
           <span className="vote-card-footer-count">{commentCount}</span>
         </span>
-        <button type="button" className="ml-auto text-gray-400" aria-label="ブックマーク">
+        <button type="button" className="flex items-center justify-center text-gray-400" aria-label="ブックマーク">
           {bookmarked ? (
-            <span className="bookmark-icon-bookmarked h-5 w-5 scale-110" aria-hidden />
+            <span className="bookmark-icon-bookmarked h-[18px] w-[15px]" aria-hidden />
           ) : (
-            <img src="/icons/bookmark.svg" alt="" className="h-5 w-5 scale-110 opacity-40" />
+            <img src="/icons/bookmark.svg" alt="" className="h-[18px] w-[15px] opacity-40" />
           )}
         </button>
-        <button type="button" className="text-gray-400" aria-label="その他">
+        <button
+          type="button"
+          className="ml-auto flex items-center justify-center text-gray-400"
+          aria-label="その他"
+          onClick={() => cardId != null && onMoreClick?.(cardId)}
+        >
           <MoreIcon className="h-5 w-5" />
         </button>
       </div>

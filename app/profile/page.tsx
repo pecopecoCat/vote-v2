@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import BottomNav from "../components/BottomNav";
 import VoteCard from "../components/VoteCard";
-import { getCreatedVotes } from "../data/createdVotes";
+import { getCreatedVotes, deleteCreatedVote } from "../data/createdVotes";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
 import { getAllActivity, getMergedCounts, getCardIdsUserCommentedOn, getActivity, type CardActivity, type VoteComment } from "../data/voteCardActivity";
 import { getFavoriteTags, getFavoriteTagsUpdatedEventName } from "../data/favoriteTags";
@@ -13,6 +13,8 @@ import {
   getCollectionsUpdatedEventName,
   isCardInAnyCollection,
   createCollection,
+  updateCollection,
+  deleteCollection,
   type Collection,
   type CollectionVisibility,
 } from "../data/collections";
@@ -20,6 +22,10 @@ import type { VoteCardData } from "../data/voteCards";
 import type { CurrentUser } from "../components/VoteCard";
 import VoteCardMini from "../components/VoteCardMini";
 import BookmarkCollectionModal from "../components/BookmarkCollectionModal";
+import Button from "../components/Button";
+import CollectionSettingsModal from "../components/CollectionSettingsModal";
+import CollectionOptionsModal from "../components/CollectionOptionsModal";
+import CardOptionsModal from "../components/CardOptionsModal";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   member: "メンバー限定",
@@ -116,6 +122,21 @@ export default function ProfilePage() {
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<null | "all" | string>(null);
   /** ブックマーク先選択モーダルを開くカードID */
   const [modalCardId, setModalCardId] = useState<string | null>(null);
+  const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  /** コレクション設定モーダル（新規追加 or 編集） */
+  const [showCollectionSettings, setShowCollectionSettings] = useState(false);
+  /** 編集中のコレクション（null = 新規追加） */
+  const [editingCollectionForSettings, setEditingCollectionForSettings] = useState<Collection | null>(null);
+  /** 3点リーダーメニューを開いているコレクションID */
+  const [collectionMenuOpenId, setCollectionMenuOpenId] = useState<string | null>(null);
+  /** myVOTE 編集モード（カード削除用） */
+  const [isMyVoteEditMode, setIsMyVoteEditMode] = useState(false);
+  /** 作ったVOTE一覧の再取得用 */
+  const [createdVotesRefreshKey, setCreatedVotesRefreshKey] = useState(0);
+  /** myVOTE 並び順 */
+  const [myVoteSortOrder, setMyVoteSortOrder] = useState<"newest" | "oldest">("newest");
+  /** myVOTE 新着順プルダウン開閉 */
+  const [myVoteSortDropdownOpen, setMyVoteSortDropdownOpen] = useState(false);
 
   useEffect(() => {
     setCollections(getCollections());
@@ -142,7 +163,20 @@ export default function ProfilePage() {
 
   const currentUser: CurrentUser = { type: "sns", name: MOCK_USER.name, iconUrl: MOCK_USER.iconUrl };
 
-  const createdVotes = useMemo(() => (typeof window !== "undefined" ? getCreatedVotes() : []), []);
+  const createdVotesRaw = useMemo(
+    () => (typeof window !== "undefined" ? getCreatedVotes() : []),
+    [createdVotesRefreshKey]
+  );
+  const createdVotes = useMemo(() => {
+    if (myVoteSortOrder === "oldest") {
+      return [...createdVotesRaw].sort((a, b) => {
+        const da = a.createdAt ?? "";
+        const db = b.createdAt ?? "";
+        return da.localeCompare(db);
+      });
+    }
+    return createdVotesRaw;
+  }, [createdVotesRaw, myVoteSortOrder]);
 
   const seedCards = useMemo(
     () => voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` })),
@@ -200,8 +234,11 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="font-bold text-gray-900">{MOCK_USER.name}</p>
-              <p className="text-sm font-bold text-gray-900">
-                {voteCount} VOTE · {collectionCount} COLLECTION
+              <p className="profile-stats-text text-sm font-bold text-gray-900">
+                <span className="text-[16px]">{voteCount}</span>
+                <span className="text-[12px]"> VOTE</span>
+                <span className="text-[16px]"> · {collectionCount}</span>
+                <span className="text-[12px]"> COLLECTION</span>
               </p>
             </div>
           </div>
@@ -233,7 +270,7 @@ export default function ProfilePage() {
               <Link
                 key={tag}
                 href={`/search?tag=${encodeURIComponent(tag)}`}
-                className="shrink-0 rounded-full bg-[#FFEB3B]/80 px-4 py-2 text-sm font-medium text-gray-900"
+                className="profile-favorite-tag shrink-0 rounded-full bg-white/60 px-4 py-2 text-[13px] text-[#191919]"
               >
                 {tag}
               </Link>
@@ -243,37 +280,99 @@ export default function ProfilePage() {
       </div>
 
       {/* タブバー */}
-      <nav className="flex bg-white" aria-label="マイページタブ">
-        {tabLabels.map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setActiveTab(id)}
-            className={`flex flex-1 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-              activeTab === id ? "text-gray-900" : "text-gray-500"
-            }`}
-          >
-            <span className="flex-1" aria-hidden />
-            <span className="relative inline-block">
-              {label}
+      <div className="w-full min-w-0">
+        <nav className="flex w-full bg-white" aria-label="マイページタブ">
+          {tabLabels.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
+                activeTab === id ? "text-gray-900" : "text-gray-500"
+              }`}
+            >
+              <span className="flex-1" aria-hidden />
+              <span className="inline-block">{label}</span>
               {activeTab === id && (
                 <span
-                  className="absolute -bottom-[11.4px] left-0 right-0 h-[3px] w-full bg-[#FFE100]"
+                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
                   aria-hidden
                 />
               )}
-            </span>
-          </button>
-        ))}
-      </nav>
+            </button>
+          ))}
+        </nav>
+      </div>
 
       <main className="mx-auto max-w-lg bg-[#F1F1F1] px-[5.333vw] pb-6 pt-4">
         {activeTab === "myVOTE" && (
           <>
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-bold text-gray-600">新着順</span>
-              <button type="button" className="flex items-center gap-1 text-sm text-gray-700">
-                <ChevronDownIcon className="h-4 w-4 text-[#FFE100]" />
+            <div className="relative mt-5 mb-5 flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm">
+              <div className="relative">
+                <button
+                  type="button"
+                  className="flex items-center gap-2 text-sm font-bold text-gray-600"
+                  aria-haspopup="listbox"
+                  aria-expanded={myVoteSortDropdownOpen}
+                  onClick={() => setMyVoteSortDropdownOpen((o) => !o)}
+                >
+                  {myVoteSortOrder === "newest" ? "新着順" : "古い順"}
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
+                    <img
+                      src="/icons/icon_b_arrow.svg"
+                      alt=""
+                      className="h-2 w-2 shrink-0"
+                      width={8}
+                      height={6}
+                      style={{ transform: "rotate(0deg)" }}
+                    />
+                  </span>
+                </button>
+                {myVoteSortDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      aria-hidden
+                      onClick={() => setMyVoteSortDropdownOpen(false)}
+                    />
+                    <ul
+                      className="absolute left-0 top-full z-20 mt-1 min-w-[120px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                      role="listbox"
+                    >
+                      <li role="option" aria-selected={myVoteSortOrder === "newest"}>
+                        <button
+                          type="button"
+                          className="w-full px-4 py-2 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"
+                          onClick={() => {
+                            setMyVoteSortOrder("newest");
+                            setMyVoteSortDropdownOpen(false);
+                          }}
+                        >
+                          新着順
+                        </button>
+                      </li>
+                      <li role="option" aria-selected={myVoteSortOrder === "oldest"}>
+                        <button
+                          type="button"
+                          className="w-full px-4 py-2 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"
+                          onClick={() => {
+                            setMyVoteSortOrder("oldest");
+                            setMyVoteSortDropdownOpen(false);
+                          }}
+                        >
+                          古い順
+                        </button>
+                      </li>
+                    </ul>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                className={`text-sm font-bold ${isMyVoteEditMode ? "text-blue-600" : "text-gray-700"}`}
+                onClick={() => setIsMyVoteEditMode((prev) => !prev)}
+              >
+                {isMyVoteEditMode ? "完了" : "編集"}
               </button>
             </div>
             {createdVotes.length === 0 ? (
@@ -292,24 +391,44 @@ export default function ProfilePage() {
                     act ?? { countA: 0, countB: 0, comments: [] }
                   );
                   return (
-                    <VoteCard
-                      key={cardId}
-                      backgroundImageUrl={backgroundForCard(card, cardId)}
-                      patternType={card.patternType ?? "yellow-loops"}
-                      question={card.question}
-                      optionA={card.optionA}
-                      optionB={card.optionB}
-                      countA={merged.countA}
-                      countB={merged.countB}
-                      commentCount={merged.commentCount}
-                      tags={card.tags}
-                      readMoreText={card.readMoreText}
-                      creator={card.creator}
-                      currentUser={currentUser}
-                      cardId={cardId}
-                      bookmarked={isCardInAnyCollection(cardId)}
-                      onBookmarkClick={setModalCardId}
-                    />
+                    <div key={cardId} className="relative">
+                      {isMyVoteEditMode && (
+                        <button
+                          type="button"
+                          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white text-blue-600"
+                          style={{ boxShadow: "0 1px 1px rgba(0,0,0,0.15)" }}
+                          aria-label="このVOTEを削除"
+                          onClick={() => {
+                            deleteCreatedVote(cardId);
+                            setCreatedVotesRefreshKey((k) => k + 1);
+                          }}
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                      <VoteCard
+                        backgroundImageUrl={backgroundForCard(card, cardId)}
+                        patternType={card.patternType ?? "yellow-loops"}
+                        question={card.question}
+                        optionA={card.optionA}
+                        optionB={card.optionB}
+                        countA={merged.countA}
+                        countB={merged.countB}
+                        commentCount={merged.commentCount}
+                        tags={card.tags}
+                        readMoreText={card.readMoreText}
+                        creator={card.creator}
+                        currentUser={currentUser}
+                        cardId={cardId}
+                        bookmarked={isCardInAnyCollection(cardId)}
+                        hasCommented={commentedCardIds.includes(cardId)}
+                        onBookmarkClick={setModalCardId}
+                        onMoreClick={setCardOptionsCardId}
+                        visibility={card.visibility}
+                      />
+                    </div>
                   );
                 })}
               </div>
@@ -356,7 +475,10 @@ export default function ProfilePage() {
                       cardId={cardId}
                       initialSelectedOption={act?.userSelectedOption ?? null}
                       bookmarked={isCardInAnyCollection(cardId)}
+                      hasCommented={commentedCardIds.includes(cardId)}
                       onBookmarkClick={setModalCardId}
+                      onMoreClick={setCardOptionsCardId}
+                      visibility={card.visibility}
                     />
                   );
                 })}
@@ -370,55 +492,61 @@ export default function ProfilePage() {
             {selectedBookmarkId == null ? (
               /* Bookmark TOP: コレクションリスト */
               <div className="flex flex-col gap-0">
-                {/* ALL 行 */}
+                {/* ALL 行（ドロップシャドウなし） */}
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm"
+                  className="flex w-full items-center rounded-xl bg-white px-4 py-3"
                   onClick={() => setSelectedBookmarkId("all")}
                 >
                   <span className="text-sm font-bold text-gray-900">ALL</span>
-                  <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
-                  </svg>
                 </button>
                 <p className="mb-2 mt-3 text-sm font-bold text-gray-900">コレクション</p>
                 <div className="flex flex-col gap-2">
                   {collections.map((col) => (
-                    <button
+                    <div
                       key={col.id}
-                      type="button"
-                      className="flex w-full items-center gap-3 rounded-xl bg-white px-4 py-3 text-left shadow-sm"
-                      onClick={() => setSelectedBookmarkId(col.id)}
+                      className="flex w-full items-center gap-3 rounded-xl bg-white px-4 py-3"
                     >
-                      <span
-                        className="h-10 w-10 shrink-0 rounded-full"
-                        style={{ backgroundColor: col.color }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-[#191919]">{col.name}</p>
-                        <p className="text-xs text-gray-500">
-                          登録数 {col.cardIds.length}件 · {VISIBILITY_LABEL[col.visibility]}
-                        </p>
-                      </div>
-                      <svg className="h-5 w-5 shrink-0 text-gray-400" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-                        <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
-                      </svg>
-                    </button>
+                      <Link
+                        href={`/collection/${col.id}`}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <span
+                          className="h-10 w-10 shrink-0 rounded-full"
+                          style={{ backgroundColor: col.color }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-[#191919]">{col.name}</p>
+                          <p className="text-xs text-gray-500">
+                            登録数 {col.cardIds.length}件 · {VISIBILITY_LABEL[col.visibility]}
+                          </p>
+                        </div>
+                      </Link>
+                      <button
+                        type="button"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center text-[#666666]"
+                        aria-label="コレクションの設定"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setCollectionMenuOpenId(col.id);
+                        }}
+                      >
+                        <img src="/icons/icon_3ten.svg" alt="" className="h-6 w-6" width={24} height={24} />
+                      </button>
+                    </div>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  className="mt-4 w-full rounded-xl border border-gray-200 bg-white py-3 text-sm font-bold text-gray-900"
+                <Button
+                  variant="outline"
+                  className="mt-4 w-full"
                   onClick={() => {
-                    const name = window.prompt("コレクション名");
-                    if (name != null && name.trim()) {
-                      createCollection(name.trim());
-                      setCollections(getCollections());
-                    }
+                    setEditingCollectionForSettings(null);
+                    setShowCollectionSettings(true);
                   }}
                 >
                   新しいコレクションを追加
-                </button>
+                </Button>
               </div>
             ) : (
               /* コレクション or ALL 選択時: カード一覧 */
@@ -480,7 +608,10 @@ export default function ProfilePage() {
                             currentUser={currentUser}
                             cardId={cardId}
                             bookmarked={isCardInAnyCollection(cardId)}
+                            hasCommented={commentedCardIds.includes(cardId)}
                             onBookmarkClick={setModalCardId}
+                            onMoreClick={setCardOptionsCardId}
+                            visibility={card.visibility}
                           />
                         );
                       })}
@@ -525,6 +656,7 @@ export default function ProfilePage() {
                           commentCount={merged.commentCount}
                           selectedSide={act.userSelectedOption}
                           userIconUrl={currentUser.iconUrl ?? "/default-avatar.png"}
+                          hasCommented
                         />
                         <div className="border-t border-gray-100 px-[5.333vw] py-3">
                           {myComments.map((comment) => (
@@ -548,6 +680,52 @@ export default function ProfilePage() {
           cardId={modalCardId}
           onClose={() => setModalCardId(null)}
           onCollectionsUpdated={() => setCollections(getCollections())}
+        />
+      )}
+
+      {cardOptionsCardId != null && (
+        <CardOptionsModal
+          cardId={cardOptionsCardId}
+          onClose={() => setCardOptionsCardId(null)}
+        />
+      )}
+
+      {collectionMenuOpenId != null && (
+        <CollectionOptionsModal
+          onClose={() => setCollectionMenuOpenId(null)}
+          onEdit={() => {
+            const col = collections.find((c) => c.id === collectionMenuOpenId);
+            if (col) {
+              setEditingCollectionForSettings(col);
+              setShowCollectionSettings(true);
+            }
+            setCollectionMenuOpenId(null);
+          }}
+          onDelete={() => {
+            deleteCollection(collectionMenuOpenId);
+            setCollections(getCollections());
+            setCollectionMenuOpenId(null);
+          }}
+        />
+      )}
+
+      {showCollectionSettings && (
+        <CollectionSettingsModal
+          editingCollection={editingCollectionForSettings}
+          onClose={() => {
+            setShowCollectionSettings(false);
+            setEditingCollectionForSettings(null);
+          }}
+          onSave={(name, color, visibility) => {
+            if (editingCollectionForSettings) {
+              updateCollection(editingCollectionForSettings.id, { name, color, visibility });
+            } else {
+              createCollection(name, { color, visibility });
+            }
+            setCollections(getCollections());
+            setShowCollectionSettings(false);
+            setEditingCollectionForSettings(null);
+          }}
         />
       )}
     </div>

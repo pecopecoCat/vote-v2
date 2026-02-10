@@ -4,8 +4,9 @@
 export type ActivityType =
   | "created"              // 2択作成した
   | "voted"                // 投票した
+  | "commented"            // コメントした
   | "voted_on_mine"        // 作成した2択に投票された
-  | "comment_on_mine"      // 作成した2択にコメントが来た
+  | "comment_on_mine"     // 作成した2択にコメントが来た
   | "comment_on_commented" // 自分がコメントした2択にコメントが来た
   | "period_ended";        // 投票期間が終わった
 
@@ -24,6 +25,7 @@ export interface ActivityItem {
 export const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {
   created: "2択を作成しました",
   voted: "投票しました",
+  commented: "コメントしました",
   voted_on_mine: "作成した2択に投票されました",
   comment_on_mine: "作成した2択にコメントが届きました",
   comment_on_commented: "コメントした2択にコメントが届きました",

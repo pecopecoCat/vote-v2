@@ -7,6 +7,8 @@ import AppHeader from "../components/AppHeader";
 import CollectionCard from "../components/CollectionCard";
 import RecommendedTags from "../components/RecommendedTags";
 import VoteCard from "../components/VoteCard";
+import CardOptionsModal from "../components/CardOptionsModal";
+import TagMenuModal, { type TagMenuVariant } from "../components/TagMenuModal";
 import Checkbox from "../components/Checkbox";
 import BottomNav from "../components/BottomNav";
 import type { CurrentUser } from "../components/VoteCard";
@@ -21,19 +23,38 @@ import {
   getAllActivity,
   addVote as persistVote,
   getMergedCounts,
+  getCardIdsUserCommentedOn,
   type CardActivity,
 } from "../data/voteCardActivity";
 import {
   getFavoriteTags,
   toggleFavoriteTag,
   isFavoriteTag,
+  getFavoriteTagsUpdatedEventName,
 } from "../data/favoriteTags";
+import { isHiddenTag } from "../data/hiddenTags";
+import {
+  getCollections,
+  getPinnedCollectionIds,
+  PINNED_UPDATED_EVENT,
+} from "../data/collections";
 import {
   trendingTags,
   popularCollections,
   searchTags,
   searchCollections,
+  type CollectionGradient,
 } from "../data/search";
+
+/** ピン留めコレクション用グラデーションのローテーション（検索画面はグラデーション表示に統一） */
+const PINNED_GRADIENTS: CollectionGradient[] = [
+  "blue-cyan",
+  "pink-purple",
+  "purple-pink",
+  "orange-yellow",
+  "green-yellow",
+  "cyan-aqua",
+];
 
 const demoCurrentUser: CurrentUser = { type: "guest" };
 
@@ -58,9 +79,13 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 function TagRow({
   tag,
   count,
+  variant,
+  onMenuClick,
 }: {
   tag: string;
   count: number;
+  variant: TagMenuVariant;
+  onMenuClick?: (tag: string, variant: TagMenuVariant) => void;
 }) {
   return (
     <Link
@@ -75,7 +100,11 @@ function TagRow({
         type="button"
         className="shrink-0 p-1 text-gray-400 hover:text-gray-600"
         aria-label="メニュー"
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onMenuClick?.(tag, variant);
+        }}
       >
         <EllipsisIcon className="h-5 w-5" />
       </button>
@@ -99,6 +128,9 @@ function SearchContent() {
   const [showVoted, setShowVoted] = useState(true);
   const [activity, setActivity] = useState<Record<string, CardActivity>>({});
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
+  const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [tagMenu, setTagMenu] = useState<{ tag: string; variant: TagMenuVariant } | null>(null);
+  const [hiddenTagsVersion, setHiddenTagsVersion] = useState(0);
 
   useEffect(() => {
     setActivity(getAllActivity());
@@ -106,6 +138,10 @@ function SearchContent() {
 
   useEffect(() => {
     setFavoriteTags(getFavoriteTags());
+    const eventName = getFavoriteTagsUpdatedEventName();
+    const handler = () => setFavoriteTags(getFavoriteTags());
+    window.addEventListener(eventName, handler);
+    return () => window.removeEventListener(eventName, handler);
   }, []);
 
   /** ハッシュタグタップで開いたとき（?tag=xxx）→ 従来のカード一覧。虫眼鏡タップ（/search）→ 新しい検索画面 */
@@ -121,9 +157,34 @@ function SearchContent() {
   const matchedTags = useMemo(() => searchTags(query), [query]);
   const matchedCollections = useMemo(() => searchCollections(query), [query]);
 
+  /** 注目タグ（興味がないで非表示にしたタグを除く） */
+  const displayedTrendingTags = useMemo(
+    () => trendingTags.filter((t) => !isHiddenTag(t.tag)),
+    [hiddenTagsVersion]
+  );
+
   const filteredCards = useMemo(
     () => filterCardsByTag(voteCardsData, isTagFilterView ? tagFromUrl : null),
     [isTagFilterView, tagFromUrl]
+  );
+  const commentedCardIds = useMemo(() => getCardIdsUserCommentedOn(), [activity]);
+  const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
+  const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
+  useEffect(() => {
+    setPinnedCollectionIds(getPinnedCollectionIds());
+    setCollections(getCollections());
+  }, []);
+  useEffect(() => {
+    const handler = () => {
+      setPinnedCollectionIds(getPinnedCollectionIds());
+      setCollections(getCollections());
+    };
+    window.addEventListener(PINNED_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(PINNED_UPDATED_EVENT, handler);
+  }, []);
+  const pinnedCollections = useMemo(
+    () => collections.filter((c) => pinnedCollectionIds.includes(c.id)),
+    [collections, pinnedCollectionIds]
   );
   /** ON: 全カード表示（投票済み含む） / OFF: ユーザーが投票していないカードのみ */
   const cardsToShow = useMemo(() => {
@@ -228,8 +289,11 @@ function SearchContent() {
                       creator={card.creator}
                       currentUser={demoCurrentUser}
                       cardId={cardId}
+                      hasCommented={commentedCardIds.includes(cardId)}
                       initialSelectedOption={act?.userSelectedOption ?? null}
                       onVote={handleVote}
+                      onMoreClick={setCardOptionsCardId}
+                      visibility={card.visibility}
                     />
                   );
                 })
@@ -252,46 +316,48 @@ function SearchContent() {
           {/* タブ：注目タグ / お気に入りタグ（お知らせページと同じデザイン・黄バー下50pxでグレーライン） */}
           {!isSearching && (
             <>
-              <nav className="flex bg-white" aria-label="検索タブ">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("trending")}
-                  className={`flex flex-1 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-                    activeTab === "trending" ? "text-gray-900" : "text-gray-500"
-                  }`}
-                >
-                  <span className="flex-1" aria-hidden />
-                  <span className="relative inline-flex items-center justify-center gap-1">
-                    <img src="/icons/icon_chumoku.svg" alt="" className="h-[9px] w-[18px]" width={18} height={9} />
-                    注目タグ
+              <div className="w-full min-w-0">
+                <nav className="flex w-full bg-white" aria-label="検索タブ">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("trending")}
+                    className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
+                      activeTab === "trending" ? "text-gray-900" : "text-gray-500"
+                    }`}
+                  >
+                    <span className="flex-1" aria-hidden />
+                    <span className="inline-flex items-center justify-center gap-1">
+                      <img src="/icons/icon_chumoku.svg" alt="" className="h-[9px] w-[18px] shrink-0" width={18} height={9} />
+                      注目タグ
+                    </span>
                     {activeTab === "trending" && (
                       <span
-                        className="absolute -bottom-[11.4px] left-0 right-0 h-[3px] w-full bg-[#FFE100]"
+                        className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
                         aria-hidden
                       />
                     )}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("favorite")}
-                  className={`flex flex-1 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-                    activeTab === "favorite" ? "text-gray-900" : "text-gray-500"
-                  }`}
-                >
-                  <span className="flex-1" aria-hidden />
-                  <span className="relative inline-flex items-center justify-center gap-1">
-                    <HeartIcon className="h-4 w-4" />
-                    お気に入りタグ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("favorite")}
+                    className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
+                      activeTab === "favorite" ? "text-gray-900" : "text-gray-500"
+                    }`}
+                  >
+                    <span className="flex-1" aria-hidden />
+                    <span className="inline-flex items-center justify-center gap-1">
+                      <HeartIcon className="h-4 w-4 shrink-0" />
+                      お気に入りタグ
+                    </span>
                     {activeTab === "favorite" && (
                       <span
-                        className="absolute -bottom-[11.4px] left-0 right-0 h-[3px] w-full bg-[#FFE100]"
+                        className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
                         aria-hidden
                       />
                     )}
-                  </span>
-                </button>
-              </nav>
+                  </button>
+                </nav>
+              </div>
               {/* 黄バーのすぐ下にグレーライン（余白なし） */}
               <div className="h-px bg-[#E5E7EB]" aria-hidden />
             </>
@@ -304,12 +370,18 @@ function SearchContent() {
             {activeTab === "trending" && (
               <section className="border-b border-gray-200 pt-2.5">
                 <div className="px-[5.333vw]">
-                  {trendingTags.length === 0 ? (
+                  {displayedTrendingTags.length === 0 ? (
                     <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
                   ) : (
                     <>
-                      {trendingTags.slice(0, 8).map((t) => (
-                        <TagRow key={t.tag} tag={t.tag} count={t.count} />
+                      {displayedTrendingTags.slice(0, 8).map((t) => (
+                        <TagRow
+                          key={t.tag}
+                          tag={t.tag}
+                          count={t.count}
+                          variant="trending"
+                          onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
+                        />
                       ))}
                       <div className="mb-[50px] flex justify-center pb-3 pt-3">
                         <button
@@ -342,14 +414,20 @@ function SearchContent() {
                       }))
                       .sort((a, b) => b.count - a.count)
                       .map(({ tag, count }) => (
-                        <TagRow key={tag} tag={tag} count={count} />
+                        <TagRow
+                          key={tag}
+                          tag={tag}
+                          count={count}
+                          variant="favorite"
+                          onMenuClick={(t, variant) => setTagMenu({ tag: t, variant })}
+                        />
                       ))
                   )}
                 </div>
               </section>
             )}
 
-            {/* 人気コレクション（グレーライン・18px左よせ・font-black・上マージン150%） */}
+            {/* コレクション（ピン留め＝ブックマークのコレクション・人気コレクション） */}
             <section>
               <div className="border-t border-gray-200 px-[5.333vw] pt-6">
                 <h2 className="text-left text-[18px] font-black text-gray-900">
@@ -357,6 +435,17 @@ function SearchContent() {
                 </h2>
               </div>
               <div className="flex flex-col gap-3 px-[5.333vw] pb-2 pt-4">
+                {/* ピン留めしたコレクション（検索画面ではグラデーション表示に統一） */}
+                {pinnedCollections.map((col, i) => (
+                  <CollectionCard
+                    key={col.id}
+                    id={col.id}
+                    title={col.name}
+                    gradient={PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
+                    showPin
+                    href={`/collection/${col.id}`}
+                  />
+                ))}
                 {popularCollections.map((col) => (
                   <CollectionCard
                     key={col.id}
@@ -380,7 +469,13 @@ function SearchContent() {
                   <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
                 ) : (
                   matchedTags.map((t) => (
-                    <TagRow key={t.tag} tag={t.tag} count={t.count} />
+                    <TagRow
+                      key={t.tag}
+                      tag={t.tag}
+                      count={t.count}
+                      variant="trending"
+                      onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
+                    />
                   ))
                 )}
               </div>
@@ -412,6 +507,23 @@ function SearchContent() {
 
           <BottomNav activeId="search" />
         </>
+      )}
+
+      {cardOptionsCardId != null && (
+        <CardOptionsModal
+          cardId={cardOptionsCardId}
+          onClose={() => setCardOptionsCardId(null)}
+        />
+      )}
+
+      {tagMenu != null && (
+        <TagMenuModal
+          tag={tagMenu.tag}
+          variant={tagMenu.variant}
+          onClose={() => setTagMenu(null)}
+          onHiddenTagsUpdated={() => setHiddenTagsVersion((v) => v + 1)}
+          onFavoriteTagsUpdated={() => setFavoriteTags(getFavoriteTags())}
+        />
       )}
     </div>
   );
