@@ -88,3 +88,16 @@ export function removeBookmark(cardId: string): void {
 export function getBookmarksUpdatedEventName(): string {
   return EVENT_NAME;
 }
+
+/** user1 と user2 のブックマークを空にリセット（コレクションクリア時と連動） */
+export function resetUser1AndUser2Bookmarks(): void {
+  if (typeof window === "undefined") return;
+  try {
+    for (const userId of ["user1", "user2"]) {
+      window.localStorage.removeItem(STORAGE_KEY_PREFIX + userId);
+    }
+    window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  } catch {
+    // ignore
+  }
+}

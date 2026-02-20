@@ -44,6 +44,30 @@ export const voteCardsData: VoteCardData[] = [
       "学校の授業が面白くないけど、まぁ友達と会えるのはいいかな。。。って感じだけど、みんなはどう思う？私的には給食の方が楽だし、栄養も考えられてるからいいと思うんだけどなー。",
   },
   {
+    patternType: "geometric-stripes",
+    backgroundImageUrl: "/backgrounds/bg_01.png",
+    question: "1ヶ月前離婚したばかりで再婚が決まりました。SNSでの再婚報告はあり？なし？",
+    optionA: "あり",
+    optionB: "なし",
+    countA: 20,
+    countB: 10,
+    commentCount: 0,
+    tags: ["相談", "結婚", "再婚"],
+    readMoreText:
+      "ちょっと言いづらいんだけどね。でも報告した方がいっかな？って。。",
+  },
+  {
+    patternType: "yellow-loops",
+    backgroundImageUrl: "/backgrounds/bg_02.png",
+    question: "旦那が家の合鍵を義母に渡してた。相談なく。",
+    optionA: "もやる",
+    optionB: "別に",
+    countA: 82,
+    countB: 55,
+    commentCount: 0,
+    tags: ["相談", "旦那", "義母"],
+  },
+  {
     patternType: "yellow-loops",
     backgroundImageUrl: "/backgrounds/bg_02.png",
     question: "10円パンって10円だと思ってなかった？",
@@ -65,6 +89,30 @@ export const voteCardsData: VoteCardData[] = [
     countB: 0,
     commentCount: 32,
     tags: ["ママ"],
+  },
+  {
+    patternType: "pink-blue",
+    backgroundImageUrl: "/backgrounds/bg_03.png",
+    question:
+      "女に好かれる女ってどっち？",
+    optionA: "目立たない人",
+    optionB: "人によって態度を変えない人!!",
+    countA: 20,
+    countB: 60,
+    commentCount: 0,
+    tags: ["女","性格"],
+  },
+  {
+    patternType: "pink-blue",
+    backgroundImageUrl: "/backgrounds/bg_03.png",
+    question:
+      "旅行って",
+    optionA: "宿重視",
+    optionB: "観光重視!!",
+    countA: 10,
+    countB: 20,
+    commentCount: 0,
+    tags: ["旅行","旅館","ホテル","観光"],
   },
   {
     patternType: "blue-cyan",
@@ -109,6 +157,17 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["ママ", "ママ友"],
   },
   {
+    patternType: "geometric-stripes",
+    backgroundImageUrl: "/backgrounds/bg_04.png",
+    question: "彼氏に1ヶ月で5キロ痩せないと別れるって言われました🥺みなさんならどちらを実施しますか？？",
+    optionA: "1日置きのファスティング",
+    optionB: "毎日10kmのランニング",
+    countA: 40,
+    countB: 20,
+    commentCount: 0,
+    tags: ["恋愛", "彼氏"],
+  },
+  {
     patternType: "pink-blue",
     backgroundImageUrl: "/backgrounds/bg_03.png",
     question: "コストコスイーツ、マストは?",
@@ -143,7 +202,68 @@ export const voteCardsData: VoteCardData[] = [
     commentCount: 36,
     tags: ["ママ", "ママ友"],
   },
+  {
+    patternType: "geometric-stripes",
+    backgroundImageUrl: "/backgrounds/bg_03.png",
+    question:
+      "付き合いたいのは？",
+    optionA: "見た目がタイプだけど性格が最悪",
+    optionB: "見た目は受け付けないけど性格が最高",
+    countA: 20,
+    countB: 20,
+    commentCount: 0,
+    tags: ["恋愛", "顔が好き"],
+  },
+  {
+    patternType: "geometric-stripes",
+    backgroundImageUrl: "/backgrounds/bg_03.png",
+    question:
+      "パピコはんぶんこ、どっちとしたい？",
+    optionA: "中村倫也",
+    optionB: "松坂桃李",
+    countA: 48,
+    countB: 51,
+    commentCount: 0,
+    tags: ["妄想", "中村倫也","松坂桃李"],
+  },
+  {
+    patternType: "geometric-stripes",
+    backgroundImageUrl: "/backgrounds/bg_03.png",
+    question:
+      "芸能人の不倫は…",
+    optionA: "不倫は悪！とことん追求してほしい！",
+    optionB: "自分には1ミリも関係ないのでどうでもいい😚",
+    countA: 1,
+    countB: 60,
+    commentCount: 0,
+    tags: ["芸能人", "不倫"],
+  },
+  {
+    patternType: "geometric-stripes",
+    backgroundImageUrl: "/backgrounds/bg_03.png",
+    question:
+      "もう見たくない不倫芸能人は、どっち？",
+    optionA: "渡部 建",
+    optionB: "斉藤 慎二",
+    countA: 25,
+    countB: 75,
+    commentCount: 0,
+    tags: ["芸能人", "不倫"],
+  },
+  {
+    patternType: "geometric-stripes",
+    backgroundImageUrl: "/backgrounds/bg_03.png",
+    question:
+      "憧れの芸能人と一夏の恋か、自分を大切にしてくれる人との幸せな恋、どっちを選ぶ？",
+    optionA: "憧れの芸能人と一夏の恋",
+    optionB: "自分を大切にしてくれる人と幸せな恋",
+    countA: 38,
+    countB: 61,
+    commentCount: 0,
+    tags: ["芸能人", "恋","妄想"],
+  },
 ];
+
 
 export function getVoteCardById(id: string): VoteCardData | null {
   const index = parseInt(id, 10);

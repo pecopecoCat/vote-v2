@@ -76,6 +76,34 @@ function save(userId: string, collections: Collection[]): void {
   }
 }
 
+/** テストサイトuser以外が登録したコレクション（人気コレクション用・全員に表示） */
+export const OTHER_USERS_COLLECTIONS: Collection[] = [
+  { id: "other-1", name: "ここだけで聞いてみたい、相談VOTE", color: "#FF6389", gradient: "pink-purple", visibility: "public", cardIds: ["seed-1", "seed-2", "seed-5"] },
+  { id: "other-2", name: "やっぱりこれ！定番の2択", color: "#707FED", gradient: "blue-cyan", visibility: "public", cardIds: ["seed-3", "seed-6", "seed-7", "seed-13"] },
+  { id: "other-3", name: "推しを比べる2択", color: "#FF8B8B", gradient: "purple-pink", visibility: "public", cardIds: ["seed-16", "seed-17", "seed-18", "seed-19"] },
+  { id: "other-4", name: "妄想2択", color: "#FF4B28", gradient: "orange-yellow", visibility: "public", cardIds: ["seed-16", "seed-19"] },
+  { id: "other-5", name: "グルメな2択", color: "#DDEDA0", gradient: "green-yellow", visibility: "public", cardIds: ["seed-0", "seed-3", "seed-8", "seed-12"] },
+  { id: "other-6", name: "恋愛迷子たちの駆け込み2択", color: "#CA76E8", gradient: "cyan-aqua", visibility: "public", cardIds: ["seed-11", "seed-15", "seed-19"] },
+  { id: "other-7", name: "⚠️パパ閲覧注意！ママ限定2択", color: "#FC47F5", gradient: "pink-purple", visibility: "public", cardIds: ["seed-2", "seed-4", "seed-9", "seed-10", "seed-14"] },
+];
+
+/** 他ユーザーのコレクション一覧を取得 */
+export function getOtherUsersCollections(): Collection[] {
+  return OTHER_USERS_COLLECTIONS;
+}
+
+/** IDでコレクションを取得（自コレクション優先、なければ他ユーザー分） */
+export function getCollectionById(id: string): Collection | null {
+  const mine = load(getCurrentActivityUserId()).find((c) => c.id === id);
+  if (mine) return mine;
+  return OTHER_USERS_COLLECTIONS.find((c) => c.id === id) ?? null;
+}
+
+/** コレクションが他ユーザー作成か */
+export function isOtherUsersCollection(collectionId: string): boolean {
+  return OTHER_USERS_COLLECTIONS.some((c) => c.id === collectionId);
+}
+
 /** 現在のユーザーが作ったコレクション一覧を取得（マイページで表示する用） */
 export function getCollections(): Collection[] {
   return load(getCurrentActivityUserId());

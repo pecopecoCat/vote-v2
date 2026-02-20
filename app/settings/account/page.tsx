@@ -101,15 +101,15 @@ export default function AccountSettingsPage() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#D9D9D9] hover:opacity-90"
+              className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#191919] text-white hover:opacity-90"
               aria-label="写真をアップロード"
             >
               <span
                 className="block h-5 w-5 shrink-0"
                 style={{
-                  backgroundColor: "#787878",
-                  mask: "url(/icons/icon_photo.svg) no-repeat center/contain",
-                  WebkitMask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+                  backgroundColor: "#ffffff",
+                  mask: "url(/icons/icon_camera.svg) no-repeat center/contain",
+                  WebkitMask: "url(/icons/icon_camera.svg) no-repeat center/contain",
                 }}
               />
             </button>

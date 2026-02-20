@@ -28,7 +28,7 @@ import {
   type CardActivity,
 } from "./data/voteCardActivity";
 import { getCollections, getCollectionsUpdatedEventName, resetUser1AndUser2Collections } from "./data/collections";
-import { getBookmarkIds, getBookmarksUpdatedEventName } from "./data/bookmarks";
+import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
 import { getAuth, getAuthUpdatedEventName } from "./data/auth";
 import { popularCollections, type CollectionGradient } from "./data/search";
 
@@ -129,8 +129,8 @@ function buildTimelineItems(cards: VoteCardData[]): TimelineItem[] {
 }
 
 const RESET_VOTE_COUNTS_FLAG = "vote_counts_reset_v1";
-/** 一度だけ user1/user2 のコレクションを空にする。以降は登録を保持（二度とリセットしない） */
-const RESET_COLLECTIONS_FLAG = "vote_collections_reset_v2";
+/** 一度だけ user1/user2 のコレクション・ブックマークを空にする。以降は登録を保持（二度とリセットしない） */
+const RESET_COLLECTIONS_FLAG = "vote_collections_reset_v3";
 
 function ensureVoteCountsResetOnce(): void {
   if (typeof window === "undefined") return;
@@ -143,6 +143,7 @@ function ensureUser1User2CollectionsResetOnce(): void {
   if (typeof window === "undefined") return;
   if (window.localStorage.getItem(RESET_COLLECTIONS_FLAG)) return;
   resetUser1AndUser2Collections();
+  resetUser1AndUser2Bookmarks();
   window.localStorage.setItem(RESET_COLLECTIONS_FLAG, "1");
 }
 

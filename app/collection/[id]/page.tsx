@@ -9,9 +9,11 @@ import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import BottomNav from "../../components/BottomNav";
 import Checkbox from "../../components/Checkbox";
 import {
+  getCollectionById,
   getCollections,
   getCollectionsUpdatedEventName,
   getPinnedCollectionIds,
+  isOtherUsersCollection,
   togglePinnedCollection,
   type Collection,
   type CollectionVisibility,
@@ -61,14 +63,6 @@ function backgroundForCard(card: VoteCardData, cardId: string): string {
   return CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
 }
 
-function ChevronDownIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path d="M7 10l5 5 5-5H7z" />
-    </svg>
-  );
-}
-
 export default function CollectionPage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
@@ -113,7 +107,7 @@ export default function CollectionPage() {
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
-  const collection = useMemo(() => collections.find((c) => c.id === id) ?? null, [collections, id]);
+  const collection = useMemo(() => getCollectionById(id), [id, collections]);
   const isPinned = pinnedIds.includes(id);
   const commentedCardIds = useMemo(() => getCardIdsUserCommentedOn(), [activity]);
 
@@ -158,7 +152,7 @@ export default function CollectionPage() {
         style={collection.gradient ? undefined : { backgroundColor: collection.color }}
       >
         <Link
-          href="/profile"
+          href={isOtherUsersCollection(id) ? "/search" : "/profile"}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/90 text-gray-900"
           aria-label="戻る"
         >
@@ -192,14 +186,22 @@ export default function CollectionPage() {
           {collection.visibility !== "public" && ` · ${VISIBILITY_LABEL[collection.visibility]}`}
         </p>
 
-        {/* 新着順・投票済みを表示 */}
-        <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+        {/* 新着順・投票済みを表示（mypageのmyVOTEタブと同じ見た目） */}
+        <div className="mt-3 flex items-center justify-between">
           <button
             type="button"
-            className="flex items-center gap-1 text-sm font-bold text-gray-700"
+            className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-gray-900 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
           >
             新着順
-            <ChevronDownIcon className="h-4 w-4 text-[#FFE100]" />
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
+              <img
+                src="/icons/icon_b_arrow.svg"
+                alt=""
+                className="h-2.5 w-2.5 shrink-0"
+                width={10}
+                height={8}
+              />
+            </span>
           </button>
           <Checkbox
             checked={showVoted}

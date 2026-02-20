@@ -37,14 +37,15 @@ import {
 import { isHiddenTag } from "../data/hiddenTags";
 import {
   getCollections,
+  getOtherUsersCollections,
   getPinnedCollectionIds,
+  getCollectionsUpdatedEventName,
   PINNED_UPDATED_EVENT,
 } from "../data/collections";
 import { isCardBookmarked } from "../data/bookmarks";
 import { getAuth, getAuthUpdatedEventName } from "../data/auth";
 import {
   getTrendingTagsByScore,
-  popularCollections,
   searchCollections,
   type CollectionGradient,
 } from "../data/search";
@@ -146,10 +147,14 @@ function SearchContent() {
     setAuth(getAuth());
     setActivity(getAllActivity());
     setFavoriteTags(getFavoriteTags());
+    setCollections(getCollections());
+    setPinnedCollectionIds(getPinnedCollectionIds());
     const handler = () => {
       setAuth(getAuth());
       setActivity(getAllActivity());
       setFavoriteTags(getFavoriteTags());
+      setCollections(getCollections());
+      setPinnedCollectionIds(getPinnedCollectionIds());
     };
     window.addEventListener(getAuthUpdatedEventName(), handler);
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
@@ -223,12 +228,12 @@ function SearchContent() {
       setCollections(getCollections());
     };
     window.addEventListener(PINNED_UPDATED_EVENT, handler);
-    return () => window.removeEventListener(PINNED_UPDATED_EVENT, handler);
+    window.addEventListener(getCollectionsUpdatedEventName(), handler);
+    return () => {
+      window.removeEventListener(PINNED_UPDATED_EVENT, handler);
+      window.removeEventListener(getCollectionsUpdatedEventName(), handler);
+    };
   }, []);
-  const pinnedCollections = useMemo(
-    () => collections.filter((c) => pinnedCollectionIds.includes(c.id)),
-    [collections, pinnedCollectionIds]
-  );
   /** ON: 全カード表示（投票済み含む） / OFF: ユーザーが投票していないカードのみ */
   const cardsToShow = useMemo(() => {
     if (showVoted) return filteredCards;
@@ -491,7 +496,7 @@ function SearchContent() {
               </section>
             )}
 
-            {/* コレクション（ピン留め＝ブックマークのコレクション・人気コレクション） */}
+            {/* コレクション（他ユーザー登録分＋自分のコレクション） */}
             <section>
               <div className="border-t border-gray-200 px-[5.333vw] pt-6">
                 <h2 className="text-left text-[18px] font-black text-gray-900">
@@ -499,27 +504,31 @@ function SearchContent() {
                 </h2>
               </div>
               <div className="flex flex-col gap-3 px-[5.333vw] pb-2 pt-4">
-                {/* ピン留めしたコレクション（検索画面ではグラデーション表示に統一） */}
-                {pinnedCollections.map((col, i) => (
+                {getOtherUsersCollections().map((col, i) => (
                   <CollectionCard
                     key={col.id}
                     id={col.id}
                     title={col.name}
                     gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
-                    showPin
+                    showPin={pinnedCollectionIds.includes(col.id)}
                     href={`/collection/${col.id}`}
                   />
                 ))}
-                {popularCollections.map((col) => (
+                {collections.map((col, i) => (
                   <CollectionCard
                     key={col.id}
                     id={col.id}
-                    title={col.title}
-                    gradient={col.gradient}
-                    showPin={col.showPin}
+                    title={col.name}
+                    gradient={col.gradient ?? PINNED_GRADIENTS[(getOtherUsersCollections().length + i) % PINNED_GRADIENTS.length]}
+                    showPin={pinnedCollectionIds.includes(col.id)}
                     href={`/collection/${col.id}`}
                   />
                 ))}
+                {getOtherUsersCollections().length === 0 && collections.length === 0 && (
+                  <p className="py-6 text-center text-sm text-gray-500">
+                    {isLoggedIn ? "コレクションがありません。マイページで作成しよう。" : "ログインするとコレクションを表示できます。"}
+                  </p>
+                )}
               </div>
             </section>
           </>
