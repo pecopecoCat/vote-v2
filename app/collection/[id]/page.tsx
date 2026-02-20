@@ -258,7 +258,7 @@ export default function CollectionPage() {
         )}
       </main>
 
-      <BottomNav activeId="mypage" />
+      <BottomNav activeId="profile" />
 
       {cardOptionsCardId != null && (
         <CardOptionsModal
