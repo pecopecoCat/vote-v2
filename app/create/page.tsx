@@ -6,6 +6,7 @@ import AppHeader from "../components/AppHeader";
 import BottomNav from "../components/BottomNav";
 import { voteCardsData } from "../data/voteCards";
 import { getCreatedVotes } from "../data/createdVotes";
+import { getAuth } from "../data/auth";
 
 const QUESTION_MAX = 80;
 const RELATED_TOPICS_LIMIT = 5;
@@ -73,6 +74,13 @@ export default function CreateQuestionPage() {
     });
     setAllCards(merged);
   }, []);
+
+  /** ログイン後のみVOTEを作成可能。ログイン後はこの画面へ戻す */
+  useEffect(() => {
+    if (!getAuth().isLoggedIn) {
+      router.replace("/profile?returnTo=" + encodeURIComponent("/create"));
+    }
+  }, [router]);
 
   const relatedTopics = useMemo(
     () => getRelatedTopicsFromInput(question, allCards, RELATED_TOPICS_LIMIT),

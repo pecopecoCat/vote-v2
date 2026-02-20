@@ -9,6 +9,7 @@ import {
   MOCK_ANNOUNCEMENTS,
   type ActivityItem,
 } from "../data/notifications";
+import { getAuth, getAuthUpdatedEventName } from "../data/auth";
 import { getCreatedVotes } from "../data/createdVotes";
 import { getAllActivity } from "../data/voteCardActivity";
 import { voteCardsData } from "../data/voteCards";
@@ -95,12 +96,21 @@ function buildUserActivityItems(): ActivityItem[] {
   return items;
 }
 
-/** デモ用：SNSログインしているか（true=アクティビティタブ表示、false=運営お知らせのみ） */
-const IS_SNS_LOGGED_IN = true;
-
 export default function NotificationsPage() {
   const [activeTab, setActiveTab] = useState<NotificationTabId>("activity");
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setIsLoggedIn(getAuth().isLoggedIn);
+    setActivityItems(buildUserActivityItems());
+    const handler = () => {
+      setIsLoggedIn(getAuth().isLoggedIn);
+      setActivityItems(buildUserActivityItems());
+    };
+    window.addEventListener(getAuthUpdatedEventName(), handler);
+    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
+  }, []);
 
   useEffect(() => {
     setActivityItems(buildUserActivityItems());
@@ -109,7 +119,7 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen pb-20">
       <NotificationTabs
-        isLoggedIn={IS_SNS_LOGGED_IN}
+        isLoggedIn={isLoggedIn}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         headerLabel="news-VOTEからのお知らせ"

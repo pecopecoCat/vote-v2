@@ -2,22 +2,25 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import BottomNav from "../components/BottomNav";
 import VoteCard from "../components/VoteCard";
-import { getCreatedVotes, deleteCreatedVote } from "../data/createdVotes";
+import { getCreatedVotes, getCreatedVotesForTimeline, deleteCreatedVote } from "../data/createdVotes";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
 import { getAllActivity, getMergedCounts, getCardIdsUserCommentedOn, getActivity, type CardActivity, type VoteComment } from "../data/voteCardActivity";
 import { getFavoriteTags, getFavoriteTagsUpdatedEventName } from "../data/favoriteTags";
 import {
   getCollections,
   getCollectionsUpdatedEventName,
-  isCardInAnyCollection,
   createCollection,
   updateCollection,
   deleteCollection,
   type Collection,
   type CollectionVisibility,
 } from "../data/collections";
+import { getBookmarkIds, isCardBookmarked, getBookmarksUpdatedEventName } from "../data/bookmarks";
+import { getCollectionGradientStyle } from "../data/search";
+import { getAuth, getAuthUpdatedEventName } from "../data/auth";
 import type { VoteCardData } from "../data/voteCards";
 import type { CurrentUser } from "../components/VoteCard";
 import VoteCardMini from "../components/VoteCardMini";
@@ -76,7 +79,7 @@ function ProfileCommentRow({ comment }: { comment: VoteComment }) {
           </span>
         </div>
       </div>
-      <button type="button" className="shrink-0 text-gray-400" aria-label="その他" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="shrink-0 text-[var(--color-brand-logo)] hover:opacity-80" aria-label="その他" onClick={(e) => e.stopPropagation()}>
         <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
           <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
         </svg>
@@ -114,6 +117,9 @@ function backgroundForCard(card: VoteCardData, cardId: string): string {
 }
 
 export default function ProfilePage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const returnTo = searchParams.get("returnTo"); // 未ログインでVOTE作成から来た場合の戻り先
   const [activeTab, setActiveTab] = useState<ProfileTabId>("vote");
   const [collections, setCollections] = useState<Collection[]>([]);
   const [activity, setActivity] = useState<Record<string, CardActivity>>({});
@@ -137,9 +143,21 @@ export default function ProfilePage() {
   const [myVoteSortOrder, setMyVoteSortOrder] = useState<"newest" | "oldest">("newest");
   /** myVOTE 新着順プルダウン開閉 */
   const [myVoteSortDropdownOpen, setMyVoteSortDropdownOpen] = useState(false);
+  /** ログイン状態（LINEのみ。未ログイン時はログイン画面を表示） */
+  const [auth, setAuth] = useState(() => getAuth());
 
   useEffect(() => {
     setCollections(getCollections());
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      setAuth(getAuth());
+      setActivity(getAllActivity());
+      setFavoriteTags(getFavoriteTags());
+    };
+    window.addEventListener(getAuthUpdatedEventName(), handler);
+    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
   useEffect(() => {
@@ -161,7 +179,18 @@ export default function ProfilePage() {
     return () => window.removeEventListener(eventName, handler);
   }, []);
 
-  const currentUser: CurrentUser = { type: "sns", name: MOCK_USER.name, iconUrl: MOCK_USER.iconUrl };
+  const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
+  useEffect(() => {
+    const eventName = getBookmarksUpdatedEventName();
+    const handler = () => setBookmarkRefreshKey((k) => k + 1);
+    window.addEventListener(eventName, handler);
+    return () => window.removeEventListener(eventName, handler);
+  }, []);
+
+  const profileUser = auth.user ?? MOCK_USER;
+  const currentUser: CurrentUser = auth.isLoggedIn
+    ? { type: "sns", name: profileUser.name, iconUrl: profileUser.iconUrl }
+    : { type: "guest" };
 
   const createdVotesRaw = useMemo(
     () => (typeof window !== "undefined" ? getCreatedVotes() : []),
@@ -183,9 +212,10 @@ export default function ProfilePage() {
     []
   );
 
+  /** 投票・Bookmark・コメントタブ用（全ユーザーの作ったVOTE＋シード） */
   const allCards = useMemo(
-    () => [...createdVotes, ...seedCards],
-    [createdVotes, seedCards]
+    () => [...(typeof window !== "undefined" ? getCreatedVotesForTimeline() : []), ...seedCards],
+    [createdVotesRefreshKey, seedCards]
   );
 
   const votedCards = useMemo(
@@ -193,11 +223,7 @@ export default function ProfilePage() {
     [allCards, activity]
   );
 
-  const allBookmarkedIds = useMemo(() => {
-    const set = new Set<string>();
-    collections.forEach((c) => c.cardIds.forEach((id) => set.add(id)));
-    return Array.from(set);
-  }, [collections]);
+  const allBookmarkedIds = useMemo(() => getBookmarkIds(), [collections, bookmarkRefreshKey, auth]);
   const bookmarkedCards = useMemo(
     () => allCards.filter((c) => allBookmarkedIds.includes(c.id ?? "")),
     [allCards, allBookmarkedIds]
@@ -215,9 +241,76 @@ export default function ProfilePage() {
   const voteCount = createdVotes.length;
   const collectionCount = collections.length;
 
+  /* 非ログイン時：ログイン画面（LINEのみ）。ロゴ・テキスト・ボタンを1ブロックで上下中央に */
+  if (!auth.isLoggedIn) {
+    return (
+      <div className="flex min-h-screen flex-col bg-[#FFE100] pb-20">
+        <header className="flex shrink-0 justify-end px-[5.333vw] pt-4">
+          <Link
+            href="/settings"
+            className="flex h-10 w-10 items-center justify-center text-gray-900"
+            aria-label="設定"
+          >
+            <img src="/icons/icon_setting.svg" alt="" className="h-6 w-6" width={20} height={20} />
+          </Link>
+        </header>
+        <main className="mx-auto flex min-h-0 flex-1 flex-col items-center justify-center px-[5.333vw] text-center">
+          <div className="flex w-full max-w-md flex-col items-center">
+            <div className="flex justify-center" style={{ transform: "scale(1.61)" }}>
+              <img src="/logo.svg" alt="VOTE" className="h-16 w-auto" width={177} height={77} />
+            </div>
+            <div className="mt-[40px] w-full">
+              <h2
+                className="text-[16px] font-black text-gray-900"
+                style={{ fontFamily: "var(--font-noto-sans-jp), sans-serif" }}
+              >
+                ログインしよう。
+              </h2>
+              <p
+                className="mt-4 text-[13px] font-bold text-gray-900"
+                style={{
+                  fontFamily: "var(--font-noto-sans-jp), sans-serif",
+                  letterSpacing: "1px",
+                  lineHeight: 1.66,
+                }}
+              >
+                {returnTo ? (
+                  "VOTEにログインすると自分の2択を作成できる！"
+                ) : (
+                  <>
+                    VOTEにログインすると、
+                    <br />
+                    みんなに質問したり、
+                    <br />
+                    みんなから意見がもらえたり.......
+                    <br />
+                    <br />
+                    長い間疑問に感じていたことも、
+                    <br />
+                    ですぐに解決できるかも！
+                  </>
+                )}
+              </p>
+            </div>
+            <div className="mt-[30px] w-full">
+              <Link
+                href={returnTo ? `/profile/login?returnTo=${encodeURIComponent(returnTo)}` : "/profile/login"}
+                className="block w-full rounded-xl bg-gray-900 py-4 text-center text-base font-bold text-white hover:opacity-90"
+                aria-label="LINEでログインする"
+              >
+                LINEでログインする
+              </Link>
+            </div>
+          </div>
+        </main>
+        <BottomNav activeId="profile" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F1F1F1] pb-20">
-      {/* 黄色ヘッダー */}
+      {/* 黄色ヘッダー（ログイン時） */}
       <div className="bg-[#FFE100] px-[5.333vw] pt-4 pb-[15px]">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
@@ -225,7 +318,7 @@ export default function ProfilePage() {
               className="h-14 w-14 shrink-0 overflow-hidden rounded-full border-4 border-white bg-white shadow-[0_0_4px_rgba(0,0,0,0.1)]"
             >
               <img
-                src={MOCK_USER.iconUrl}
+                src={profileUser.iconUrl ?? "/default-avatar.png"}
                 alt=""
                 className="h-full w-full object-cover"
                 width={56}
@@ -233,7 +326,7 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <p className="font-bold text-gray-900">{MOCK_USER.name}</p>
+              <p className="font-bold text-gray-900">{profileUser.name}</p>
               <p className="profile-stats-text text-sm font-bold text-gray-900">
                 <span className="text-[16px]">{voteCount}</span>
                 <span className="text-[12px]"> VOTE</span>
@@ -295,7 +388,7 @@ export default function ProfilePage() {
               <span className="inline-block">{label}</span>
               {activeTab === id && (
                 <span
-                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
+                  className="absolute bottom-0 left-0 right-0 h-[4px] rounded-full bg-[#FFE100]"
                   aria-hidden
                 />
               )}
@@ -304,27 +397,26 @@ export default function ProfilePage() {
         </nav>
       </div>
 
-      <main className="mx-auto max-w-lg bg-[#F1F1F1] px-[5.333vw] pb-6 pt-4">
+      <main className="mx-auto max-w-lg bg-[#F1F1F1] px-[5.333vw] pb-6 pt-[20px]">
         {activeTab === "myVOTE" && (
           <>
-            <div className="relative mt-5 mb-5 flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm">
+            <div className="relative mb-5 flex items-center justify-between">
               <div className="relative">
                 <button
                   type="button"
-                  className="flex items-center gap-2 text-sm font-bold text-gray-600"
+                  className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-gray-900 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
                   aria-haspopup="listbox"
                   aria-expanded={myVoteSortDropdownOpen}
                   onClick={() => setMyVoteSortDropdownOpen((o) => !o)}
                 >
                   {myVoteSortOrder === "newest" ? "新着順" : "古い順"}
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
                     <img
                       src="/icons/icon_b_arrow.svg"
                       alt=""
-                      className="h-2 w-2 shrink-0"
-                      width={8}
-                      height={6}
-                      style={{ transform: "rotate(0deg)" }}
+                      className="h-2.5 w-2.5 shrink-0 rotate-0"
+                      width={10}
+                      height={8}
                     />
                   </span>
                 </button>
@@ -369,7 +461,7 @@ export default function ProfilePage() {
               </div>
               <button
                 type="button"
-                className={`text-sm font-bold ${isMyVoteEditMode ? "text-blue-600" : "text-gray-700"}`}
+                className={`text-sm font-bold text-gray-900 ${isMyVoteEditMode ? "text-blue-600" : ""}`}
                 onClick={() => setIsMyVoteEditMode((prev) => !prev)}
               >
                 {isMyVoteEditMode ? "完了" : "編集"}
@@ -422,11 +514,13 @@ export default function ProfilePage() {
                         creator={card.creator}
                         currentUser={currentUser}
                         cardId={cardId}
-                        bookmarked={isCardInAnyCollection(cardId)}
+                        bookmarked={isCardBookmarked(cardId)}
                         hasCommented={commentedCardIds.includes(cardId)}
                         onBookmarkClick={setModalCardId}
                         onMoreClick={setCardOptionsCardId}
                         visibility={card.visibility}
+                        optionAImageUrl={card.optionAImageUrl}
+                        optionBImageUrl={card.optionBImageUrl}
                       />
                     </div>
                   );
@@ -474,11 +568,13 @@ export default function ProfilePage() {
                       currentUser={currentUser}
                       cardId={cardId}
                       initialSelectedOption={act?.userSelectedOption ?? null}
-                      bookmarked={isCardInAnyCollection(cardId)}
+                      bookmarked={isCardBookmarked(cardId)}
                       hasCommented={commentedCardIds.includes(cardId)}
                       onBookmarkClick={setModalCardId}
                       onMoreClick={setCardOptionsCardId}
                       visibility={card.visibility}
+                      optionAImageUrl={card.optionAImageUrl}
+                      optionBImageUrl={card.optionBImageUrl}
                     />
                   );
                 })}
@@ -492,10 +588,10 @@ export default function ProfilePage() {
             {selectedBookmarkId == null ? (
               /* Bookmark TOP: コレクションリスト */
               <div className="flex flex-col gap-0">
-                {/* ALL 行（ドロップシャドウなし） */}
+                {/* ALL 行（コレクション行と同じ高さに合わせる） */}
                 <button
                   type="button"
-                  className="flex w-full items-center rounded-xl bg-white px-4 py-3"
+                  className="flex min-h-[64px] w-full items-center rounded-xl bg-white px-4 py-3"
                   onClick={() => setSelectedBookmarkId("all")}
                 >
                   <span className="text-sm font-bold text-gray-900">ALL</span>
@@ -505,7 +601,7 @@ export default function ProfilePage() {
                   {collections.map((col) => (
                     <div
                       key={col.id}
-                      className="flex w-full items-center gap-3 rounded-xl bg-white px-4 py-3"
+                      className="flex w-full items-center gap-3 rounded-xl bg-white pl-4 pr-[10px] py-3"
                     >
                       <Link
                         href={`/collection/${col.id}`}
@@ -513,7 +609,7 @@ export default function ProfilePage() {
                       >
                         <span
                           className="h-10 w-10 shrink-0 rounded-full"
-                          style={{ backgroundColor: col.color }}
+                          style={getCollectionGradientStyle(col.gradient, col.color)}
                         />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-bold text-[#191919]">{col.name}</p>
@@ -607,11 +703,13 @@ export default function ProfilePage() {
                             creator={card.creator}
                             currentUser={currentUser}
                             cardId={cardId}
-                            bookmarked={isCardInAnyCollection(cardId)}
+                            bookmarked={isCardBookmarked(cardId)}
                             hasCommented={commentedCardIds.includes(cardId)}
                             onBookmarkClick={setModalCardId}
                             onMoreClick={setCardOptionsCardId}
                             visibility={card.visibility}
+                            optionAImageUrl={card.optionAImageUrl}
+                            optionBImageUrl={card.optionBImageUrl}
                           />
                         );
                       })}
@@ -679,6 +777,7 @@ export default function ProfilePage() {
         <BookmarkCollectionModal
           cardId={modalCardId}
           onClose={() => setModalCardId(null)}
+          isLoggedIn={auth.isLoggedIn}
           onCollectionsUpdated={() => setCollections(getCollections())}
         />
       )}
@@ -716,11 +815,11 @@ export default function ProfilePage() {
             setShowCollectionSettings(false);
             setEditingCollectionForSettings(null);
           }}
-          onSave={(name, color, visibility) => {
+          onSave={(name, gradient, visibility) => {
             if (editingCollectionForSettings) {
-              updateCollection(editingCollectionForSettings.id, { name, color, visibility });
+              updateCollection(editingCollectionForSettings.id, { name, gradient, visibility });
             } else {
-              createCollection(name, { color, visibility });
+              createCollection(name, { gradient, visibility });
             }
             setCollections(getCollections());
             setShowCollectionSettings(false);

@@ -1,15 +1,39 @@
 /**
  * ユーザーお気に入りタグ（mypage・検索画面で共通。ハートで追加・削除）
- * 初回は 0 件のまま。
+ * user1 / user2 / ゲストごとに localStorage で保持。
  */
 
-const STORAGE_KEY = "vote_favorite_tags";
+import { getCurrentActivityUserId } from "./auth";
+
+const STORAGE_KEY_PREFIX = "vote_favorite_tags_";
+const LEGACY_KEY = "vote_favorite_tags";
 const EVENT_NAME = "vote_favorite_tags_updated";
+
+function getStorageKey(): string {
+  return STORAGE_KEY_PREFIX + getCurrentActivityUserId();
+}
 
 function load(): string[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const key = getStorageKey();
+    let raw = window.localStorage.getItem(key);
+    if (!raw && (key.includes("user1") || key.includes("user2"))) {
+      raw = window.localStorage.getItem(LEGACY_KEY);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (Array.isArray(parsed)) {
+            const tags = parsed.filter((t): t is string => typeof t === "string" && t.length > 0);
+            window.localStorage.setItem(key, JSON.stringify(tags));
+            window.localStorage.removeItem(LEGACY_KEY);
+            return tags;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -22,7 +46,7 @@ function load(): string[] {
 function save(tags: string[]): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tags));
+    window.localStorage.setItem(getStorageKey(), JSON.stringify(tags));
     window.dispatchEvent(new CustomEvent(EVENT_NAME));
   } catch {
     // ignore

@@ -1,11 +1,17 @@
 import { voteCardsData } from "./voteCards";
+import type { CardActivity } from "./voteCardActivity";
+import { getMergedCounts } from "./voteCardActivity";
 
-/** 注目タグ（登録数 = そのタグが付いたカード数。直近1週間集計想定のデモでは全期間で算出） */
+/** 注目タグ（登録数 = そのタグが付いたカード数） */
 export interface TrendingTag {
   tag: string;
   /** 登録数（このタグが付いたカード数） */
   count: number;
 }
+
+/** 注目タグスコアの重み（投票 +1, コメント +3, bookmark +5, 新着 +2, タグがお気に入り +3） */
+const TAG_SCORE_WEIGHTS = { vote: 1, comment: 3, bookmark: 5, new: 2, favorite: 3 } as const;
+const TRENDING_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** カード配列からタグごとの登録数を集計。引数省略時は voteCardsData のみ使用 */
 export function getTrendingTagsFromCards(
@@ -22,7 +28,70 @@ export function getTrendingTagsFromCards(
     .sort((a, b) => b.count - a.count);
 }
 
-/** 注目タグ（実際のカードデータから集計。登録数も実数） */
+export type CardForTagScore = {
+  id?: string;
+  tags?: string[];
+  countA?: number;
+  countB?: number;
+  commentCount?: number;
+  bookmarkCount?: number;
+  createdAt?: string;
+};
+
+/**
+ * 注目タグをスコアでランキング（タグ登録カードの engagement 合計で計算）
+ * 投票 +1, コメント +3, bookmark +5, 新着 +2, タグお気に入り登録 +3
+ */
+export function getTrendingTagsByScore(
+  cards: CardForTagScore[],
+  activity: Record<string, CardActivity>,
+  favoriteTagIds: string[]
+): TrendingTag[] {
+  const favoriteSet = new Set(favoriteTagIds);
+  const tagToCount = new Map<string, number>();
+  const tagToScore = new Map<string, number>();
+  const now = Date.now();
+
+  for (const card of cards) {
+    const cardId = card.id ?? "";
+    const act = activity[cardId] ?? { countA: 0, countB: 0, comments: [] };
+    const merged = getMergedCounts(
+      card.countA ?? 0,
+      card.countB ?? 0,
+      card.commentCount ?? 0,
+      act
+    );
+    const votes = merged.countA + merged.countB;
+    const comments = merged.commentCount;
+    const bookmarks = card.bookmarkCount ?? 0;
+    const createdMs = card.createdAt ? new Date(card.createdAt).getTime() : 0;
+    const isNew = createdMs >= now - TRENDING_WEEK_MS;
+    const cardScore =
+      votes * TAG_SCORE_WEIGHTS.vote +
+      comments * TAG_SCORE_WEIGHTS.comment +
+      bookmarks * TAG_SCORE_WEIGHTS.bookmark +
+      (isNew ? TAG_SCORE_WEIGHTS.new : 0);
+
+    for (const tag of card.tags ?? []) {
+      tagToCount.set(tag, (tagToCount.get(tag) ?? 0) + 1);
+      const prev = tagToScore.get(tag) ?? 0;
+      tagToScore.set(tag, prev + cardScore);
+    }
+  }
+
+  for (const tag of favoriteSet) {
+    if (tagToScore.has(tag)) {
+      tagToScore.set(tag, (tagToScore.get(tag) ?? 0) + TAG_SCORE_WEIGHTS.favorite);
+    }
+  }
+
+  return Array.from(tagToCount.entries())
+    .map(([tag, count]) => ({ tag, count, score: tagToScore.get(tag) ?? 0 }))
+    .sort((a, b) => b.score - a.score)
+    .map(({ tag, count }) => ({ tag, count }));
+}
+
+/** 注目タグ（登録数ベースのフォールバック。getTrendingTagsByScore を検索画面で使用） */
 export const trendingTags: TrendingTag[] = getTrendingTagsFromCards();
 
 /** コレクションのグラデーション種類 */
@@ -46,17 +115,28 @@ export interface PopularCollection {
   voteScore: number;
 }
 
+/** コレクション用グラデーション（画像仕様の6色と対応） */
 const COLLECTION_GRADIENTS: Record<
   CollectionGradient,
   string
 > = {
-  "blue-cyan": "from-[#7dd3fc] to-[#e0f2fe]",
-  "pink-purple": "from-[#f9a8d4] to-[#e879f9]",
-  "purple-pink": "from-[#c084fc] to-[#f472b6]",
-  "orange-yellow": "from-[#fb923c] to-[#fde047]",
-  "green-yellow": "from-[#a3e635] to-[#d9f99d]",
-  "cyan-aqua": "from-[#67e8f9] to-[#a5f3fc]",
+  "blue-cyan": "from-[#707FED] to-[#A5E8ED]",
+  "pink-purple": "from-[#FF6389] to-[#FC47F5]",
+  "purple-pink": "from-[#FF8B8B] to-[#FF7EFA]",
+  "orange-yellow": "from-[#FF4B28] to-[#FFCC0F]",
+  "green-yellow": "from-[#DDEDA0] to-[#15D7A8]",
+  "cyan-aqua": "from-[#CA76E8] to-[#E1CAFF]",
 };
+
+/** 全画面共通のグラデーション選択肢（Bookmark/検索/MyPage/コレクション設定で同一） */
+export const COLLECTION_GRADIENT_OPTIONS: { id: CollectionGradient; start: string; end: string }[] = [
+  { id: "blue-cyan", start: "#707FED", end: "#A5E8ED" },
+  { id: "pink-purple", start: "#FF6389", end: "#FC47F5" },
+  { id: "purple-pink", start: "#FF8B8B", end: "#FF7EFA" },
+  { id: "orange-yellow", start: "#FF4B28", end: "#FFCC0F" },
+  { id: "green-yellow", start: "#DDEDA0", end: "#15D7A8" },
+  { id: "cyan-aqua", start: "#CA76E8", end: "#E1CAFF" },
+];
 
 /** デモ用：人気コレクション一覧（voteScore 降順で表示用） */
 export const popularCollections: PopularCollection[] = [
@@ -71,6 +151,21 @@ export const popularCollections: PopularCollection[] = [
 
 export function getCollectionGradientClass(g: CollectionGradient): string {
   return COLLECTION_GRADIENTS[g] ?? "from-gray-200 to-gray-300";
+}
+
+/** コレクションの丸アイコン用：背景グラデーションを反映した style（Tailwindの動的クラスを避け確実に表示） */
+export function getCollectionGradientStyle(
+  gradient?: CollectionGradient | null,
+  fallbackColor?: string
+): { background: string } {
+  if (gradient) {
+    const opt = COLLECTION_GRADIENT_OPTIONS.find((o) => o.id === gradient);
+    if (opt) {
+      return { background: `linear-gradient(to right, ${opt.start}, ${opt.end})` };
+    }
+  }
+  const color = fallbackColor ?? "#E5E7EB";
+  return { background: `linear-gradient(135deg, ${color} 0%, ${color}99 100%)` };
 }
 
 /** 検索語に一致するタグ（部分一致） */

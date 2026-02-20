@@ -8,6 +8,7 @@ import CollectionCard from "../components/CollectionCard";
 import RecommendedTags from "../components/RecommendedTags";
 import VoteCard from "../components/VoteCard";
 import CardOptionsModal from "../components/CardOptionsModal";
+import BookmarkCollectionModal from "../components/BookmarkCollectionModal";
 import TagMenuModal, { type TagMenuVariant } from "../components/TagMenuModal";
 import Checkbox from "../components/Checkbox";
 import BottomNav from "../components/BottomNav";
@@ -18,6 +19,7 @@ import {
   CARD_BACKGROUND_IMAGES,
   recommendedTagList,
 } from "../data/voteCards";
+import { getCreatedVotesForTimeline } from "../data/createdVotes";
 import {
   getActivity,
   getAllActivity,
@@ -38,10 +40,11 @@ import {
   getPinnedCollectionIds,
   PINNED_UPDATED_EVENT,
 } from "../data/collections";
+import { isCardBookmarked } from "../data/bookmarks";
+import { getAuth, getAuthUpdatedEventName } from "../data/auth";
 import {
-  trendingTags,
+  getTrendingTagsByScore,
   popularCollections,
-  searchTags,
   searchCollections,
   type CollectionGradient,
 } from "../data/search";
@@ -56,14 +59,14 @@ const PINNED_GRADIENTS: CollectionGradient[] = [
   "cyan-aqua",
 ];
 
-const demoCurrentUser: CurrentUser = { type: "guest" };
-
 /** タグでフィルター（tag 指定時）、新着順でソート */
 function filterCardsByTag(cards: VoteCardData[], tag: string | null): VoteCardData[] {
   if (!tag) return [];
   return [...cards]
     .filter((c) => c.tags?.includes(tag))
-    .reverse();
+    .sort((a, b) =>
+      (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0")
+    );
 }
 
 /** セクション見出し（グレーの横バー・中央テキスト） */
@@ -129,11 +132,27 @@ function SearchContent() {
   const [activity, setActivity] = useState<Record<string, CardActivity>>({});
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [tagMenu, setTagMenu] = useState<{ tag: string; variant: TagMenuVariant } | null>(null);
   const [hiddenTagsVersion, setHiddenTagsVersion] = useState(0);
-
+  /** 注目タグの表示件数（初期10件、もっと表示するで10件ずつ追加） */
+  const [trendingTagsVisibleCount, setTrendingTagsVisibleCount] = useState(10);
+  const [auth, setAuth] = useState(() => getAuth());
+  const isLoggedIn = auth.isLoggedIn;
+  const currentUser: CurrentUser = auth.isLoggedIn && auth.user
+    ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
+    : { type: "guest" };
   useEffect(() => {
+    setAuth(getAuth());
     setActivity(getAllActivity());
+    setFavoriteTags(getFavoriteTags());
+    const handler = () => {
+      setAuth(getAuth());
+      setActivity(getAllActivity());
+      setFavoriteTags(getFavoriteTags());
+    };
+    window.addEventListener(getAuthUpdatedEventName(), handler);
+    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
   useEffect(() => {
@@ -153,19 +172,43 @@ function SearchContent() {
 
   const query = searchValue.trim();
   const isSearching = query.length > 0;
-
-  const matchedTags = useMemo(() => searchTags(query), [query]);
   const matchedCollections = useMemo(() => searchCollections(query), [query]);
+
+  /** 注目タグ用の全カード（作成VOTE + シード） */
+  const allCardsForTags = useMemo(() => {
+    const created = typeof window !== "undefined" ? getCreatedVotesForTimeline() : [];
+    const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
+    return [...created, ...seedWithId];
+  }, []);
+
+  /** 注目タグ（スコア順：投票+1, コメント+3, bookmark+5, 新着+2, お気に入り+3） */
+  const trendingTagsByScore = useMemo(
+    () => getTrendingTagsByScore(allCardsForTags, activity, favoriteTags),
+    [allCardsForTags, activity, favoriteTags]
+  );
 
   /** 注目タグ（興味がないで非表示にしたタグを除く） */
   const displayedTrendingTags = useMemo(
-    () => trendingTags.filter((t) => !isHiddenTag(t.tag)),
-    [hiddenTagsVersion]
+    () => trendingTagsByScore.filter((t) => !isHiddenTag(t.tag)),
+    [trendingTagsByScore, hiddenTagsVersion]
   );
 
+  /** 検索時：「query」が含まれるタグ（スコア順の一覧から抽出） */
+  const matchedTags = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return trendingTagsByScore.filter((t) => t.tag.toLowerCase().includes(q));
+  }, [query, trendingTagsByScore]);
+
+  /** ハッシュタグフィルター用の全カード（作成VOTE + シード） */
+  const allCardsForTagFilter = useMemo(() => {
+    const created = typeof window !== "undefined" ? getCreatedVotesForTimeline() : [];
+    return [...created, ...voteCardsData];
+  }, []);
+
   const filteredCards = useMemo(
-    () => filterCardsByTag(voteCardsData, isTagFilterView ? tagFromUrl : null),
-    [isTagFilterView, tagFromUrl]
+    () => filterCardsByTag(allCardsForTagFilter, isTagFilterView ? tagFromUrl : null),
+    [allCardsForTagFilter, isTagFilterView, tagFromUrl]
   );
   const commentedCardIds = useMemo(() => getCardIdsUserCommentedOn(), [activity]);
   const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
@@ -190,9 +233,8 @@ function SearchContent() {
   const cardsToShow = useMemo(() => {
     if (showVoted) return filteredCards;
     return filteredCards.filter((card) => {
-      const index = voteCardsData.indexOf(card);
-      const id = `seed-${index}`;
-      return !activity[id]?.userSelectedOption;
+      const cardId = card.id ?? `seed-${voteCardsData.indexOf(card)}`;
+      return !activity[cardId]?.userSelectedOption;
     });
   }, [filteredCards, showVoted, activity]);
   const backgroundPerCard = useMemo(
@@ -265,7 +307,7 @@ function SearchContent() {
               ) : (
                 cardsToShow.map((card) => {
                   const index = voteCardsData.indexOf(card);
-                  const cardId = `seed-${index}`;
+                  const cardId = card.id ?? `seed-${index}`;
                   const act = activity[cardId];
                   const merged = getMergedCounts(
                     card.countA ?? 0,
@@ -273,10 +315,12 @@ function SearchContent() {
                     card.commentCount ?? 0,
                     act ?? { countA: 0, countB: 0, comments: [] }
                   );
+                  const bgUrl =
+                    card.backgroundImageUrl ?? backgroundPerCard[Math.max(0, index)];
                   return (
                     <VoteCard
-                      key={`${card.question}-${index}`}
-                      backgroundImageUrl={backgroundPerCard[index]}
+                      key={cardId}
+                      backgroundImageUrl={bgUrl}
                       patternType={card.patternType}
                       question={card.question}
                       optionA={card.optionA}
@@ -287,13 +331,17 @@ function SearchContent() {
                       tags={card.tags}
                       readMoreText={card.readMoreText}
                       creator={card.creator}
-                      currentUser={demoCurrentUser}
+                      currentUser={currentUser}
                       cardId={cardId}
+                      bookmarked={isCardBookmarked(cardId)}
                       hasCommented={commentedCardIds.includes(cardId)}
                       initialSelectedOption={act?.userSelectedOption ?? null}
                       onVote={handleVote}
+                      onBookmarkClick={setModalCardId}
                       onMoreClick={setCardOptionsCardId}
                       visibility={card.visibility}
+                      optionAImageUrl={card.optionAImageUrl}
+                      optionBImageUrl={card.optionBImageUrl}
                     />
                   );
                 })
@@ -374,7 +422,7 @@ function SearchContent() {
                     <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
                   ) : (
                     <>
-                      {displayedTrendingTags.slice(0, 8).map((t) => (
+                      {displayedTrendingTags.slice(0, trendingTagsVisibleCount).map((t) => (
                         <TagRow
                           key={t.tag}
                           tag={t.tag}
@@ -383,18 +431,21 @@ function SearchContent() {
                           onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
                         />
                       ))}
-                      <div className="mb-[50px] flex justify-center pb-3 pt-3">
-                        <button
-                          type="button"
-                          className="inline-block text-center"
-                        >
-                          <span className="text-sm font-medium text-gray-600">もっと表示する</span>
-                          <span
-                            className="mt-2.5 block h-0.5 w-full bg-[#FFE100]"
-                            aria-hidden
-                          />
-                        </button>
-                      </div>
+                      {displayedTrendingTags.length > 10 && trendingTagsVisibleCount < displayedTrendingTags.length && (
+                        <div className="mb-[50px] flex justify-center pb-3 pt-3">
+                          <button
+                            type="button"
+                            className="inline-block text-center"
+                            onClick={() => setTrendingTagsVisibleCount((prev) => prev + 10)}
+                          >
+                            <span className="text-sm font-medium text-gray-600">もっと表示する</span>
+                            <span
+                              className="mt-2.5 block h-0.5 w-full bg-[#FFE100]"
+                              aria-hidden
+                            />
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -404,13 +455,26 @@ function SearchContent() {
             {activeTab === "favorite" && (
               <section className="border-b border-gray-200 pt-2.5">
                 <div className="px-[5.333vw]">
-                  {favoriteTags.length === 0 ? (
+                  {!isLoggedIn ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <p className="text-sm text-gray-700">
+                        LINEでログインするとお気に入りタグを保存できるよ
+                      </p>
+                      <Link
+                        href="/profile/login?returnTo=/search"
+                        className="mt-6 block w-full max-w-md rounded-xl bg-[#FFE100] py-4 text-center text-base font-bold text-gray-900 hover:opacity-90"
+                        aria-label="LINEでログインする"
+                      >
+                        LINEでログインする
+                      </Link>
+                    </div>
+                  ) : favoriteTags.length === 0 ? (
                     <p className="py-6 text-center text-sm text-gray-500">お気に入りタグはまだありません。</p>
                   ) : (
                     [...favoriteTags]
                       .map((tag) => ({
                         tag,
-                        count: trendingTags.find((t) => t.tag === tag)?.count ?? 0,
+                        count: trendingTagsByScore.find((t) => t.tag === tag)?.count ?? 0,
                       }))
                       .sort((a, b) => b.count - a.count)
                       .map(({ tag, count }) => (
@@ -441,7 +505,7 @@ function SearchContent() {
                     key={col.id}
                     id={col.id}
                     title={col.name}
-                    gradient={PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
+                    gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
                     showPin
                     href={`/collection/${col.id}`}
                   />
@@ -513,6 +577,14 @@ function SearchContent() {
         <CardOptionsModal
           cardId={cardOptionsCardId}
           onClose={() => setCardOptionsCardId(null)}
+        />
+      )}
+
+      {modalCardId != null && (
+        <BookmarkCollectionModal
+          cardId={modalCardId}
+          onClose={() => setModalCardId(null)}
+          isLoggedIn={isLoggedIn}
         />
       )}
 

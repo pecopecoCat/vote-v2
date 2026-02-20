@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import VoteCard from "../../components/VoteCard";
 import CardOptionsModal from "../../components/CardOptionsModal";
+import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import BottomNav from "../../components/BottomNav";
 import Checkbox from "../../components/Checkbox";
 import {
@@ -12,12 +13,14 @@ import {
   getCollectionsUpdatedEventName,
   getPinnedCollectionIds,
   togglePinnedCollection,
-  isCardInAnyCollection,
   type Collection,
   type CollectionVisibility,
 } from "../../data/collections";
-import { getCreatedVotes } from "../../data/createdVotes";
+import { isCardBookmarked } from "../../data/bookmarks";
+import { getCollectionGradientClass } from "../../data/search";
+import { getCreatedVotesForTimeline } from "../../data/createdVotes";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
+import { getAuth, getAuthUpdatedEventName } from "../../data/auth";
 import {
   getAllActivity,
   getMergedCounts,
@@ -33,8 +36,6 @@ const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   private: "非公開",
 };
 
-const demoCurrentUser: CurrentUser = { type: "guest" };
-
 function getCardByStableId(id: string): VoteCardData | null {
   if (id.startsWith("seed-")) {
     const index = parseInt(id.slice(5), 10);
@@ -43,7 +44,7 @@ function getCardByStableId(id: string): VoteCardData | null {
   }
   if (id.startsWith("created-")) {
     if (typeof window === "undefined") return null;
-    const created = getCreatedVotes();
+    const created = getCreatedVotesForTimeline();
     return created.find((c) => c.id === id) ?? null;
   }
   const index = parseInt(id, 10);
@@ -76,7 +77,15 @@ export default function CollectionPage() {
   const [activity, setActivity] = useState<Record<string, CardActivity>>({});
   const [showVoted, setShowVoted] = useState(true);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [modalCardId, setModalCardId] = useState<string | null>(null);
+  const [auth, setAuth] = useState(() => getAuth());
+  const currentUser: CurrentUser = auth.isLoggedIn && auth.user
+    ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
+    : { type: "guest" };
 
+  useEffect(() => {
+    setAuth(getAuth());
+  }, []);
   useEffect(() => {
     setCollections(getCollections());
     setPinnedIds(getPinnedCollectionIds());
@@ -93,6 +102,15 @@ export default function CollectionPage() {
 
   useEffect(() => {
     setActivity(getAllActivity());
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      setAuth(getAuth());
+      setActivity(getAllActivity());
+    };
+    window.addEventListener(getAuthUpdatedEventName(), handler);
+    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
   const collection = useMemo(() => collections.find((c) => c.id === id) ?? null, [collections, id]);
@@ -134,26 +152,26 @@ export default function CollectionPage() {
 
   return (
     <div className="min-h-screen bg-[#F1F1F1] pb-20">
-      {/* ヘッダー：設定カラー背景・タイトル・戻る・ピン */}
+      {/* ヘッダー：設定グラデーション/カラー背景・コレクション名・戻る・ピン（全画面共通） */}
       <header
-        className="flex items-center justify-between px-4 py-3"
-        style={{ backgroundColor: collection.color }}
+        className={`flex items-center justify-between px-4 py-3 ${collection.gradient ? `bg-gradient-to-r ${getCollectionGradientClass(collection.gradient)}` : ""}`}
+        style={collection.gradient ? undefined : { backgroundColor: collection.color }}
       >
         <Link
           href="/profile"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-gray-900"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/90 text-gray-900"
           aria-label="戻る"
         >
           <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
           </svg>
         </Link>
-        <h1 className="min-w-0 flex-1 truncate text-center text-base font-bold text-gray-900">
+        <h1 className="min-w-0 flex-1 truncate text-center text-base font-bold text-white drop-shadow-sm">
           {collection.name}
         </h1>
         <button
           type="button"
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isPinned ? "bg-[#FFE100]" : "bg-white"}`}
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isPinned ? "bg-[#FFE100]" : "bg-white/90"}`}
           aria-label={isPinned ? "ピン留めを外す" : "検索画面にピン留め"}
           onClick={handleTogglePin}
         >
@@ -223,13 +241,16 @@ export default function CollectionPage() {
                   tags={card.tags}
                   readMoreText={card.readMoreText}
                   creator={card.creator}
-                  currentUser={demoCurrentUser}
+                  currentUser={currentUser}
                   cardId={cardId}
-                  bookmarked={isCardInAnyCollection(cardId)}
+                  bookmarked={isCardBookmarked(cardId)}
                   hasCommented={commentedCardIds.includes(cardId)}
                   initialSelectedOption={act?.userSelectedOption ?? null}
+                  onBookmarkClick={setModalCardId}
                   onMoreClick={setCardOptionsCardId}
                   visibility={card.visibility}
+                  optionAImageUrl={card.optionAImageUrl}
+                  optionBImageUrl={card.optionBImageUrl}
                 />
               );
             })}
@@ -243,6 +264,14 @@ export default function CollectionPage() {
         <CardOptionsModal
           cardId={cardOptionsCardId}
           onClose={() => setCardOptionsCardId(null)}
+        />
+      )}
+
+      {modalCardId != null && (
+        <BookmarkCollectionModal
+          cardId={modalCardId}
+          onClose={() => setModalCardId(null)}
+          isLoggedIn={auth.isLoggedIn}
         />
       )}
     </div>

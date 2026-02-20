@@ -35,6 +35,8 @@ export interface VoteCardCompactProps {
   hasCommented?: boolean;
   /** 3点リーダー（その他）タップ時（cardId を渡してモーダル表示用） */
   onMoreClick?: (cardId: string) => void;
+  /** ブックマークタップ時（コレクション選択モーダル用。指定時はタップでこのコールバックのみ呼ぶ） */
+  onBookmarkClick?: (cardId: string) => void;
   cardId?: string;
 }
 
@@ -57,6 +59,7 @@ export default function VoteCardCompact({
   variant = "default",
   hasCommented = false,
   onMoreClick,
+  onBookmarkClick,
   cardId,
 }: VoteCardCompactProps) {
   const useImage = Boolean(backgroundImageUrl);
@@ -195,7 +198,12 @@ export default function VoteCardCompact({
           )}
           <span className="vote-card-footer-count">{commentCount}</span>
         </span>
-        <button type="button" className="flex items-center justify-center text-gray-400" aria-label="ブックマーク">
+        <button
+          type="button"
+          className="flex items-center justify-center text-gray-400"
+          aria-label="ブックマーク"
+          onClick={() => cardId != null && onBookmarkClick?.(cardId)}
+        >
           {bookmarked ? (
             <span className="bookmark-icon-bookmarked h-[18px] w-[15px]" aria-hidden />
           ) : (
@@ -204,7 +212,7 @@ export default function VoteCardCompact({
         </button>
         <button
           type="button"
-          className="ml-auto flex items-center justify-center text-gray-400"
+          className="ml-auto flex items-center justify-center text-[var(--color-brand-logo)] hover:opacity-80"
           aria-label="その他"
           onClick={() => cardId != null && onMoreClick?.(cardId)}
         >

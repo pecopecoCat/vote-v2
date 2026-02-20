@@ -59,6 +59,10 @@ export interface VoteCardProps {
   hasCommented?: boolean;
   /** 3点リーダー（その他）タップ時（cardId を渡してモーダル表示用） */
   onMoreClick?: (cardId: string) => void;
+  /** Aの画像URL（指定時はフッター下にA/B画像を表示） */
+  optionAImageUrl?: string;
+  /** Bの画像URL */
+  optionBImageUrl?: string;
 }
 
 const patternClasses: Record<VoteCardPattern, string> = {
@@ -92,6 +96,8 @@ export default function VoteCard({
   visibility,
   hasCommented = false,
   onMoreClick,
+  optionAImageUrl,
+  optionBImageUrl,
 }: VoteCardProps) {
   const patternClass = patternClasses[patternType];
   const useImage = Boolean(backgroundImageUrl);
@@ -179,7 +185,7 @@ export default function VoteCard({
             <>
               <button
                 type="button"
-                className="flex w-full overflow-hidden rounded-xl bg-white text-left shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-opacity active:opacity-90"
+                className="vote-card-answer-shadow flex w-full overflow-hidden rounded-xl bg-white text-left transition-opacity active:opacity-90"
                 onClick={handleSelectA}
               >
                 <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#E63E48] py-3.5 text-base font-bold text-white">
@@ -191,7 +197,7 @@ export default function VoteCard({
               </button>
               <button
                 type="button"
-                className="flex w-full overflow-hidden rounded-xl bg-white text-left shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-opacity active:opacity-90"
+                className="vote-card-answer-shadow flex w-full overflow-hidden rounded-xl bg-white text-left transition-opacity active:opacity-90"
                 onClick={handleSelectB}
               >
                 <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#3273E3] py-3.5 text-base font-bold text-white">
@@ -205,7 +211,7 @@ export default function VoteCard({
           ) : (
             <>
               <div className="relative w-full overflow-visible">
-                <div className="flex overflow-visible rounded-xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                <div className="vote-card-answer-shadow flex overflow-visible rounded-xl bg-white">
                   <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#E63E48] py-3.5 text-base font-bold text-white">
                     A
                   </span>
@@ -230,7 +236,7 @@ export default function VoteCard({
                 </div>
               </div>
               <div className="relative w-full overflow-visible">
-                <div className="flex overflow-visible rounded-xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                <div className="vote-card-answer-shadow flex overflow-visible rounded-xl bg-white">
                   <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#3273E3] py-3.5 text-base font-bold text-white">
                     B
                   </span>
@@ -316,7 +322,7 @@ export default function VoteCard({
         </button>
         <button
           type="button"
-          className="ml-auto flex items-center justify-center text-gray-400 hover:text-gray-600"
+          className="ml-auto flex items-center justify-center text-[var(--color-brand-logo)] hover:opacity-80"
           aria-label="その他"
           onClick={(e) => {
             e.preventDefault();
@@ -327,9 +333,49 @@ export default function VoteCard({
         </button>
       </div>
 
-      {/* タグ（タグブロックの下0.78em＝0.6em×1.3） */}
+      {/* A/B画像（指定時のみ：フッター下・タグ上に2枚並び・角にA/Bバッジ） */}
+      {(optionAImageUrl != null || optionBImageUrl != null) && (
+        <div className="flex gap-2 px-[4.27vw] pt-3">
+          {optionAImageUrl != null && (
+            <div className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={optionAImageUrl}
+                alt={optionA}
+                className="h-full w-full object-cover"
+              />
+              <span
+                className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-[#E63E48] text-sm font-bold text-white"
+                aria-hidden
+              >
+                A
+              </span>
+            </div>
+          )}
+          {optionBImageUrl != null && (
+            <div className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={optionBImageUrl}
+                alt={optionB}
+                className="h-full w-full object-cover"
+              />
+              <span
+                className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-[#3273E3] text-sm font-bold text-white"
+                aria-hidden
+              >
+                B
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* タグ（画像がある場合は上に10px間隔。タグブロックの下0.78em＝0.6em×1.3） */}
       {tags.length > 0 && (
-        <div className={`flex flex-wrap gap-2 px-[4.27vw] ${!readMoreText ? "pb-[0.78em]" : ""}`}>
+        <div
+          className={`flex flex-wrap gap-2 px-[4.27vw] ${(optionAImageUrl != null || optionBImageUrl != null) ? "pt-[10px]" : ""} ${!readMoreText ? "pb-[0.78em]" : ""}`}
+        >
           {tags.map((tag) => (
             <Link
               key={tag}
@@ -342,15 +388,15 @@ export default function VoteCard({
         </div>
       )}
 
-      {/* 続きを読む（タグとの間0.8em、下側padding 1.3倍） */}
+      {/* 続きを読む（テキスト下・続きを読む上下のマージンは15px） */}
       {readMoreText && (
-        <div className="px-[4.27vw] pt-[0.8em] pb-[1.04em]">
+        <div className="px-[4.27vw] pt-[0.8em]">
           <p
             className={`text-[14px] text-gray-600 ${!readMoreExpanded ? "line-clamp-2" : ""}`}
           >
             {readMoreExpanded ? readMoreText : readMoreText}
           </p>
-          <div className="mt-[1.6vw] border-t border-[#E5E7EB] pt-[1.6vw] pb-[2.08vw] -mx-[4.27vw]">
+          <div className="mt-[15px] border-t border-[#E5E7EB] pt-[15px] pb-[15px] -mx-[4.27vw]">
             <div className="px-[4.27vw] text-center">
               <button
                 type="button"

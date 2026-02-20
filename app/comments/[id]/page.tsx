@@ -8,6 +8,7 @@ import VoteCard from "../../components/VoteCard";
 import VoteCardCompact from "../../components/VoteCardCompact";
 import VoteCardMini from "../../components/VoteCardMini";
 import CardOptionsModal from "../../components/CardOptionsModal";
+import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import RecommendedTags from "../../components/RecommendedTags";
 import CommentInput from "../../components/CommentInput";
 import {
@@ -18,7 +19,7 @@ import {
   getNewestVoteCards,
   recommendedTagList,
 } from "../../data/voteCards";
-import { getCreatedVotes } from "../../data/createdVotes";
+import { getCreatedVotesForTimeline } from "../../data/createdVotes";
 import {
   getActivity,
   addVote as persistVote,
@@ -27,6 +28,8 @@ import {
   getCardIdsUserCommentedOn,
   type VoteComment,
 } from "../../data/voteCardActivity";
+import { isCardBookmarked } from "../../data/bookmarks";
+import { getAuth, getAuthUpdatedEventName } from "../../data/auth";
 import type { VoteCardData } from "../../data/voteCards";
 
 /** stableId (seed-N / created-xxx / 0,1,...) からカードを取得 */
@@ -38,7 +41,7 @@ function getCardByStableId(id: string): VoteCardData | null {
   }
   if (id.startsWith("created-")) {
     if (typeof window === "undefined") return null;
-    const created = getCreatedVotes();
+    const created = getCreatedVotesForTimeline();
     return created.find((c) => c.id === id) ?? null;
   }
   const card = getVoteCardById(id);
@@ -81,6 +84,20 @@ export default function CommentsPage() {
   const [activity, setActivity] = useState<ReturnType<typeof getActivity>>(() => getActivity(id));
   const [resolved, setResolved] = useState(!id.startsWith("created-"));
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [modalCardId, setModalCardId] = useState<string | null>(null);
+  const [auth, setAuth] = useState(() => getAuth());
+  const isLoggedIn = auth.isLoggedIn;
+  useEffect(() => {
+    setAuth(getAuth());
+    setActivity(getActivity(id));
+    const eventName = getAuthUpdatedEventName();
+    const handler = () => {
+      setAuth(getAuth());
+      setActivity(getActivity(id));
+    };
+    window.addEventListener(eventName, handler);
+    return () => window.removeEventListener(eventName, handler);
+  }, [id]);
 
   useEffect(() => {
     if (!id.startsWith("created-")) return;
@@ -94,7 +111,7 @@ export default function CommentsPage() {
   }, [id]);
 
   const allCards = useMemo(() => {
-    const created = getCreatedVotes();
+    const created = getCreatedVotesForTimeline();
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
     return [...created, ...seedWithId];
   }, []);
@@ -114,6 +131,9 @@ export default function CommentsPage() {
 
   const backgroundUrl = card ? backgroundForCard(card, id) : CARD_BACKGROUND_IMAGES[0];
   const merged = card ? getMergedCounts(card.countA ?? 0, card.countB ?? 0, card.commentCount ?? 0, activity) : { countA: 0, countB: 0, commentCount: 0 };
+  const currentUser = isLoggedIn && auth.user
+    ? { type: "sns" as const, name: auth.user.name, iconUrl: auth.user.iconUrl }
+    : { type: "guest" as const };
 
   const handleVote = (side: "A" | "B") => {
     persistVote(id, side);
@@ -164,9 +184,12 @@ export default function CommentsPage() {
             countB={merged.countB}
             commentCount={merged.commentCount}
             selectedSide={activity.userSelectedOption}
-            userIconUrl="/default-avatar.png"
+            userIconUrl={currentUser.type === "sns" && currentUser.iconUrl ? currentUser.iconUrl : "/default-avatar.png"}
             hasCommented={commentedCardIds.includes(id)}
             onVote={handleVote}
+            cardId={id}
+            bookmarked={isCardBookmarked(id)}
+            onBookmarkClick={setModalCardId}
           />
         </div>
 
@@ -223,16 +246,20 @@ export default function CommentsPage() {
                     tags={related.tags}
                     readMoreText={related.readMoreText}
                     creator={related.creator}
+                    currentUser={currentUser}
                     cardId={relatedId}
-                    bookmarked={related.bookmarked ?? false}
+                    bookmarked={isCardBookmarked(relatedId)}
                     hasCommented={commentedCardIds.includes(relatedId)}
                     initialSelectedOption={relActivity.userSelectedOption ?? null}
                     onVote={(cid, option) => {
                       persistVote(cid, option);
                       setActivity(getActivity(id));
                     }}
+                    onBookmarkClick={setModalCardId}
                     onMoreClick={setCardOptionsCardId}
                     visibility={related.visibility}
+                    optionAImageUrl={related.optionAImageUrl}
+                    optionBImageUrl={related.optionBImageUrl}
                   />
                 );
               })}
@@ -241,13 +268,27 @@ export default function CommentsPage() {
         )}
       </main>
 
-      {/* ページ下：コメント入力（送信で登録され、コメント数・一覧に反映） */}
-      <CommentInput cardId={id} onCommentSubmit={handleCommentSubmit} />
+      {/* ページ下：コメント入力（ログイン後かつ投票後のみ可能） */}
+      <CommentInput
+        cardId={id}
+        onCommentSubmit={handleCommentSubmit}
+        disabled={!isLoggedIn || activity.userSelectedOption == null}
+        disabledPlaceholder={!isLoggedIn ? "ログインするとコメントできます" : undefined}
+        currentUser={currentUser.type === "sns" ? { name: currentUser.name ?? "自分", iconUrl: currentUser.iconUrl } : undefined}
+      />
 
       {cardOptionsCardId != null && (
         <CardOptionsModal
           cardId={cardOptionsCardId}
           onClose={() => setCardOptionsCardId(null)}
+        />
+      )}
+
+      {modalCardId != null && (
+        <BookmarkCollectionModal
+          cardId={modalCardId}
+          onClose={() => setModalCardId(null)}
+          isLoggedIn={isLoggedIn}
         />
       )}
     </div>
@@ -267,7 +308,7 @@ function CommentRow({ comment }: { comment: VoteComment }) {
         <p className="mt-0.5 text-sm text-[#191919]">{comment.text}</p>
         <p className="mt-1 text-xs text-gray-500">{formatCommentDate(comment.date)}</p>
       </div>
-      <button type="button" className="shrink-0 text-gray-400" aria-label="その他">
+      <button type="button" className="shrink-0 text-[var(--color-brand-logo)] hover:opacity-80" aria-label="その他">
         <MoreIcon className="h-5 w-5" />
       </button>
     </div>

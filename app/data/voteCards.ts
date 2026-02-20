@@ -13,6 +13,8 @@ export interface VoteCardData {
   creator?: { name: string; iconUrl?: string };
   /** ブックマーク済みか（タップでトグルされるフラグ） */
   bookmarked?: boolean;
+  /** ブックマーク数（急上昇ポイント計算用。未設定時は0扱い） */
+  bookmarkCount?: number;
   /** 作成日（ISO文字列）。新着ソート用 */
   createdAt?: string;
   /** 背景画像URL（指定時は pattern の代わりに画像を使用） */
@@ -21,6 +23,10 @@ export interface VoteCardData {
   id?: string;
   /** public: みんな見れる / private: リンクを知ってる人だけ見れる（擬似） */
   visibility?: "public" | "private";
+  /** Aの画像URL（指定時はカード内にA/B画像エリアを表示） */
+  optionAImageUrl?: string;
+  /** Bの画像URL */
+  optionBImageUrl?: string;
 }
 
 export const voteCardsData: VoteCardData[] = [
@@ -30,8 +36,8 @@ export const voteCardsData: VoteCardData[] = [
     question: "好きな韓国料理は？",
     optionA: "スンドゥブチゲ",
     optionB: "チヂミ",
-    countA: 82,
-    countB: 54,
+    countA: 0,
+    countB: 0,
     commentCount: 49,
     tags: ["韓国グルメ", "しめ", "ご飯"],
     readMoreText:
@@ -43,8 +49,8 @@ export const voteCardsData: VoteCardData[] = [
     question: "10円パンって10円だと思ってなかった？",
     optionA: "思ってた",
     optionB: "んなわきゃない",
-    countA: 104,
-    countB: 69,
+    countA: 0,
+    countB: 0,
     commentCount: 75,
     tags: ["10円パン"],
   },
@@ -55,9 +61,10 @@ export const voteCardsData: VoteCardData[] = [
       "未就学児の子育てママに質問 ☆ 1人時間を作ってますか??",
     optionA: "自分の時間よりとりあえず睡眠確保",
     optionB: "睡眠削ってでも、好きな事したい時間を作る!!",
-    countA: 53,
-    countB: 36,
+    countA: 0,
+    countB: 0,
     commentCount: 32,
+    tags: ["ママ"],
   },
   {
     patternType: "blue-cyan",
@@ -65,8 +72,8 @@ export const voteCardsData: VoteCardData[] = [
     question: "物買う時どっち派？",
     optionA: "すぐ手に入る定価の新品",
     optionB: "中古がないか探してみる",
-    countA: 67,
-    countB: 45,
+    countA: 0,
+    countB: 0,
     commentCount: 28,
   },
   {
@@ -75,8 +82,8 @@ export const voteCardsData: VoteCardData[] = [
     question: "割と私の周り辛いのが好きな人多くて。",
     optionA: "辛いの好き",
     optionB: "辛いの苦手",
-    countA: 57,
-    countB: 38,
+    countA: 0,
+    countB: 0,
     commentCount: 41,
   },
   {
@@ -85,10 +92,10 @@ export const voteCardsData: VoteCardData[] = [
     question: "羨ましいのはどっち？",
     optionA: "旦那さんがイケメン",
     optionB: "旦那さんがイクメン",
-    countA: 94,
-    countB: 62,
+    countA: 0,
+    countB: 0,
     commentCount: 62,
-    tags: ["旦那", "ママ友"],
+    tags: ["旦那", "ママ", "ママ友"],
   },
   {
     patternType: "geometric-stripes",
@@ -96,9 +103,23 @@ export const voteCardsData: VoteCardData[] = [
     question: "ママ友と飲みに行くことになりました🍷...",
     optionA: "楽しみ！",
     optionB: "ちょっと憂鬱",
-    countA: 47,
-    countB: 31,
+    countA: 0,
+    countB: 0,
     commentCount: 19,
+    tags: ["ママ", "ママ友"],
+  },
+  {
+    patternType: "pink-blue",
+    backgroundImageUrl: "/backgrounds/bg_03.png",
+    question: "コストコスイーツ、マストは?",
+    optionA: "ティラミス",
+    optionB: "マフィン",
+    countA: 0,
+    countB: 0,
+    commentCount: 0,
+    tags: ["コストコ", "スイーツ", "マフィン", "ケーキ"],
+    optionAImageUrl: "/backgrounds/bg_01.png",
+    optionBImageUrl: "/backgrounds/bg_02.png",
   },
   {
     patternType: "yellow-loops",
@@ -106,8 +127,8 @@ export const voteCardsData: VoteCardData[] = [
     question: "小学校のお昼はどちらがいい？",
     optionA: "給食",
     optionB: "お弁当",
-    countA: 80,
-    countB: 54,
+    countA: 0,
+    countB: 0,
     commentCount: 55,
   },
   {
@@ -117,9 +138,10 @@ export const voteCardsData: VoteCardData[] = [
       "0〜3歳の子育てママのストレス解消法はどっち？",
     optionA: "一人の時間を作る",
     optionB: "ママ友とおしゃべり",
-    countA: 59,
-    countB: 39,
+    countA: 0,
+    countB: 0,
     commentCount: 36,
+    tags: ["ママ", "ママ友"],
   },
 ];
 
@@ -169,6 +191,25 @@ export const CARD_BACKGROUND_IMAGES = [
   "/backgrounds/bg_03.png",
   "/backgrounds/bg_04.png",
   "/backgrounds/bg_05.png",
+  "/backgrounds/bg_06.png",
+  "/backgrounds/bg_07.png",
+  "/backgrounds/bg_08.png",
+  "/backgrounds/bg_09.png",
+  "/backgrounds/bg_10.png",
+  "/backgrounds/bg_11.png",
+  "/backgrounds/bg_12.png",
+  "/backgrounds/bg_13.png",
+  "/backgrounds/bg_15.png",
+  "/backgrounds/bg_16.png",
+  "/backgrounds/bg_17.png",
+  "/backgrounds/grd_01.png",
+  "/backgrounds/grd_02.png",
+  "/backgrounds/grd_03.png",
+  "/backgrounds/grd_04.png",
+  "/backgrounds/grd_05.png",
+  "/backgrounds/grd_06.png",
+  "/backgrounds/grd_07.png",
+  "/backgrounds/grd_08.png",
 ] as const;
 
 export const recommendedTagList = [

@@ -1,7 +1,9 @@
 import type { VoteCardData } from "./voteCards";
 import type { VoteCardPattern } from "../components/VoteCard";
+import { getCurrentActivityUserId } from "./auth";
 
-const STORAGE_KEY = "vote_created_cards";
+const STORAGE_KEY_PREFIX = "vote_created_cards_";
+const LEGACY_STORAGE_KEY = "vote_created_cards";
 
 const VALID_PATTERNS: VoteCardPattern[] = [
   "geometric-stripes",
@@ -49,13 +51,15 @@ function normalizeCard(raw: unknown): VoteCardData | null {
     backgroundImageUrl: typeof o.backgroundImageUrl === "string" ? o.backgroundImageUrl : undefined,
     id: typeof o.id === "string" ? o.id : undefined,
     visibility: o.visibility === "private" ? "private" : "public",
+    optionAImageUrl: typeof o.optionAImageUrl === "string" ? o.optionAImageUrl : undefined,
+    optionBImageUrl: typeof o.optionBImageUrl === "string" ? o.optionBImageUrl : undefined,
   };
 }
 
-export function getCreatedVotes(): VoteCardData[] {
+function loadForUser(userId: string): VoteCardData[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEY_PREFIX + userId);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -70,22 +74,65 @@ export function getCreatedVotes(): VoteCardData[] {
   }
 }
 
-export function addCreatedVote(card: VoteCardData): void {
-  const list = getCreatedVotes();
-  list.unshift(card);
+function saveForUser(userId: string, list: VoteCardData[]): void {
+  if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    window.localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(list));
   } catch {
     // ignore
   }
 }
 
-/** 作ったVOTEを削除（cardId = card.id ?? card.question） */
-export function deleteCreatedVote(cardId: string): void {
-  const list = getCreatedVotes().filter((c) => (c.id ?? c.question) !== cardId);
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  } catch {
-    // ignore
+/** 現在ログイン中のユーザーが作ったVOTEのみ（mypageの「作ったVOTE」用） */
+export function getCreatedVotes(): VoteCardData[] {
+  const userId = getCurrentActivityUserId();
+  let list = loadForUser(userId);
+  if (list.length === 0 && (userId === "user1" || userId === "user2")) {
+    const legacy = loadLegacy();
+    if (legacy.length > 0) {
+      list = legacy;
+      saveForUser(userId, list);
+    }
   }
+  return list;
+}
+
+function loadLegacy(): VoteCardData[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const result: VoteCardData[] = [];
+    for (const item of parsed) {
+      const card = normalizeCard(item);
+      if (card) result.push(card);
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+/** タイムライン・カード解決用：全ユーザーの作ったVOTEをマージ（user1 + user2） */
+export function getCreatedVotesForTimeline(): VoteCardData[] {
+  if (typeof window === "undefined") return [];
+  const fromUser1 = loadForUser("user1");
+  const fromUser2 = loadForUser("user2");
+  return [...fromUser1, ...fromUser2];
+}
+
+export function addCreatedVote(card: VoteCardData): void {
+  const userId = getCurrentActivityUserId();
+  const list = loadForUser(userId);
+  list.unshift(card);
+  saveForUser(userId, list);
+}
+
+/** 作ったVOTEを削除（現在ユーザー分のみ。cardId = card.id ?? card.question） */
+export function deleteCreatedVote(cardId: string): void {
+  const userId = getCurrentActivityUserId();
+  const list = loadForUser(userId).filter((c) => (c.id ?? c.question) !== cardId);
+  saveForUser(userId, list);
 }

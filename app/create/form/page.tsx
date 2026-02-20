@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useMemo, Suspense } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "../../components/AppHeader";
@@ -8,6 +8,7 @@ import BottomNav from "../../components/BottomNav";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 import { getCollections } from "../../data/collections";
+import { getAuth } from "../../data/auth";
 import { CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
 import { addCreatedVote } from "../../data/createdVotes";
 
@@ -27,6 +28,10 @@ function CreateFormContent() {
   const [question, setQuestion] = useState(qFromUrl);
   const [optionA, setOptionA] = useState("");
   const [optionB, setOptionB] = useState("");
+  const [optionAImageUrl, setOptionAImageUrl] = useState<string | undefined>(undefined);
+  const [optionBImageUrl, setOptionBImageUrl] = useState<string | undefined>(undefined);
+  const fileInputARef = useRef<HTMLInputElement>(null);
+  const fileInputBRef = useRef<HTMLInputElement>(null);
   const [reason, setReason] = useState("");
   const [noComments, setNoComments] = useState(false);
   const [hashtagQuery, setHashtagQuery] = useState("");
@@ -58,6 +63,14 @@ function CreateFormContent() {
     if (qFromUrl) setQuestion(qFromUrl);
   }, [qFromUrl]);
 
+  /** ログイン後のみVOTEを作成可能。ログイン後はこの画面へ戻す */
+  useEffect(() => {
+    if (!getAuth().isLoggedIn) {
+      const returnPath = "/create/form" + (qFromUrl ? "?q=" + encodeURIComponent(qFromUrl) : "");
+      router.replace("/profile?returnTo=" + encodeURIComponent(returnPath));
+    }
+  }, [router, qFromUrl]);
+
   const canSubmit =
     question.trim().length > 0 &&
     question.length <= QUESTION_MAX &&
@@ -81,6 +94,8 @@ function CreateFormContent() {
       tags,
       createdAt: now,
       visibility,
+      optionAImageUrl: optionAImageUrl || undefined,
+      optionBImageUrl: optionBImageUrl || undefined,
     });
     router.push("/");
   }, [
@@ -89,10 +104,28 @@ function CreateFormContent() {
     question,
     optionA,
     optionB,
+    optionAImageUrl,
+    optionBImageUrl,
     hashtagQuery,
     selectedBackgroundUrl,
     visibility,
   ]);
+
+  const handleImageSelect = useCallback(
+    (side: "A" | "B", e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !file.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        if (side === "A") setOptionAImageUrl(dataUrl);
+        else setOptionBImageUrl(dataUrl);
+      };
+      reader.readAsDataURL(file);
+      e.target.value = "";
+    },
+    []
+  );
 
   return (
     <div className="min-h-screen bg-[#F1F1F1] pb-24">
@@ -121,7 +154,7 @@ function CreateFormContent() {
             onClick={() =>
               router.push(`/create?q=${encodeURIComponent(question)}`)
             }
-            className="relative flex min-h-[80px] w-full flex-col items-start rounded-xl bg-white p-4 text-left shadow-none outline-none"
+            className="flex min-h-[80px] w-full flex-col items-start rounded-xl bg-white p-5 text-left shadow-none outline-none"
           >
             <span
               className={`min-h-[52px] w-full resize-none text-sm outline-none placeholder:text-gray-400 ${
@@ -130,21 +163,18 @@ function CreateFormContent() {
             >
               {question || "例) 朝ご飯は、"}
             </span>
-            <span className="absolute bottom-2 right-2 text-gray-300" aria-hidden>
-              <ImageIcon className="h-5 w-5" />
-            </span>
           </button>
           <p className={`mt-1 text-xs ${question.length > QUESTION_MAX ? "text-red-600" : "text-gray-500"}`}>
             {question.length}/{QUESTION_MAX}
           </p>
         </section>
 
-        {/* Aの回答（00文字以内）* */}
+        {/* Aの回答（00文字以内）* + 画像設定 */}
         <section>
           <h2 className="mb-1 text-sm font-bold text-gray-900">
             Aの回答（{OPTION_MAX}文字以内） <span className="text-red-600">*</span>
           </h2>
-          <div className="relative rounded-xl bg-white px-4 py-3">
+          <div className="relative rounded-xl bg-white p-5 pr-[60px]">
             <input
               type="text"
               value={optionA}
@@ -152,18 +182,45 @@ function CreateFormContent() {
               placeholder="例) パン"
               className="w-full border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
             />
-            <span className="absolute bottom-2 right-2 text-gray-300" aria-hidden>
-              <ImageIcon className="h-5 w-5" />
-            </span>
+            <input
+              ref={fileInputARef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              aria-label="Aの画像を選択"
+              onChange={(e) => handleImageSelect("A", e)}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputARef.current?.click()}
+              className="absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] bg-[#D9D9D9] hover:opacity-90"
+              aria-label={optionAImageUrl ? "Aの画像を変更" : "Aの画像を設定"}
+            >
+              {optionAImageUrl ? (
+                <span className="relative flex h-8 w-8 overflow-hidden rounded-lg border border-gray-200 pointer-events-none">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={optionAImageUrl} alt="" className="h-full w-full object-cover" />
+                </span>
+              ) : (
+                <span
+                  className="block h-[17.5px] w-5 shrink-0 pointer-events-none"
+                  style={{
+                    backgroundColor: "#787878",
+                    mask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+                    WebkitMask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+                  }}
+                />
+              )}
+            </button>
           </div>
         </section>
 
-        {/* Bの回答（00文字以内）* */}
+        {/* Bの回答（00文字以内）* + 画像設定 */}
         <section>
           <h2 className="mb-1 text-sm font-bold text-gray-900">
             Bの回答（{OPTION_MAX}文字以内） <span className="text-red-600">*</span>
           </h2>
-          <div className="relative rounded-xl bg-white px-4 py-3">
+          <div className="relative rounded-xl bg-white p-5 pr-[60px]">
             <input
               type="text"
               value={optionB}
@@ -171,16 +228,43 @@ function CreateFormContent() {
               placeholder="例) パン"
               className="w-full border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
             />
-            <span className="absolute bottom-2 right-2 text-gray-300" aria-hidden>
-              <ImageIcon className="h-5 w-5" />
-            </span>
+            <input
+              ref={fileInputBRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              aria-label="Bの画像を選択"
+              onChange={(e) => handleImageSelect("B", e)}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputBRef.current?.click()}
+              className="absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] bg-[#D9D9D9] hover:opacity-90"
+              aria-label={optionBImageUrl ? "Bの画像を変更" : "Bの画像を設定"}
+            >
+              {optionBImageUrl ? (
+                <span className="relative flex h-8 w-8 overflow-hidden rounded-lg border border-gray-200 pointer-events-none">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={optionBImageUrl} alt="" className="h-full w-full object-cover" />
+                </span>
+              ) : (
+                <span
+                  className="block h-[17.5px] w-5 shrink-0 pointer-events-none"
+                  style={{
+                    backgroundColor: "#787878",
+                    mask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+                    WebkitMask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+                  }}
+                />
+              )}
+            </button>
           </div>
         </section>
 
         {/* 質問の理由（他と同様に白背景ボックス外・入力下にCheckbox） */}
         <section>
           <h2 className="mb-1 text-sm font-bold text-gray-900">質問の理由</h2>
-          <div className="rounded-xl bg-white p-4">
+          <div className="rounded-xl bg-white p-5">
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -200,7 +284,7 @@ function CreateFormContent() {
         {/* ハッシュタグを設定 */}
         <section>
           <h2 className="mb-1 text-sm font-bold text-gray-900">ハッシュタグを設定</h2>
-          <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-3">
+          <div className="flex items-center gap-2 rounded-xl bg-white p-5">
             <MagnifyIcon className="h-5 w-5 shrink-0 text-gray-400" />
             <input
               type="text"
@@ -240,35 +324,6 @@ function CreateFormContent() {
                 )}
               </button>
             ))}
-          </div>
-        </section>
-
-        {/* 公開設定：みんな / リンクを知ってる人だけ */}
-        <section>
-          <h2 className="mb-2 text-sm font-bold text-gray-900">公開設定</h2>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setVisibility("public")}
-              className={`flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-colors ${
-                visibility === "public"
-                  ? "border-[#FFE100] bg-[#FFE100]/20 text-gray-900"
-                  : "border-gray-200 bg-white text-gray-600"
-              }`}
-            >
-              みんなに公開
-            </button>
-            <button
-              type="button"
-              onClick={() => setVisibility("private")}
-              className={`flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-colors ${
-                visibility === "private"
-                  ? "border-[#FFE100] bg-[#FFE100]/20 text-gray-900"
-                  : "border-gray-200 bg-white text-gray-600"
-              }`}
-            >
-              リンクを知っている人だけ
-            </button>
           </div>
         </section>
 
@@ -369,7 +424,7 @@ function CreateFormContent() {
           <button
             type="button"
             onClick={() => setCollectionOpen((o) => !o)}
-            className="flex w-full items-center rounded-xl border border-gray-200 bg-white px-4 py-3 text-left"
+            className="flex w-full items-center rounded-[9999px] border border-gray-200 bg-white px-4 py-3 text-left"
           >
             <span
               className={`min-w-0 flex-1 text-sm ${selectedCollectionId ? "text-gray-900" : "text-gray-400"}`}
@@ -395,7 +450,7 @@ function CreateFormContent() {
                 aria-hidden
                 onClick={() => setCollectionOpen(false)}
               />
-              <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+              <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-[20px] border border-gray-200 bg-white py-1 shadow-lg">
                 {collections.length === 0 ? (
                   <li className="px-4 py-3 text-sm text-gray-500">コレクションがありません</li>
                 ) : (
@@ -437,19 +492,6 @@ export default function CreateFormPage() {
     <Suspense fallback={<div className="min-h-screen bg-[#F1F1F1] flex items-center justify-center">読み込み中...</div>}>
       <CreateFormContent />
     </Suspense>
-  );
-}
-
-function ImageIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-      />
-    </svg>
   );
 }
 

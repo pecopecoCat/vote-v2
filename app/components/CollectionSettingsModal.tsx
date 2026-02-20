@@ -2,15 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Collection, CollectionVisibility } from "../data/collections";
-
-const COLOR_SWATCHES = [
-  "#87CEEB", // 水色
-  "#FFB6C1", // ピンク
-  "#FFB347", // オレンジ
-  "#DDA0DD", // 紫
-  "#98FB98", // 薄緑
-  "#E5E7EB", // グレー
-];
+import { COLLECTION_GRADIENT_OPTIONS, type CollectionGradient } from "../data/search";
 
 const VISIBILITY_OPTIONS: { value: CollectionVisibility; label: string }[] = [
   { value: "public", label: "公開" },
@@ -20,31 +12,32 @@ const VISIBILITY_OPTIONS: { value: CollectionVisibility; label: string }[] = [
 
 export interface CollectionSettingsModalProps {
   onClose: () => void;
-  onSave: (name: string, color: string, visibility: CollectionVisibility) => void;
+  /** 保存時は name, gradient, visibility を渡す（Bookmark/検索/MyPage/設定で共通グラデーション） */
+  onSave: (name: string, gradient: CollectionGradient, visibility: CollectionVisibility) => void;
   /** 編集時は既存コレクションを渡す（新規のときは undefined） */
   editingCollection?: Collection | null;
 }
 
 export default function CollectionSettingsModal({ onClose, onSave, editingCollection }: CollectionSettingsModalProps) {
   const [name, setName] = useState(editingCollection?.name ?? "");
-  const [color, setColor] = useState(editingCollection?.color ?? COLOR_SWATCHES[0]);
+  const [gradient, setGradient] = useState<CollectionGradient>(editingCollection?.gradient ?? "blue-cyan");
   const [visibility, setVisibility] = useState<CollectionVisibility>(editingCollection?.visibility ?? "public");
 
   useEffect(() => {
     if (editingCollection) {
       setName(editingCollection.name);
-      setColor(editingCollection.color);
+      setGradient(editingCollection.gradient ?? "blue-cyan");
       setVisibility(editingCollection.visibility);
     } else {
       setName("");
-      setColor(COLOR_SWATCHES[0]);
+      setGradient("blue-cyan");
       setVisibility("public");
     }
   }, [editingCollection]);
 
   const handleSave = () => {
     const trimmed = name.trim() || (editingCollection ? editingCollection.name : "新しいコレクション");
-    onSave(trimmed, color, visibility);
+    onSave(trimmed, gradient, visibility);
     onClose();
   };
 
@@ -81,26 +74,31 @@ export default function CollectionSettingsModal({ onClose, onSave, editingCollec
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-900">背景カラー</label>
             <div className="flex flex-wrap gap-3">
-              {COLOR_SWATCHES.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className={`relative h-10 w-10 shrink-0 rounded-full transition-transform active:scale-95 ${
-                    color === c ? "ring-2 ring-[#FFE100] ring-offset-2" : ""
-                  }`}
-                  style={{ backgroundColor: c }}
-                  aria-label={`色 ${c}`}
-                >
-                  {color === c && (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black text-white">
-                      <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                      </svg>
-                    </span>
-                  )}
-                </button>
-              ))}
+              {COLLECTION_GRADIENT_OPTIONS.map((c) => {
+                const isSelected = gradient === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setGradient(c.id)}
+                    className={`relative h-10 w-10 shrink-0 rounded-full transition-transform active:scale-95 ${
+                      isSelected ? "ring-2 ring-[#FFE100] ring-offset-2" : ""
+                    }`}
+                    style={{
+                      background: `linear-gradient(to bottom, ${c.start}, ${c.end})`,
+                    }}
+                    aria-label={`グラデーション ${c.id}`}
+                  >
+                    {isSelected && (
+                      <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#FFE100]">
+                        <svg className="h-3 w-3" fill="#191919" viewBox="0 0 24 24">
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                        </svg>
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -127,7 +125,9 @@ export default function CollectionSettingsModal({ onClose, onSave, editingCollec
                       }`}
                     >
                       {visibility === opt.value && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-gray-900" />
+                        <svg className="h-3 w-3" fill="#191919" viewBox="0 0 24 24">
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                        </svg>
                       )}
                     </span>
                   </span>
@@ -142,14 +142,14 @@ export default function CollectionSettingsModal({ onClose, onSave, editingCollec
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-xl border border-gray-200 bg-gray-100 py-3 text-sm font-medium text-gray-700"
+            className="flex-1 rounded-[9999px] border border-gray-200 bg-gray-100 py-3 text-sm font-medium text-gray-700"
           >
             キャンセル
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="flex-1 rounded-xl bg-[#FFE100] py-3 text-sm font-bold text-gray-900"
+            className="flex-1 rounded-[9999px] bg-[#FFE100] py-3 text-sm font-bold text-gray-900"
           >
             保存
           </button>

@@ -10,11 +10,12 @@ export type ButtonVariant =
   | "blackLarge"   // 大サイズ黒: 黒・白文字 60px
   | "blackMedium"  // 中サイズ黒: 黒・白文字 44px
   | "pill"         // 小サイズ丸: 黒(active) / グレー(inactive)
-  | "outline";     // 新しいコレクションを追加: 白・グレー枠・黒文字
+  | "outline"      // 新しいコレクションを追加: 白・グレー枠・黒文字
+  | "buttonS";     // 小: 選択時は黄枠・薄黄背景 / 非選択は白・グレー枠（公開設定など）
 
 export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> {
   variant: ButtonVariant;
-  /** pill のときのみ: true=アクティブ(黒)、false=非アクティブ(グレー) */
+  /** pill / buttonS のとき: true=選択中、false=非選択 */
   active?: boolean;
   children: ReactNode;
   className?: string;
@@ -58,6 +59,13 @@ const variantStyles: Record<
     "bg-white border border-[#D9D9D9] text-[#191919]",
     "hover:bg-gray-50 active:bg-gray-100",
   ].join(" "),
+  buttonS: (active = false) =>
+    [
+      "flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-colors min-h-[44px]",
+      active
+        ? "border-[#FFE100] bg-[#FFF9CC] text-gray-900"
+        : "border-[#D9D9D9] bg-white text-gray-600 hover:bg-gray-50",
+    ].join(" "),
 };
 
 export default function Button({
@@ -73,7 +81,9 @@ export default function Button({
     fontClass;
   const variantStyle =
     typeof variantStyles[variant] === "function"
-      ? (variantStyles[variant] as (active?: boolean) => string)(variant === "pill" ? active : undefined)
+      ? (variantStyles[variant] as (active?: boolean) => string)(
+          variant === "pill" || variant === "buttonS" ? active : undefined
+        )
       : (variantStyles[variant] as string);
   const isPillDisabled = variant === "pill" && !active;
   const isDisabled = disabled ?? isPillDisabled;

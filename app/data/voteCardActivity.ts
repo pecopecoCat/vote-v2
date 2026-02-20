@@ -1,7 +1,12 @@
 /**
- * VOTEカードの「活動データ」：投票数（2択のcount up）とコメント情報を保持・読み込みする。
- * ベースのカードデータ（voteCards / createdVotes）にマージして HOME・個別ページ・VoteCard に反映する。
+ * VOTEカードの「活動データ」：投票数・コメントは全ユーザー共通の総数で保存。
+ * 誰がどの選択肢を選んだか（投票済み表示）だけユーザー別に保存。
+ *
+ * - 総投票数・コメント一覧 → vote_card_activity_global（ユーザーに依存しない）
+ * - 現在ユーザーの投票選択 → vote_card_activity_${userId}（ログイン/ゲスト別）
  */
+
+import { getCurrentActivityUserId } from "./auth";
 
 /** コメント1件：コメントしたユーザー・日付・テキスト */
 export interface VoteComment {
@@ -14,79 +19,124 @@ export interface VoteComment {
   text: string;
 }
 
-/** カードごとの活動：投票数（2択の加算）とコメント一覧。この端末で投票した選択も保持。 */
+/** カードごとの活動：投票数（総数）・コメント一覧 ＋ 現在ユーザーの選択（表示用） */
 export interface CardActivity {
-  /** Aに投票した人数（この端末での加算分を含む） */
+  /** Aに投票した人数（総数・端末での加算分を含む） */
   countA: number;
-  /** Bに投票した人数（この端末での加算分を含む） */
+  /** Bに投票した人数（総数） */
   countB: number;
-  /** コメント一覧（登録されている情報） */
+  /** コメント一覧（総数） */
   comments: VoteComment[];
-  /** この端末のユーザーが選んだ選択肢（投票済み表示用） */
+  /** 現在のユーザーが選んだ選択肢（投票済み表示用・ユーザー別ストレージから） */
   userSelectedOption?: "A" | "B";
 }
 
-const STORAGE_KEY = "vote_card_activity";
+/** グローバル保存用：投票数・コメントのみ（ユーザーに依存しない） */
+interface GlobalCardData {
+  countA: number;
+  countB: number;
+  comments: VoteComment[];
+}
 
-function loadAll(): Record<string, CardActivity> {
+const GLOBAL_STORAGE_KEY = "vote_card_activity_global";
+const USER_STORAGE_KEY_PREFIX = "vote_card_activity_";
+
+function getUserStorageKey(): string {
+  return USER_STORAGE_KEY_PREFIX + getCurrentActivityUserId();
+}
+
+function loadGlobal(): Record<string, GlobalCardData> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(GLOBAL_STORAGE_KEY);
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, CardActivity>;
+    const parsed = JSON.parse(raw) as Record<string, GlobalCardData>;
     return typeof parsed === "object" && parsed !== null ? parsed : {};
   } catch {
     return {};
   }
 }
 
-function saveAll(data: Record<string, CardActivity>): void {
+function saveGlobal(data: Record<string, GlobalCardData>): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    window.localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(data));
   } catch {
     // ignore
   }
 }
 
-/** カードIDに対応する活動データを取得（なければ空のデフォルト） */
-export function getActivity(cardId: string): CardActivity {
-  const all = loadAll();
-  const a = all[cardId];
-  if (!a) return { countA: 0, countB: 0, comments: [] };
+function loadUserSelections(): Record<string, { userSelectedOption?: "A" | "B" }> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(getUserStorageKey());
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, { userSelectedOption?: "A" | "B" }>;
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUserSelections(data: Record<string, { userSelectedOption?: "A" | "B" }>): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(getUserStorageKey(), JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+function normalizeCardActivity(g: GlobalCardData | undefined, u: { userSelectedOption?: "A" | "B" } | undefined): CardActivity {
   return {
-    countA: typeof a.countA === "number" && a.countA >= 0 ? a.countA : 0,
-    countB: typeof a.countB === "number" && a.countB >= 0 ? a.countB : 0,
-    comments: Array.isArray(a.comments) ? a.comments : [],
-    userSelectedOption: a.userSelectedOption === "A" || a.userSelectedOption === "B" ? a.userSelectedOption : undefined,
+    countA: g && typeof g.countA === "number" && g.countA >= 0 ? g.countA : 0,
+    countB: g && typeof g.countB === "number" && g.countB >= 0 ? g.countB : 0,
+    comments: g && Array.isArray(g.comments) ? g.comments : [],
+    userSelectedOption: u?.userSelectedOption === "A" || u?.userSelectedOption === "B" ? u.userSelectedOption : undefined,
   };
 }
 
-/** 全カードの活動を取得（HOMEなどで一括マージする用） */
-export function getAllActivity(): Record<string, CardActivity> {
-  return loadAll();
+/** カードIDに対応する活動データを取得（総数＋現在ユーザーの選択をマージ） */
+export function getActivity(cardId: string): CardActivity {
+  const global = loadGlobal();
+  const user = loadUserSelections();
+  return normalizeCardActivity(global[cardId], user[cardId]);
 }
 
-/** 2択に投票する：countA または countB を +1 し、この端末の選択を記録 */
+/** 全カードの活動を取得（HOMEなどで一括マージする用）。総数＋現在ユーザーの選択をマージ。 */
+export function getAllActivity(): Record<string, CardActivity> {
+  const global = loadGlobal();
+  const user = loadUserSelections();
+  const cardIds = new Set([...Object.keys(global), ...Object.keys(user)]);
+  const result: Record<string, CardActivity> = {};
+  for (const id of cardIds) {
+    result[id] = normalizeCardActivity(global[id], user[id]);
+  }
+  return result;
+}
+
+/** 2択に投票する：総数に +1、現在ユーザーの選択を記録 */
 export function addVote(cardId: string, option: "A" | "B"): void {
-  const all = loadAll();
-  const current = all[cardId] ?? { countA: 0, countB: 0, comments: [] };
-  const next: CardActivity = {
+  const global = loadGlobal();
+  const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
+  const nextGlobal: GlobalCardData = {
     countA: current.countA + (option === "A" ? 1 : 0),
     countB: current.countB + (option === "B" ? 1 : 0),
     comments: Array.isArray(current.comments) ? current.comments : [],
-    userSelectedOption: option,
   };
-  saveAll({ ...all, [cardId]: next });
+  saveGlobal({ ...global, [cardId]: nextGlobal });
+
+  const user = loadUserSelections();
+  saveUserSelections({ ...user, [cardId]: { userSelectedOption: option } });
 }
 
-/** コメントを追加：コメント情報（ユーザー・日付・テキスト）を登録しコメント数を更新 */
+/** コメントを追加：総数側に登録（全ユーザー共通） */
 export function addComment(
   cardId: string,
   comment: { user: { name: string; iconUrl?: string }; text: string }
 ): void {
-  const all = loadAll();
-  const current = all[cardId] ?? { countA: 0, countB: 0, comments: [] };
+  const global = loadGlobal();
+  const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
   const comments = Array.isArray(current.comments) ? current.comments : [];
   const newComment: VoteComment = {
     id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -94,22 +144,21 @@ export function addComment(
     date: new Date().toISOString(),
     text: comment.text,
   };
-  const next: CardActivity = {
+  const next: GlobalCardData = {
     countA: current.countA ?? 0,
     countB: current.countB ?? 0,
     comments: [...comments, newComment],
-    userSelectedOption: current.userSelectedOption,
   };
-  saveAll({ ...all, [cardId]: next });
+  saveGlobal({ ...global, [cardId]: next });
 }
 
-/** 自分がコメントしたカードID一覧（コメント投稿時の user.name が「自分」のもの）。新しい順。 */
+/** 自分がコメントしたカードID一覧（総数側のコメントで user.name が「自分」のもの） */
 const MY_COMMENT_USER_NAME = "自分";
 
 export function getCardIdsUserCommentedOn(): string[] {
-  const all = loadAll();
+  const global = loadGlobal();
   const ids: string[] = [];
-  for (const [cardId, a] of Object.entries(all)) {
+  for (const [cardId, a] of Object.entries(global)) {
     if (!Array.isArray(a.comments)) continue;
     const hasMine = a.comments.some((c) => c.user?.name === MY_COMMENT_USER_NAME);
     if (hasMine) ids.push(cardId);
@@ -117,19 +166,34 @@ export function getCardIdsUserCommentedOn(): string[] {
   return ids;
 }
 
+/** 全カードの投票数（countA, countB）のみ0にリセット。コメントは残す。 */
+export function resetAllVoteCounts(): void {
+  const global = loadGlobal();
+  const next: Record<string, GlobalCardData> = {};
+  for (const [cardId, data] of Object.entries(global)) {
+    next[cardId] = {
+      countA: 0,
+      countB: 0,
+      comments: Array.isArray(data.comments) ? data.comments : [],
+    };
+  }
+  saveGlobal(next);
+}
+
 /** ベースカードと活動をマージした表示用の countA, countB, commentCount を返す */
 export function getMergedCounts(
   baseCountA: number,
   baseCountB: number,
-  baseCommentCount: number,
+  _baseCommentCount: number,
   activity: CardActivity
 ): { countA: number; countB: number; commentCount: number } {
   const a = activity.countA ?? 0;
   const b = activity.countB ?? 0;
-  const commentLen = Array.isArray(activity.comments) ? activity.comments.length : 0;
+  /** コメント数は実際に保存されているコメント件数のみ反映 */
+  const commentCount = Array.isArray(activity.comments) ? activity.comments.length : 0;
   return {
     countA: baseCountA + a,
     countB: baseCountB + b,
-    commentCount: baseCommentCount + commentLen,
+    commentCount,
   };
 }

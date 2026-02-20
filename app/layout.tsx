@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",
   subsets: ["latin"],
-  weight: ["400", "700"],
+  weight: ["400", "700", "900"],
 });
 
 const lato = Lato({

@@ -17,6 +17,8 @@ export interface CollectionCardProps {
   titleVariant?: "default" | "blackBlock";
   /** 右上のラベル（例: コレクション）。角丸・薄い背景付き */
   label?: string;
+  /** タイムライン用バナー：W335px相当・H260px・タイトルは黒ベタ・#ffffff・26px */
+  timelineBanner?: boolean;
 }
 
 
@@ -28,39 +30,56 @@ export default function CollectionCard({
   href,
   titleVariant = "default",
   label,
+  timelineBanner = false,
 }: CollectionCardProps) {
   const gradientClass = getCollectionGradientClass(gradient);
-  const isBlackBlock = titleVariant === "blackBlock";
+  const isBlackBlock = titleVariant === "blackBlock" || timelineBanner;
 
   const content = (
     <article
-      className={`relative w-full overflow-hidden rounded-[10px] min-h-[72px] ${
-        isBlackBlock
+      className={`relative w-full overflow-hidden rounded-[18px] ${
+        timelineBanner ? "h-[260px] min-h-[260px] px-5 py-5" : "min-h-[72px]"
+      } ${
+        isBlackBlock && !timelineBanner
           ? "bg-gradient-to-br from-[#c2410c] via-orange-500 to-[#fde047] px-5 py-12"
-          : `bg-gradient-to-r ${gradientClass} px-5 py-4`
-      } flex items-center`}
+          : isBlackBlock && timelineBanner
+            ? `bg-gradient-to-r ${gradientClass} flex flex-col justify-end`
+            : isBlackBlock
+              ? "bg-gradient-to-br from-[#c2410c] via-orange-500 to-[#fde047] px-5 py-12"
+              : `bg-gradient-to-r ${gradientClass} px-5 py-4`
+      } ${!timelineBanner ? "flex items-center" : ""}`}
     >
       {label && (
         <span
-          className="absolute right-3 top-3 rounded-lg bg-white/90 px-2.5 py-1 text-xs font-bold text-gray-900"
+          className="absolute right-3 top-3 rounded-[9999px] bg-white/90 px-2.5 py-1 text-xs font-bold text-gray-900"
           aria-hidden
         >
           {label}
         </span>
       )}
       {showPin && !label && (
-        <span className="absolute right-6 top-1/2 -translate-y-1/2" aria-hidden>
-          <img src="/icons/icon_pin.svg" alt="" className="h-5 w-5" width={22} height={22} />
-        </span>
+        <span
+          className="absolute right-6 top-1/2 h-5 w-5 -translate-y-1/2"
+          style={{
+            backgroundColor: "#191919",
+            mask: "url(/icons/icon_pin.svg) no-repeat center/contain",
+            WebkitMask: "url(/icons/icon_pin.svg) no-repeat center/contain",
+          }}
+          aria-hidden
+        />
       )}
       {isBlackBlock ? (
         <div className="w-full rounded-none bg-black px-4 py-3 text-left">
-          <p className="whitespace-pre-line text-[28px] font-bold leading-snug text-white">
+          <p
+            className={`whitespace-pre-line font-bold leading-snug text-[#ffffff] ${
+              timelineBanner ? "text-[26px]" : "text-[28px]"
+            }`}
+          >
             {title}
           </p>
         </div>
       ) : (
-        <p className={`text-sm font-bold text-white ${showPin ? "pr-12" : ""}`}>{title}</p>
+        <p className={`text-sm font-bold text-[#191919] ${showPin ? "pr-12" : ""}`}>{title}</p>
       )}
     </article>
   );
