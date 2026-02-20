@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import BottomNav from "../components/BottomNav";
@@ -116,7 +116,7 @@ function backgroundForCard(card: VoteCardData, cardId: string): string {
   return CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
 }
 
-export default function ProfilePage() {
+function ProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const returnTo = searchParams.get("returnTo"); // 未ログインでVOTE作成から来た場合の戻り先
@@ -828,5 +828,13 @@ export default function ProfilePage() {
         />
       )}
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#F1F1F1]">読み込み中...</div>}>
+      <ProfileContent />
+    </Suspense>
   );
 }
