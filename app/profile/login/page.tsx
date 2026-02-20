@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import BottomNav from "../../components/BottomNav";
 import { getAuth, loginAsDemoUser, DEMO_USERS } from "../../data/auth";
 
-/** ログイン専用URL。ログイン済みなら returnTo または /profile へ。1ボタンで「LINEでログイン」→ user1/user2 を選択。 */
-export default function ProfileLoginPage() {
+function ProfileLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") ?? "/profile";
@@ -113,5 +112,14 @@ export default function ProfileLoginPage() {
 
       <BottomNav activeId="profile" />
     </div>
+  );
+}
+
+/** ログイン専用URL。useSearchParams を Suspense でラップ。 */
+export default function ProfileLoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#FFE100]">読み込み中...</div>}>
+      <ProfileLoginContent />
+    </Suspense>
   );
 }
