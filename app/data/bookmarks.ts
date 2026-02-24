@@ -9,6 +9,41 @@ import { getCurrentActivityUserId } from "./auth";
 const STORAGE_KEY_PREFIX = "vote_bookmark_ids_";
 const COLLECTIONS_KEY_PREFIX = "vote_collections_";
 const EVENT_NAME = "vote_bookmarks_updated";
+const BOOKMARK_EVENTS_KEY = "vote_bookmark_events";
+const MAX_BOOKMARK_EVENTS = 100;
+
+/** ブックマークイベント（作成者向けお知らせ「作成した2択がブックマークされました」用） */
+export interface BookmarkEvent {
+  cardId: string;
+  date: string;
+}
+
+function loadBookmarkEvents(): BookmarkEvent[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(BOOKMARK_EVENTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as BookmarkEvent[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveBookmarkEvents(events: BookmarkEvent[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(BOOKMARK_EVENTS_KEY, JSON.stringify(events.slice(-MAX_BOOKMARK_EVENTS)));
+  } catch {
+    // ignore
+  }
+}
+
+/** ブックマークイベント一覧を取得（作成者向けお知らせ用・日付降順） */
+export function getBookmarkEvents(): BookmarkEvent[] {
+  const events = loadBookmarkEvents();
+  return [...events].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+}
 
 /** 既存ユーザー：コレクションの和集合をBookmarkに1回だけ移行 */
 function tryMigrateFromCollections(userId: string): string[] {
@@ -76,6 +111,9 @@ export function addBookmark(cardId: string): void {
   const ids = load(userId);
   if (ids.includes(cardId)) return;
   save(userId, [...ids, cardId]);
+  const events = loadBookmarkEvents();
+  events.push({ cardId, date: new Date().toISOString() });
+  saveBookmarkEvents(events);
 }
 
 /** Bookmarkから削除（コレクションからも一括削除する場合は collections 側で行う） */

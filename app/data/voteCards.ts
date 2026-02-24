@@ -27,6 +27,8 @@ export interface VoteCardData {
   optionAImageUrl?: string;
   /** Bの画像URL */
   optionBImageUrl?: string;
+  /** 投票期間終了日時（ISO文字列）。お知らせ「設定した投票期間が終わりました」用 */
+  periodEnd?: string;
 }
 
 export const voteCardsData: VoteCardData[] = [

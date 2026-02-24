@@ -6,9 +6,10 @@ export type ActivityType =
   | "voted"                // 投票した
   | "commented"            // コメントした
   | "voted_on_mine"        // 作成した2択に投票された
-  | "comment_on_mine"     // 作成した2択にコメントが来た
-  | "comment_on_commented" // 自分がコメントした2択にコメントが来た
-  | "period_ended";        // 投票期間が終わった
+  | "comment_on_mine"      // 作成した2択にコメントが来た
+  | "bookmark_on_mine"     // 作成した2択がブックマークされた
+  | "period_ended"         // 設定した投票期間が終わった
+  | "liked_my_comment";    // 自分が送ったコメントにいいねがついた
 
 export interface ActivityItem {
   type: ActivityType;
@@ -26,10 +27,11 @@ export const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {
   created: "2択を作成しました",
   voted: "投票しました",
   commented: "コメントしました",
-  voted_on_mine: "作成した2択に投票されました",
-  comment_on_mine: "作成した2択にコメントが届きました",
-  comment_on_commented: "コメントした2択にコメントが届きました",
-  period_ended: "投票期間が終了しました",
+  voted_on_mine: "作成した2択に投票がありました",
+  comment_on_mine: "作成した2択にコメントがありました",
+  bookmark_on_mine: "作成した2択がブックマークされました",
+  period_ended: "設定した投票期間が終わりました",
+  liked_my_comment: "送ったコメントにいいねがつきました",
 };
 
 /** デモ用：アクティビティ一覧（SNSログイン時表示用） */
@@ -63,11 +65,18 @@ export const MOCK_ACTIVITIES: ActivityItem[] = [
     questionPreview: "好きな韓国料理は？",
   },
   {
-    type: "comment_on_commented",
-    cardId: "seed-2",
-    label: ACTIVITY_TYPE_LABELS.comment_on_commented,
+    type: "bookmark_on_mine",
+    cardId: "seed-0",
+    label: ACTIVITY_TYPE_LABELS.bookmark_on_mine,
     date: "2024.10.11",
-    questionPreview: "未就学児の子育てママに質問 ☆ 1人時間を作ってますか??",
+    questionPreview: "好きな韓国料理は？",
+  },
+  {
+    type: "liked_my_comment",
+    cardId: "seed-1",
+    label: ACTIVITY_TYPE_LABELS.liked_my_comment,
+    date: "2024.10.11",
+    questionPreview: "10円パンって10円だと思ってなかった？",
   },
   {
     type: "period_ended",

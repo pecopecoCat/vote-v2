@@ -8,7 +8,7 @@
 
 import { getCurrentActivityUserId } from "./auth";
 
-/** コメント1件：コメントしたユーザー・日付・テキスト */
+/** コメント1件：コメントしたユーザー・日付・テキスト・いいね数 */
 export interface VoteComment {
   id: string;
   /** コメントしたユーザー */
@@ -17,6 +17,8 @@ export interface VoteComment {
   date: string;
   /** コメントテキスト */
   text: string;
+  /** いいね数（お知らせ「送ったコメントにいいね」用） */
+  likeCount?: number;
 }
 
 /** カードごとの活動：投票数（総数）・コメント一覧 ＋ 現在ユーザーの選択（表示用） */
@@ -40,6 +42,8 @@ interface GlobalCardData {
 
 const GLOBAL_STORAGE_KEY = "vote_card_activity_global";
 const USER_STORAGE_KEY_PREFIX = "vote_card_activity_";
+const VOTE_EVENTS_KEY = "vote_vote_events";
+const MAX_VOTE_EVENTS = 100;
 
 function getUserStorageKey(): string {
   return USER_STORAGE_KEY_PREFIX + getCurrentActivityUserId();
@@ -115,7 +119,40 @@ export function getAllActivity(): Record<string, CardActivity> {
   return result;
 }
 
-/** 2択に投票する：総数に +1、現在ユーザーの選択を記録 */
+/** 投票イベント（お知らせ「作成した2択に投票がありました」用） */
+export interface VoteEvent {
+  cardId: string;
+  date: string;
+}
+
+function loadVoteEvents(): VoteEvent[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(VOTE_EVENTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as VoteEvent[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveVoteEvents(events: VoteEvent[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(VOTE_EVENTS_KEY, JSON.stringify(events.slice(-MAX_VOTE_EVENTS)));
+  } catch {
+    // ignore
+  }
+}
+
+/** 投票イベント一覧を取得（作成者向けお知らせ用・日付降順） */
+export function getVoteEvents(): VoteEvent[] {
+  const events = loadVoteEvents();
+  return [...events].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+}
+
+/** 2択に投票する：総数に +1、現在ユーザーの選択を記録し、投票イベントを追加 */
 export function addVote(cardId: string, option: "A" | "B"): void {
   const global = loadGlobal();
   const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
@@ -128,6 +165,10 @@ export function addVote(cardId: string, option: "A" | "B"): void {
 
   const user = loadUserSelections();
   saveUserSelections({ ...user, [cardId]: { userSelectedOption: option } });
+
+  const events = loadVoteEvents();
+  events.push({ cardId, date: new Date().toISOString() });
+  saveVoteEvents(events);
 }
 
 /** コメントを追加：総数側に登録（全ユーザー共通） */
@@ -143,6 +184,7 @@ export function addComment(
     user: comment.user,
     date: new Date().toISOString(),
     text: comment.text,
+    likeCount: 0,
   };
   const next: GlobalCardData = {
     countA: current.countA ?? 0,
@@ -150,6 +192,20 @@ export function addComment(
     comments: [...comments, newComment],
   };
   saveGlobal({ ...global, [cardId]: next });
+}
+
+/** コメントにいいねを追加（お知らせ「送ったコメントにいいね」用） */
+export function addCommentLike(cardId: string, commentId: string): void {
+  const global = loadGlobal();
+  const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
+  const comments = Array.isArray(current.comments) ? current.comments : [];
+  const nextComments = comments.map((c) =>
+    c.id === commentId ? { ...c, likeCount: (c.likeCount ?? 0) + 1 } : c
+  );
+  saveGlobal({
+    ...global,
+    [cardId]: { countA: current.countA, countB: current.countB, comments: nextComments },
+  });
 }
 
 /** 自分がコメントしたカードID一覧（総数側のコメントで user.name が「自分」のもの） */

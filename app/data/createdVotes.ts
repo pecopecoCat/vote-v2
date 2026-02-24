@@ -53,6 +53,7 @@ function normalizeCard(raw: unknown): VoteCardData | null {
     visibility: o.visibility === "private" ? "private" : "public",
     optionAImageUrl: typeof o.optionAImageUrl === "string" ? o.optionAImageUrl : undefined,
     optionBImageUrl: typeof o.optionBImageUrl === "string" ? o.optionBImageUrl : undefined,
+    periodEnd: typeof o.periodEnd === "string" ? o.periodEnd : undefined,
   };
 }
 

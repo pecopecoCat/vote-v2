@@ -143,6 +143,10 @@ function ProfileContent() {
   const [myVoteSortOrder, setMyVoteSortOrder] = useState<"newest" | "oldest">("newest");
   /** myVOTE 新着順プルダウン開閉 */
   const [myVoteSortDropdownOpen, setMyVoteSortDropdownOpen] = useState(false);
+  /** 投票タブ 並び順 */
+  const [voteTabSortOrder, setVoteTabSortOrder] = useState<"newest" | "oldest">("newest");
+  /** 投票タブ 新着順プルダウン開閉 */
+  const [voteTabSortDropdownOpen, setVoteTabSortDropdownOpen] = useState(false);
   /** ログイン状態（LINEのみ。未ログイン時はログイン画面を表示） */
   const [auth, setAuth] = useState(() => getAuth());
 
@@ -218,10 +222,15 @@ function ProfileContent() {
     [createdVotesRefreshKey, seedCards]
   );
 
-  const votedCards = useMemo(
+  const votedCardsRaw = useMemo(
     () => allCards.filter((c) => activity[c.id ?? ""]?.userSelectedOption),
     [allCards, activity]
   );
+  const votedCards = useMemo(() => {
+    const list = [...votedCardsRaw];
+    if (voteTabSortOrder === "oldest") list.reverse();
+    return list;
+  }, [votedCardsRaw, voteTabSortOrder]);
 
   const allBookmarkedIds = useMemo(() => getBookmarkIds(), [collections, bookmarkRefreshKey, auth]);
   const bookmarkedCards = useMemo(
@@ -532,11 +541,65 @@ function ProfileContent() {
 
         {activeTab === "vote" && (
           <>
-            <div className="flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm">
-              <span className="text-sm font-bold text-gray-600">新着順</span>
-              <button type="button" className="flex items-center gap-1 text-sm text-gray-700">
-                <ChevronDownIcon className="h-4 w-4 text-[#FFE100]" />
-              </button>
+            <div className="relative mb-5 flex items-center justify-between">
+              <div className="relative">
+                <button
+                  type="button"
+                  className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-gray-900 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+                  aria-haspopup="listbox"
+                  aria-expanded={voteTabSortDropdownOpen}
+                  onClick={() => setVoteTabSortDropdownOpen((o) => !o)}
+                >
+                  {voteTabSortOrder === "newest" ? "新着順" : "古い順"}
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
+                    <img
+                      src="/icons/icon_b_arrow.svg"
+                      alt=""
+                      className="h-2.5 w-2.5 shrink-0 rotate-0"
+                      width={10}
+                      height={8}
+                    />
+                  </span>
+                </button>
+                {voteTabSortDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      aria-hidden
+                      onClick={() => setVoteTabSortDropdownOpen(false)}
+                    />
+                    <ul
+                      className="absolute left-0 top-full z-20 mt-1 min-w-[120px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                      role="listbox"
+                    >
+                      <li role="option" aria-selected={voteTabSortOrder === "newest"}>
+                        <button
+                          type="button"
+                          className="w-full px-4 py-2 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"
+                          onClick={() => {
+                            setVoteTabSortOrder("newest");
+                            setVoteTabSortDropdownOpen(false);
+                          }}
+                        >
+                          新着順
+                        </button>
+                      </li>
+                      <li role="option" aria-selected={voteTabSortOrder === "oldest"}>
+                        <button
+                          type="button"
+                          className="w-full px-4 py-2 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"
+                          onClick={() => {
+                            setVoteTabSortOrder("oldest");
+                            setVoteTabSortDropdownOpen(false);
+                          }}
+                        >
+                          古い順
+                        </button>
+                      </li>
+                    </ul>
+                  </>
+                )}
+              </div>
             </div>
             {votedCards.length === 0 ? (
               <div className="mt-4 rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
