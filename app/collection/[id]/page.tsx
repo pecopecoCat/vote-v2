@@ -145,7 +145,7 @@ export default function CollectionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-20">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
       {/* ヘッダー：設定グラデーション/カラー背景・コレクション名・戻る・ピン（全画面共通） */}
       <header
         className={`flex items-center justify-between px-4 py-3 ${collection.gradient ? `bg-gradient-to-r ${getCollectionGradientClass(collection.gradient)}` : ""}`}

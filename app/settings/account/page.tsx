@@ -7,8 +7,8 @@ import AppHeader from "../../components/AppHeader";
 import { getAuth, updateCurrentUserProfile, getAuthUpdatedEventName } from "../../data/auth";
 
 const ICON_OPTIONS = [
-  { value: "/chara1.png", label: "chara1" },
-  { value: "/chara2.png", label: "chara2" },
+  { value: "/user1.png", label: "女性" },
+  { value: "/user2.png", label: "男性" },
   { value: "/default-avatar.png", label: "デフォルト" },
 ] as const;
 
@@ -61,7 +61,7 @@ export default function AccountSettingsPage() {
 
   if (!auth.isLoggedIn || !auth.user) {
     return (
-      <div className="min-h-screen bg-white pb-20">
+      <div className="min-h-screen bg-white pb-[50px]">
         <AppHeader type="title" title="アカウント設定" backHref="/settings" />
         <main className="mx-auto max-w-lg px-[5.333vw] py-8">
           <p className="text-sm text-gray-500">ログインするとアカウント設定ができます。</p>
@@ -74,7 +74,7 @@ export default function AccountSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-24">
+    <div className="min-h-screen bg-white pb-[50px]">
       <AppHeader type="title" title="アカウント設定" backHref="/settings" />
       <main className="mx-auto max-w-lg px-[5.333vw] py-6">
         {/* アイコン（写真アップロード・VOTE作成画面と同じカメラアイコン） */}
@@ -101,11 +101,11 @@ export default function AccountSettingsPage() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#191919] text-white hover:opacity-90"
+              className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full bg-[#191919] text-white hover:opacity-90"
               aria-label="写真をアップロード"
             >
               <span
-                className="block h-5 w-5 shrink-0"
+                className="block h-4 w-4 shrink-0"
                 style={{
                   backgroundColor: "#ffffff",
                   mask: "url(/icons/icon_camera.svg) no-repeat center/contain",

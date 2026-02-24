@@ -128,7 +128,7 @@ function CreateFormContent() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-24">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
       <AppHeader
         type="title"
         title="VOTEを作成"

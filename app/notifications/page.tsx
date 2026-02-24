@@ -117,7 +117,7 @@ export default function NotificationsPage() {
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-[50px]">
       <NotificationTabs
         isLoggedIn={isLoggedIn}
         activeTab={activeTab}

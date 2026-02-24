@@ -244,7 +244,7 @@ function ProfileContent() {
   /* 非ログイン時：ログイン画面（LINEのみ）。ロゴ・テキスト・ボタンを1ブロックで上下中央に */
   if (!auth.isLoggedIn) {
     return (
-      <div className="flex min-h-screen flex-col bg-[#FFE100] pb-20">
+      <div className="flex min-h-screen flex-col bg-[#FFE100] pb-[50px]">
         <header className="flex shrink-0 justify-end px-[5.333vw] pt-4">
           <Link
             href="/settings"
@@ -309,7 +309,7 @@ function ProfileContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-20">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
       {/* 黄色ヘッダー（ログイン時） */}
       <div className="bg-[#FFE100] px-[5.333vw] pt-4 pb-[15px]">
         <div className="flex items-start justify-between">

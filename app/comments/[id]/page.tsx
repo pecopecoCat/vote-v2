@@ -168,7 +168,7 @@ export default function CommentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-24">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
       <AppHeader type="title" title="みんなのコメント" backHref="/" />
 
       <main className="mx-auto max-w-lg px-[5.333vw] py-4">

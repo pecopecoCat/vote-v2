@@ -97,7 +97,7 @@ export default function CreateQuestionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-20">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
       <AppHeader type="title" title="質問を入力" backHref="/" />
 
       <main className="mx-auto max-w-lg px-[5.333vw] pt-[10px]">

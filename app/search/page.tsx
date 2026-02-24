@@ -270,7 +270,7 @@ function SearchContent() {
 
   return (
     <div
-      className={`min-h-screen pb-28 ${isTagFilterView ? "bg-[#F1F1F1]" : "bg-white"}`}
+      className={`min-h-screen pb-[50px] ${isTagFilterView ? "bg-[#F1F1F1]" : "bg-white"}`}
     >
       {/* 虫眼鏡で開いた時→(2)検索 / ハッシュタグタップで開いた時→(3)ハッシュタグ */}
       <AppHeader
@@ -301,7 +301,7 @@ function SearchContent() {
               label="投票済みを表示"
             />
           </div>
-          <main className="mx-auto max-w-lg px-[5.333vw] pb-36 pt-6">
+          <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-6">
             <div className="flex flex-col gap-9">
               {cardsToShow.length === 0 ? (
                 <div className="rounded-[2rem] bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
@@ -416,7 +416,7 @@ function SearchContent() {
             </>
           )}
 
-          <main className="mx-auto max-w-lg bg-white pb-24">
+          <main className="mx-auto max-w-lg bg-white pb-[50px]">
         {!isSearching ? (
           <>
             {/* 注目タグ（見出しなし・もっと表示すると黄バー間に10px） */}

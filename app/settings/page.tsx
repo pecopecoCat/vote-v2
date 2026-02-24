@@ -15,7 +15,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-20">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
       <AppHeader type="title" title="設定" backHref="/profile" />
       <main className="mx-auto max-w-lg px-[5.333vw] py-4">
         {auth.isLoggedIn ? (

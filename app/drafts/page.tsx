@@ -32,7 +32,7 @@ export default function DraftsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-20">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
       <AppHeader type="title" title="下書き" backHref="/create/form" />
 
       <main className="mx-auto max-w-lg bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.08)]">

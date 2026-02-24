@@ -24,7 +24,7 @@ function ProfileLoginContent() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#FFE100] pb-20">
+    <div className="flex min-h-screen flex-col bg-[#FFE100] pb-[50px]">
       <header className="flex shrink-0 justify-end px-[5.333vw] pt-4">
         <Link
           href="/settings"

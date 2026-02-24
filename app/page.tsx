@@ -265,7 +265,7 @@ export default function Home() {
       />
 
       {/* メインコンテンツ（下ナビ分の余白を確保） */}
-      <main className="mx-auto max-w-lg px-[5.333vw] pb-24 pt-4">
+      <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
         <div className="flex flex-col gap-[60px]">
           {activeTab === "myTimeline" && cardsForTab.length === 0 ? (
             <div className="rounded-[2rem] bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
