@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "./components/AppHeader";
 import VoteCard from "./components/VoteCard";
@@ -148,7 +148,7 @@ function ensureUser1User2CollectionsResetOnce(): void {
   window.localStorage.setItem(RESET_COLLECTIONS_FLAG, "1");
 }
 
-export default function Home() {
+function HomeContent() {
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<FeedTabId>(() =>
@@ -389,5 +389,27 @@ export default function Home() {
         />
       )}
     </div>
+  );
+}
+
+function HomeFallback() {
+  return (
+    <div className="min-h-screen bg-[#F1F1F1]">
+      <AppHeader type="logo" />
+      <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
+        <div className="flex justify-center py-12">
+          <p className="text-sm text-gray-500">読み込み中...</p>
+        </div>
+      </main>
+      <BottomNav activeId="home" />
+    </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<HomeFallback />}>
+      <HomeContent />
+    </Suspense>
   );
 }
