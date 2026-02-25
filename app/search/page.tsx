@@ -437,7 +437,7 @@ function SearchContent() {
                         />
                       ))}
                       {displayedTrendingTags.length > 10 && trendingTagsVisibleCount < displayedTrendingTags.length && (
-                        <div className="mb-[50px] flex justify-center pb-3 pt-3">
+                        <div className="mb-[50px] flex justify-center pb-3 pt-6">
                           <button
                             type="button"
                             className="inline-block text-center"

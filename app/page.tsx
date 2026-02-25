@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import AppHeader from "./components/AppHeader";
 import VoteCard from "./components/VoteCard";
 import AdCard from "./components/AdCard";
@@ -148,7 +149,15 @@ function ensureUser1User2CollectionsResetOnce(): void {
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<FeedTabId>("trending");
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<FeedTabId>(() =>
+    tabFromUrl === "new" ? "new" : tabFromUrl === "myTimeline" ? "myTimeline" : "trending"
+  );
+  useEffect(() => {
+    if (tabFromUrl === "new") setActiveTab("new");
+    else if (tabFromUrl === "myTimeline") setActiveTab("myTimeline");
+  }, [tabFromUrl]);
   const [collections, setCollections] = useState(() => getCollections());
   const [activity, setActivity] = useState<Record<string, CardActivity>>(() => {
     ensureVoteCountsResetOnce();

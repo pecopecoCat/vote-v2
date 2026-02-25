@@ -59,18 +59,6 @@ function buildUserActivityItems(): ActivityItem[] {
 
   const items: ActivityItem[] = [];
 
-  // 自分が作った2択
-  created.forEach((c) => {
-    const cardId = c.id ?? c.question;
-    items.push({
-      type: "created",
-      cardId,
-      label: ACTIVITY_TYPE_LABELS.created,
-      date: c.createdAt ? formatDate(c.createdAt) : "",
-      questionPreview: c.question,
-    });
-  });
-
   // 自分が投票した
   Object.entries(activity).forEach(([cardId, a]) => {
     if (!a.userSelectedOption) return;

@@ -1,15 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import AppHeader from "../components/AppHeader";
 import BottomNav from "../components/BottomNav";
-
-const initialDrafts = [
-  { id: "1", text: "猫が後をついてきていました..手持ちの食べ物をあげようと" },
-  { id: "2", text: "豚バラか牛串か?" },
-  { id: "3", text: "一人旅最長!自転車でどこまで行きました? 私は世田谷から奥多摩。" },
-];
+import { getDrafts, deleteDraft, type DraftItem } from "../data/drafts";
 
 function TrashIcon({ className }: { className?: string }) {
   return (
@@ -25,10 +20,15 @@ function TrashIcon({ className }: { className?: string }) {
 }
 
 export default function DraftsPage() {
-  const [drafts, setDrafts] = useState(initialDrafts);
+  const [drafts, setDrafts] = useState<DraftItem[]>([]);
+
+  useEffect(() => {
+    setDrafts(getDrafts());
+  }, []);
 
   const handleDelete = (id: string) => {
-    setDrafts((prev) => prev.filter((d) => d.id !== id));
+    deleteDraft(id);
+    setDrafts(getDrafts());
   };
 
   return (
@@ -36,26 +36,30 @@ export default function DraftsPage() {
       <AppHeader type="title" title="下書き" backHref="/create/form" />
 
       <main className="mx-auto max-w-lg bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.08)]">
-        <ul className="divide-y divide-gray-100">
-          {drafts.map((draft) => (
-            <li key={draft.id} className="flex items-center gap-3 px-[5.333vw] py-4">
-              <Link
-                href={`/create/form?q=${encodeURIComponent(draft.text)}`}
-                className="min-w-0 flex-1 text-sm text-gray-900"
-              >
-                {draft.text}
-              </Link>
-              <button
-                type="button"
-                className="shrink-0 p-2 text-gray-400 hover:text-gray-600"
-                aria-label="削除"
-                onClick={() => handleDelete(draft.id)}
-              >
-                <TrashIcon className="h-5 w-5" />
-              </button>
-            </li>
-          ))}
-        </ul>
+        {drafts.length === 0 ? (
+          <p className="px-[5.333vw] py-8 text-center text-sm text-gray-500">下書きはありません</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {drafts.map((draft) => (
+              <li key={draft.id} className="flex items-center gap-3 px-[5.333vw] py-4">
+                <Link
+                  href={`/create/form?q=${encodeURIComponent(draft.text)}`}
+                  className="min-w-0 flex-1 text-sm text-gray-900"
+                >
+                  {draft.text}
+                </Link>
+                <button
+                  type="button"
+                  className="shrink-0 p-2 text-gray-400 hover:text-gray-600"
+                  aria-label="削除"
+                  onClick={() => handleDelete(draft.id)}
+                >
+                  <TrashIcon className="h-5 w-5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </main>
 
       <BottomNav activeId="add" />

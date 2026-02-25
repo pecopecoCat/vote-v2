@@ -11,6 +11,8 @@ import { getCollections } from "../../data/collections";
 import { getAuth } from "../../data/auth";
 import { CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
 import { addCreatedVote } from "../../data/createdVotes";
+import { addDraft } from "../../data/drafts";
+import SuccessModal from "../../components/SuccessModal";
 
 const QUESTION_MAX = 80;
 const OPTION_MAX = 30; // A/Bの回答の文字数上限（画像の「00文字以内」はここで表示）
@@ -34,7 +36,10 @@ function CreateFormContent() {
   const fileInputBRef = useRef<HTMLInputElement>(null);
   const [reason, setReason] = useState("");
   const [noComments, setNoComments] = useState(false);
-  const [hashtagQuery, setHashtagQuery] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const [showVoteCreatedModal, setShowVoteCreatedModal] = useState(false);
+  const [showDraftSavedModal, setShowDraftSavedModal] = useState(false);
   const [selectedBackgroundUrl, setSelectedBackgroundUrl] = useState<string>(
     CARD_BACKGROUND_IMAGES[0]
   );
@@ -81,7 +86,7 @@ function CreateFormContent() {
     if (!canSubmit) return;
     if (!getAuth().isLoggedIn) return;
     const now = new Date().toISOString();
-    const tags = hashtagQuery.trim() ? hashtagQuery.trim().split(/\s+/).filter(Boolean) : undefined;
+    const tagList = tags.length > 0 ? tags : undefined;
     addCreatedVote({
       id: `created-${Date.now()}`,
       patternType: "yellow-loops",
@@ -92,13 +97,13 @@ function CreateFormContent() {
       countA: 0,
       countB: 0,
       commentCount: 0,
-      tags,
+      tags: tagList,
       createdAt: now,
       visibility,
       optionAImageUrl: optionAImageUrl || undefined,
       optionBImageUrl: optionBImageUrl || undefined,
     });
-    router.push("/");
+    setShowVoteCreatedModal(true);
   }, [
     canSubmit,
     router,
@@ -107,10 +112,25 @@ function CreateFormContent() {
     optionB,
     optionAImageUrl,
     optionBImageUrl,
-    hashtagQuery,
+    tags,
     selectedBackgroundUrl,
     visibility,
   ]);
+
+  const handleVoteCreatedModalClose = useCallback(() => {
+    setShowVoteCreatedModal(false);
+    router.push("/?tab=new");
+  }, [router]);
+
+  const handleDraftSavedModalClose = useCallback(() => {
+    setShowDraftSavedModal(false);
+  }, []);
+
+  const handleSaveDraft = useCallback(() => {
+    const text = question.trim() || "（未入力）";
+    addDraft(text);
+    setShowDraftSavedModal(true);
+  }, [question]);
 
   const handleImageSelect = useCallback(
     (side: "A" | "B", e: React.ChangeEvent<HTMLInputElement>) => {
@@ -144,7 +164,7 @@ function CreateFormContent() {
         }
       />
 
-      <main className="mx-auto max-w-lg space-y-[30px] px-[5.333vw] pb-8 pt-4">
+      <main className="mx-auto max-w-lg space-y-[30px] px-[5.333vw] pb-28 pt-4">
         {/* 2択の質問（80文字）* - タップで質問入力画面へ */}
         <section>
           <h2 className="mb-1 text-sm font-bold text-gray-900">
@@ -194,11 +214,11 @@ function CreateFormContent() {
             <button
               type="button"
               onClick={() => fileInputARef.current?.click()}
-              className="absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] bg-[#D9D9D9] hover:opacity-90"
+              className={`absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] hover:opacity-90 ${optionAImageUrl ? "bg-transparent" : "bg-[#D9D9D9]"}`}
               aria-label={optionAImageUrl ? "Aの画像を変更" : "Aの画像を設定"}
             >
               {optionAImageUrl ? (
-                <span className="relative flex h-8 w-8 overflow-hidden rounded-lg border border-gray-200 pointer-events-none">
+                <span className="relative flex h-10 w-10 overflow-hidden rounded-[10px] pointer-events-none">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={optionAImageUrl} alt="" className="h-full w-full object-cover" />
                 </span>
@@ -240,11 +260,11 @@ function CreateFormContent() {
             <button
               type="button"
               onClick={() => fileInputBRef.current?.click()}
-              className="absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] bg-[#D9D9D9] hover:opacity-90"
+              className={`absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] hover:opacity-90 ${optionBImageUrl ? "bg-transparent" : "bg-[#D9D9D9]"}`}
               aria-label={optionBImageUrl ? "Bの画像を変更" : "Bの画像を設定"}
             >
               {optionBImageUrl ? (
-                <span className="relative flex h-8 w-8 overflow-hidden rounded-lg border border-gray-200 pointer-events-none">
+                <span className="relative flex h-10 w-10 overflow-hidden rounded-[10px] pointer-events-none">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={optionBImageUrl} alt="" className="h-full w-full object-cover" />
                 </span>
@@ -282,18 +302,65 @@ function CreateFormContent() {
           </div>
         </section>
 
-        {/* ハッシュタグを設定 */}
+        {/* タグ付け（四角の中で展開・キーワードごとにグレー pill・取り消し×） */}
         <section>
-          <h2 className="mb-1 text-sm font-bold text-gray-900">ハッシュタグを設定</h2>
-          <div className="flex items-center gap-2 rounded-xl bg-white p-5">
-            <MagnifyIcon className="h-5 w-5 shrink-0 text-gray-400" />
-            <input
-              type="text"
-              value={hashtagQuery}
-              onChange={(e) => setHashtagQuery(e.target.value)}
-              placeholder="タグを検索"
-              className="min-w-0 flex-1 border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
-            />
+          <h2 className="mb-2 text-sm font-bold text-gray-900">タグ付け</h2>
+          <div className="rounded-xl bg-white p-5">
+            {tags.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 rounded-full bg-gray-200 px-3 py-1.5 text-sm text-gray-900"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => setTags((prev) => prev.filter((t) => t !== tag))}
+                      className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-300 hover:text-gray-700"
+                      aria-label={`${tag} を削除`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <MagnifyIcon className="h-5 w-5 shrink-0 text-gray-400" />
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === " " || e.key === "Enter") {
+                    e.preventDefault();
+                    const word = tagInput.trim();
+                    if (word && !tags.includes(word)) {
+                      setTags((prev) => [...prev, word]);
+                      setTagInput("");
+                    }
+                  }
+                }}
+                placeholder="その他のタグを検索"
+                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+              />
+            </div>
+            {tagInput.trim() && (
+              <button
+                type="button"
+                className="mt-2 text-xs text-gray-500 underline"
+                onClick={() => {
+                  const word = tagInput.trim();
+                  if (word && !tags.includes(word)) {
+                    setTags((prev) => [...prev, word]);
+                    setTagInput("");
+                  }
+                }}
+              >
+                追加
+              </button>
+            )}
           </div>
         </section>
 
@@ -447,11 +514,11 @@ function CreateFormContent() {
           {collectionOpen && (
             <>
               <div
-                className="fixed inset-0 z-10"
+                className="fixed inset-0 z-30"
                 aria-hidden
                 onClick={() => setCollectionOpen(false)}
               />
-              <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-[20px] border border-gray-200 bg-white py-1 shadow-lg">
+              <ul className="absolute left-0 right-0 top-full z-40 mt-1 max-h-48 overflow-auto rounded-[20px] border border-gray-200 bg-white py-1 shadow-lg">
                 {collections.length === 0 ? (
                   <li className="px-4 py-3 text-sm text-gray-500">コレクションがありません</li>
                 ) : (
@@ -476,12 +543,27 @@ function CreateFormContent() {
         </section>
       </main>
 
-      {/* 固定フッター: VOTEを作成 */}
-      <div className="fixed bottom-14 left-0 right-0 z-10 mx-auto max-w-lg px-[5.333vw] pb-2 pt-2">
+      {/* 固定フッター: 下書き保存 + VOTEを作成 */}
+      <div className="fixed bottom-14 left-0 right-0 z-20 mx-auto max-w-lg space-y-2 px-[5.333vw] pb-2 pt-2">
+        <Button variant="outline" type="button" onClick={handleSaveDraft} className="w-full">
+          下書き保存
+        </Button>
         <Button variant="createVote" type="button" onClick={handleSubmit} disabled={!canSubmit}>
           VOTEを作成
         </Button>
       </div>
+
+      <SuccessModal
+        open={showVoteCreatedModal}
+        message="VOTEを作成しました"
+        onClose={handleVoteCreatedModalClose}
+        autoCloseSeconds={1.5}
+      />
+      <SuccessModal
+        open={showDraftSavedModal}
+        message="下書きが完了しました"
+        onClose={handleDraftSavedModalClose}
+      />
 
       <BottomNav activeId="add" />
     </div>
