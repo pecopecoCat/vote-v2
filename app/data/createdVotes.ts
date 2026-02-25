@@ -75,13 +75,22 @@ function loadForUser(userId: string): VoteCardData[] {
   }
 }
 
+const CREATED_VOTES_UPDATED_EVENT = "vote_created_votes_updated";
+
 function saveForUser(userId: string, list: VoteCardData[]): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(list));
-  } catch {
-    // ignore
+    window.dispatchEvent(new CustomEvent(CREATED_VOTES_UPDATED_EVENT));
+  } catch (e) {
+    if (typeof console !== "undefined" && console.error) {
+      console.error("[createdVotes] save failed:", e);
+    }
   }
+}
+
+export function getCreatedVotesUpdatedEventName(): string {
+  return CREATED_VOTES_UPDATED_EVENT;
 }
 
 /** 現在ログイン中のユーザーが作ったVOTEのみ（mypageの「作ったVOTE」用） */
@@ -125,9 +134,15 @@ export function getCreatedVotesForTimeline(): VoteCardData[] {
 }
 
 export function addCreatedVote(card: VoteCardData): void {
+  if (typeof window === "undefined") return;
   const userId = getCurrentActivityUserId();
   const list = loadForUser(userId);
-  list.unshift(card);
+  const toAdd = {
+    ...card,
+    id: card.id ?? `created-${Date.now()}`,
+    createdAt: card.createdAt ?? new Date().toISOString(),
+  };
+  list.unshift(toAdd);
   saveForUser(userId, list);
 }
 

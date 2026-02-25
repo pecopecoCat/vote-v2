@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import BottomNav from "../components/BottomNav";
 import VoteCard from "../components/VoteCard";
-import { getCreatedVotes, getCreatedVotesForTimeline, deleteCreatedVote } from "../data/createdVotes";
+import {
+  getCreatedVotes,
+  getCreatedVotesForTimeline,
+  deleteCreatedVote,
+  getCreatedVotesUpdatedEventName,
+} from "../data/createdVotes";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
 import { getAllActivity, getMergedCounts, getCardIdsUserCommentedOn, getActivity, type CardActivity, type VoteComment } from "../data/voteCardActivity";
 import { getFavoriteTags, getFavoriteTagsUpdatedEventName } from "../data/favoriteTags";
@@ -187,6 +192,13 @@ function ProfileContent() {
   useEffect(() => {
     const eventName = getBookmarksUpdatedEventName();
     const handler = () => setBookmarkRefreshKey((k) => k + 1);
+    window.addEventListener(eventName, handler);
+    return () => window.removeEventListener(eventName, handler);
+  }, []);
+
+  useEffect(() => {
+    const eventName = getCreatedVotesUpdatedEventName();
+    const handler = () => setCreatedVotesRefreshKey((k) => k + 1);
     window.addEventListener(eventName, handler);
     return () => window.removeEventListener(eventName, handler);
   }, []);

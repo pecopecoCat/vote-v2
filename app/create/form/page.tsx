@@ -79,6 +79,7 @@ function CreateFormContent() {
 
   const handleSubmit = useCallback(() => {
     if (!canSubmit) return;
+    if (!getAuth().isLoggedIn) return;
     const now = new Date().toISOString();
     const tags = hashtagQuery.trim() ? hashtagQuery.trim().split(/\s+/).filter(Boolean) : undefined;
     addCreatedVote({
