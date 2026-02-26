@@ -2,7 +2,7 @@
  * Vercel KV (Upstash Redis) を利用する場合のみ有効。
  * KV_REST_API_URL / KV_REST_API_TOKEN を設定すると他ユーザーとデータ共有されます。
  */
-export async function getKV(): Promise<import("@vercel/kv").kv | null> {
+export async function getKV(): Promise<KVClient | null> {
   if (
     typeof process === "undefined" ||
     !process.env?.KV_REST_API_URL ||
@@ -11,5 +11,12 @@ export async function getKV(): Promise<import("@vercel/kv").kv | null> {
     return null;
   }
   const { kv } = await import("@vercel/kv");
-  return kv;
+  return kv as KVClient;
 }
+
+/** KV クライアントの型（@vercel/kv の型に依存しない） */
+export type KVClient = {
+  get: <T = unknown>(key: string) => Promise<T | null>;
+  set: (key: string, value: unknown) => Promise<void>;
+  del: (key: string) => Promise<void>;
+};
