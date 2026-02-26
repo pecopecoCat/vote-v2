@@ -215,7 +215,7 @@ export default function CommentsPage() {
             <div className="flex flex-col gap-6">
               {bottomCards.map((related) => {
                 const relatedId = related.id ?? related.question;
-                const relActivity = getActivity(relatedId);
+                const relActivity = sharedActivity[relatedId] ?? emptyActivity;
                 const relMerged = getMergedCounts(
                   related.countA ?? 0,
                   related.countB ?? 0,
@@ -242,8 +242,7 @@ export default function CommentsPage() {
                     hasCommented={commentedCardIds.includes(relatedId)}
                     initialSelectedOption={relActivity.userSelectedOption ?? null}
                     onVote={(cid, option) => {
-                      persistVote(cid, option);
-                      setActivity(getActivity(id));
+                      void sharedAddVote(cid, option);
                     }}
                     onBookmarkClick={setModalCardId}
                     onMoreClick={setCardOptionsCardId}
