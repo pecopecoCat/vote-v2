@@ -32,7 +32,8 @@ export async function GET(request: Request): Promise<NextResponse<Record<string,
     const globalData = global && typeof global === "object" ? global : {};
     const userSelections: Record<string, "A" | "B"> = {};
     if (userRaw && typeof userRaw === "object") {
-      for (const [cardId, v] of Object.entries(userRaw)) {
+      type UserSelection = { userSelectedOption?: "A" | "B" };
+      for (const [cardId, v] of Object.entries(userRaw) as [string, UserSelection][]) {
         if (v?.userSelectedOption === "A" || v?.userSelectedOption === "B") {
           userSelections[cardId] = v.userSelectedOption;
         }
