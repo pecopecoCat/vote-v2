@@ -42,18 +42,18 @@ export const DEMO_USER_IDS = [
 ] as const;
 export type DemoUserId = (typeof DEMO_USER_IDS)[number];
 
-/** 簡易ログイン用：10ユーザー（user1/user2 はアイコンあり、user3..10 はデフォルトアイコン） */
+/** 簡易ログイン用：10ユーザー（user1..user9 は public/user1.png..user9.png、user10 はデフォルト） */
 export const DEMO_USERS: Record<DemoUserId, { name: string; iconUrl: string }> = {
   user1: { name: "user1", iconUrl: "/user1.png" },
   user2: { name: "user2", iconUrl: "/user2.png" },
-  user3: { name: "user3", iconUrl: "/default-avatar.png" },
-  user4: { name: "user4", iconUrl: "/default-avatar.png" },
-  user5: { name: "user5", iconUrl: "/default-avatar.png" },
-  user6: { name: "user6", iconUrl: "/default-avatar.png" },
-  user7: { name: "user7", iconUrl: "/default-avatar.png" },
-  user8: { name: "user8", iconUrl: "/default-avatar.png" },
-  user9: { name: "user9", iconUrl: "/default-avatar.png" },
-  user10: { name: "user10", iconUrl: "/default-avatar.png" },
+  user3: { name: "user3", iconUrl: "/user3.png" },
+  user4: { name: "user4", iconUrl: "/user4.png" },
+  user5: { name: "user5", iconUrl: "/user5.png" },
+  user6: { name: "user6", iconUrl: "/user6.png" },
+  user7: { name: "user7", iconUrl: "/user7.png" },
+  user8: { name: "user8", iconUrl: "/user8.png" },
+  user9: { name: "user9", iconUrl: "/user9.png" },
+  user10: { name: "user10", iconUrl: "/user10.png" },
 };
 
 export interface AuthState {
