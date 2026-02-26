@@ -1,6 +1,6 @@
 import type { VoteCardData } from "./voteCards";
 import type { VoteCardPattern } from "../components/VoteCard";
-import { getCurrentActivityUserId } from "./auth";
+import { getCurrentActivityUserId, DEMO_USER_IDS } from "./auth";
 
 const STORAGE_KEY_PREFIX = "vote_created_cards_";
 const LEGACY_STORAGE_KEY = "vote_created_cards";
@@ -97,7 +97,7 @@ export function getCreatedVotesUpdatedEventName(): string {
 export function getCreatedVotes(): VoteCardData[] {
   const userId = getCurrentActivityUserId();
   let list = loadForUser(userId);
-  if (list.length === 0 && (userId === "user1" || userId === "user2")) {
+  if (list.length === 0 && (DEMO_USER_IDS as readonly string[]).includes(userId)) {
     const legacy = loadLegacy();
     if (legacy.length > 0) {
       list = legacy;
@@ -125,12 +125,14 @@ function loadLegacy(): VoteCardData[] {
   }
 }
 
-/** タイムライン・カード解決用：全ユーザーの作ったVOTEをマージ（user1 + user2） */
+/** タイムライン・カード解決用：全ユーザーの作ったVOTEをマージ（user1..user10） */
 export function getCreatedVotesForTimeline(): VoteCardData[] {
   if (typeof window === "undefined") return [];
-  const fromUser1 = loadForUser("user1");
-  const fromUser2 = loadForUser("user2");
-  return [...fromUser1, ...fromUser2];
+  const all: VoteCardData[] = [];
+  for (const uid of DEMO_USER_IDS) {
+    all.push(...loadForUser(uid));
+  }
+  return all;
 }
 
 export function addCreatedVote(card: VoteCardData): void {

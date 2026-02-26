@@ -1,16 +1,31 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import BottomNav from "../../components/BottomNav";
-import { getAuth, loginAsDemoUser, DEMO_USERS } from "../../data/auth";
+import { getAuth, loginAsDemoUser, DEMO_USERS, DEMO_USER_IDS, type DemoUserId } from "../../data/auth";
+
+const USER_LABELS: Record<DemoUserId, string> = {
+  user1: "ピンク",
+  user2: "ブルー",
+  user3: "3",
+  user4: "4",
+  user5: "5",
+  user6: "6",
+  user7: "7",
+  user8: "8",
+  user9: "9",
+  user10: "10",
+};
 
 function ProfileLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") ?? "/profile";
   const [showUserChoice, setShowUserChoice] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
     if (getAuth().isLoggedIn) {
@@ -18,10 +33,30 @@ function ProfileLoginContent() {
     }
   }, [router, returnTo]);
 
-  const handleLoginAs = (userId: "user1" | "user2") => {
-    loginAsDemoUser(userId);
-    router.replace(returnTo);
-  };
+  const handleLoginAs = useCallback(
+    async (userId: DemoUserId) => {
+      setLoginError(null);
+      setLoading(true);
+      try {
+        const res = await fetch("/api/active-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+        const data = (await res.json()) as { error?: string; code?: string };
+        if (res.status === 409) {
+          setLoginError(data.error ?? "このアカウントは別の端末でログイン中です。");
+          return;
+        }
+        if (!res.ok) return;
+        loginAsDemoUser(userId);
+        router.replace(returnTo);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [returnTo, router]
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FFE100] pb-[50px]">
@@ -80,31 +115,34 @@ function ProfileLoginContent() {
                 LINEでログインする
               </button>
             ) : (
-              <div className="flex w-full flex-col gap-3">
-                <p className="text-sm font-bold text-gray-700">どちらでログインする？</p>
-                <div className="flex gap-4">
-                  <button
-                    type="button"
-                    onClick={() => handleLoginAs("user1")}
-                    className="flex flex-1 flex-col items-center gap-2 rounded-xl border-2 border-pink-400 bg-pink-50 py-4 hover:bg-pink-100 active:bg-pink-100"
-                    aria-label="user1（ピンク）でログイン"
-                  >
-                    <img src={DEMO_USERS.user1.iconUrl} alt="" className="h-14 w-14 rounded-full object-cover" width={56} height={56} />
-                    <span className="text-sm font-bold text-gray-900">user1</span>
-                    <span className="text-xs text-pink-600">ピンク</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoginAs("user2")}
-                    className="flex flex-1 flex-col items-center gap-2 rounded-xl border-2 border-blue-400 bg-blue-50 py-4 hover:bg-blue-100 active:bg-blue-100"
-                    aria-label="user2（ブルー）でログイン"
-                  >
-                    <img src={DEMO_USERS.user2.iconUrl} alt="" className="h-14 w-14 rounded-full object-cover" width={56} height={56} />
-                    <span className="text-sm font-bold text-gray-900">user2</span>
-                    <span className="text-xs text-blue-600">ブルー</span>
-                  </button>
+              <>
+                {loginError && (
+                  <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{loginError}</p>
+                )}
+                <p className="mb-3 text-sm font-bold text-gray-700">どれでログインする？</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {DEMO_USER_IDS.map((userId) => (
+                    <button
+                      key={userId}
+                      type="button"
+                      onClick={() => handleLoginAs(userId)}
+                      disabled={loading}
+                      className="flex flex-col items-center gap-1 rounded-xl border-2 border-gray-300 bg-white py-3 hover:border-gray-900 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50"
+                      aria-label={`${DEMO_USERS[userId].name}でログイン`}
+                    >
+                      <img
+                        src={DEMO_USERS[userId].iconUrl}
+                        alt=""
+                        className="h-10 w-10 rounded-full object-cover"
+                        width={40}
+                        height={40}
+                      />
+                      <span className="text-xs font-bold text-gray-900">{DEMO_USERS[userId].name}</span>
+                      <span className="text-[10px] text-gray-500">{USER_LABELS[userId]}</span>
+                    </button>
+                  ))}
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>

@@ -35,17 +35,32 @@ export interface LineAuthUser {
   iconUrl?: string;
 }
 
-/** 簡易ログイン用：user0=未ログイン, user1=ピンクアイコン, user2=ブルーアイコン */
-export const DEMO_USERS = {
+/** デモ用ユーザーID（user1..user10） */
+export const DEMO_USER_IDS = [
+  "user1", "user2", "user3", "user4", "user5",
+  "user6", "user7", "user8", "user9", "user10",
+] as const;
+export type DemoUserId = (typeof DEMO_USER_IDS)[number];
+
+/** 簡易ログイン用：10ユーザー（user1/user2 はアイコンあり、user3..10 はデフォルトアイコン） */
+export const DEMO_USERS: Record<DemoUserId, { name: string; iconUrl: string }> = {
   user1: { name: "user1", iconUrl: "/user1.png" },
   user2: { name: "user2", iconUrl: "/user2.png" },
-} as const;
+  user3: { name: "user3", iconUrl: "/default-avatar.png" },
+  user4: { name: "user4", iconUrl: "/default-avatar.png" },
+  user5: { name: "user5", iconUrl: "/default-avatar.png" },
+  user6: { name: "user6", iconUrl: "/default-avatar.png" },
+  user7: { name: "user7", iconUrl: "/default-avatar.png" },
+  user8: { name: "user8", iconUrl: "/default-avatar.png" },
+  user9: { name: "user9", iconUrl: "/default-avatar.png" },
+  user10: { name: "user10", iconUrl: "/default-avatar.png" },
+};
 
 export interface AuthState {
   isLoggedIn: boolean;
   user?: LineAuthUser;
-  /** デモ用：user1/user2 のどちらでログインしたか（ニックネーム変更後もコレクション等の紐づけに使用） */
-  userId?: "user1" | "user2";
+  /** デモ用：どのユーザーでログインしたか（ニックネーム変更後もコレクション等の紐づけに使用） */
+  userId?: DemoUserId;
 }
 
 function load(): AuthState {
@@ -57,11 +72,13 @@ function load(): AuthState {
     if (!raw) return { isLoggedIn: false };
     const parsed = JSON.parse(raw) as unknown;
     if (parsed && typeof parsed === "object" && "isLoggedIn" in parsed) {
-      const p = parsed as { isLoggedIn: boolean; user?: LineAuthUser; userId?: "user1" | "user2" };
+      const p = parsed as { isLoggedIn: boolean; user?: LineAuthUser; userId?: string };
+      const uid = p.userId;
+      const userId = typeof uid === "string" && DEMO_USER_IDS.includes(uid as DemoUserId) ? (uid as DemoUserId) : undefined;
       return {
         isLoggedIn: Boolean(p.isLoggedIn),
         user: p.user && typeof p.user === "object" ? p.user : undefined,
-        userId: p.userId === "user1" || p.userId === "user2" ? p.userId : undefined,
+        userId,
       };
     }
   } catch {
@@ -80,11 +97,11 @@ function save(state: AuthState): void {
   }
 }
 
-function getProfileStorageKey(userId: "user1" | "user2"): string {
+function getProfileStorageKey(userId: DemoUserId): string {
   return PROFILE_STORAGE_KEY_PREFIX + userId;
 }
 
-function loadSavedProfile(userId: "user1" | "user2"): Partial<LineAuthUser> | null {
+function loadSavedProfile(userId: DemoUserId): Partial<LineAuthUser> | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(getProfileStorageKey(userId));
@@ -101,7 +118,7 @@ function loadSavedProfile(userId: "user1" | "user2"): Partial<LineAuthUser> | nu
   }
 }
 
-function saveProfile(userId: "user1" | "user2", profile: LineAuthUser): void {
+function saveProfile(userId: DemoUserId, profile: LineAuthUser): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(getProfileStorageKey(userId), JSON.stringify(profile));
@@ -123,8 +140,8 @@ export function setLineLogin(user?: LineAuthUser): void {
   });
 }
 
-/** 簡易デモ：user1 または user2 でログイン（保存済みニックネーム・アイコンがあれば復元） */
-export function loginAsDemoUser(userId: "user1" | "user2"): void {
+/** 簡易デモ：user1..user10 のいずれかでログイン（保存済みニックネーム・アイコンがあれば復元） */
+export function loginAsDemoUser(userId: DemoUserId): void {
   const defaultUser = DEMO_USERS[userId];
   const saved = loadSavedProfile(userId);
   const user: LineAuthUser = saved
@@ -149,8 +166,8 @@ export function updateCurrentUserProfile(updates: Partial<LineAuthUser>): void {
     iconUrl: updates.iconUrl !== undefined ? updates.iconUrl : state.user.iconUrl,
   };
   save({ ...state, user: nextUser });
-  const userId = state.userId ?? (state.user.name === "user1" || state.user.name === "user2" ? state.user.name : null);
-  if (userId === "user1" || userId === "user2") {
+  const userId = state.userId ?? (state.user && DEMO_USER_IDS.includes(state.user.name as DemoUserId) ? (state.user.name as DemoUserId) : null);
+  if (userId) {
     saveProfile(userId, nextUser);
   }
 }
@@ -168,8 +185,8 @@ export function logout(): void {
 export function getCurrentActivityUserId(): string {
   const state = load();
   if (state.isLoggedIn) {
-    if (state.userId === "user1" || state.userId === "user2") return state.userId;
-    if (state.user && (state.user.name === "user1" || state.user.name === "user2")) return state.user.name;
+    if (state.userId) return state.userId;
+    if (state.user && DEMO_USER_IDS.includes(state.user.name as DemoUserId)) return state.user.name;
     return "line";
   }
   return "guest_" + getGuestId();
