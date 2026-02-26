@@ -14,9 +14,9 @@ export async function getKV(): Promise<KVClient | null> {
   return kv as KVClient;
 }
 
-/** KV クライアントの型（@vercel/kv の型に依存しない） */
+/** KV クライアントの型（@vercel/kv の型に依存しない。del は Redis 仕様で number を返す） */
 export type KVClient = {
   get: <T = unknown>(key: string) => Promise<T | null>;
   set: (key: string, value: unknown) => Promise<void>;
-  del: (key: string) => Promise<void>;
+  del: (key: string) => Promise<number>;
 };
