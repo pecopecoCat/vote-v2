@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, Suspense } from "react";
+import { useMemo, useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "./components/AppHeader";
 import VoteCard from "./components/VoteCard";
@@ -221,19 +221,36 @@ function HomeContent() {
     [collections, bookmarkRefreshKey, auth]
   );
 
-  /** ページ表示時点で投票済みのID（リロード・再訪問時のみ更新。投票直後は更新しない） */
-  const [votedIdsAtLoad, setVotedIdsAtLoad] = useState<Set<string>>(new Set());
+  /** ページ表示時点で投票済みのID。初回マウント時のみ activity からセットし、投票直後は更新しない */
+  const [votedIdsAtLoad, setVotedIdsAtLoad] = useState<Set<string>>(() => new Set());
+  const votedIdsInitializedRef = useRef(false);
   useEffect(() => {
-    if (votedIdsAtLoad.size > 0) return;
+    if (votedIdsInitializedRef.current) return;
     const ids = new Set(
       Object.entries(activity)
         .filter(([, a]) => a?.userSelectedOption)
         .map(([id]) => id)
     );
     setVotedIdsAtLoad(ids);
-  }, [activity, votedIdsAtLoad.size]);
+    votedIdsInitializedRef.current = true;
+  }, [activity]);
 
-  /** 急上昇中・新着では投票済みカードを除外（votedIdsAtLoad のためリロード/再訪問時のみ反映） */
+  /** 別タブに移動して戻ってきたときに最新の投票済み状態を反映 */
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState !== "visible") return;
+      const ids = new Set(
+        Object.entries(activity)
+          .filter(([, a]) => a?.userSelectedOption)
+          .map(([id]) => id)
+      );
+      setVotedIdsAtLoad(ids);
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, [activity]);
+
+  /** 急上昇中・新着では投票済みカードを除外（表示時点の投票済みのみ。投票後はそのまま表示し、離脱して戻ったときに最新状態で反映） */
   const cardsForFeed = useMemo(
     () => publicCards.filter((c) => !votedIdsAtLoad.has(c.id ?? "")),
     [publicCards, votedIdsAtLoad]

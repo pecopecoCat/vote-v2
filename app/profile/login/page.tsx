@@ -28,8 +28,10 @@ function ProfileLoginContent() {
   const [loginError, setLoginError] = useState<string | null>(null);
   /** 別端末でログイン中＝重複ログインさせないため選択不可にするID一覧 */
   const [activeUserIds, setActiveUserIds] = useState<string[]>([]);
-  /** ログイン中一覧の取得完了前はクリックさせない（重複防止のため） */
+  /** ログイン中一覧の取得完了前は選択不可（true のときだけユーザーボタン有効） */
   const [activeListLoaded, setActiveListLoaded] = useState(false);
+  /** ユーザー選択を開くためにAPI取得中か */
+  const [openingUserChoice, setOpeningUserChoice] = useState(false);
 
   useEffect(() => {
     if (getAuth().isLoggedIn) {
@@ -37,27 +39,31 @@ function ProfileLoginContent() {
     }
   }, [router, returnTo]);
 
-  /** ユーザー選択を開いたときにログイン中一覧を取得 */
-  useEffect(() => {
-    if (!showUserChoice) {
-      setActiveListLoaded(false);
-      return;
-    }
-    let cancelled = false;
+  /** 「LINEでログインする」タップで一覧取得を開始し、取得完了後にユーザー選択を表示（1回タップで選択可能に） */
+  const openUserChoice = useCallback(() => {
+    if (openingUserChoice) return;
+    setOpeningUserChoice(true);
     setActiveListLoaded(false);
+    setShowUserChoice(false);
+    let cancelled = false;
     fetch("/api/active-user")
       .then((res) => res.json())
       .then((data: { userIds?: string[] }) => {
         if (!cancelled) {
           setActiveUserIds(Array.isArray(data.userIds) ? data.userIds : []);
           setActiveListLoaded(true);
+          setShowUserChoice(true);
         }
+        if (!cancelled) setOpeningUserChoice(false);
       })
       .catch(() => {
-        if (!cancelled) setActiveListLoaded(true);
+        if (!cancelled) {
+          setActiveListLoaded(true);
+          setShowUserChoice(true);
+          setOpeningUserChoice(false);
+        }
       });
-    return () => { cancelled = true; };
-  }, [showUserChoice]);
+  }, [openingUserChoice]);
 
   const handleLoginAs = useCallback(
     async (userId: DemoUserId) => {
@@ -134,11 +140,17 @@ function ProfileLoginContent() {
             {!showUserChoice ? (
               <button
                 type="button"
-                onClick={() => setShowUserChoice(true)}
-                className="w-full rounded-xl bg-gray-900 py-4 text-center text-base font-bold text-white hover:opacity-90"
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.currentTarget.releasePointerCapture?.(e.pointerId);
+                  openUserChoice();
+                }}
+                disabled={openingUserChoice}
+                className="w-full rounded-xl bg-gray-900 py-4 text-center text-base font-bold text-white hover:opacity-90 touch-manipulation disabled:opacity-70 disabled:cursor-wait"
+                style={{ touchAction: "manipulation" }}
                 aria-label="LINEでログインする"
               >
-                LINEでログインする
+                {openingUserChoice ? "確認中..." : "LINEでログインする"}
               </button>
             ) : (
               <>
@@ -146,9 +158,6 @@ function ProfileLoginContent() {
                   <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{loginError}</p>
                 )}
                 <p className="mb-3 text-sm font-bold text-gray-700">どれでログインする？</p>
-                {!activeListLoaded && (
-                  <p className="mb-2 text-xs text-gray-500">ログイン状況を確認中...</p>
-                )}
                 <div className="grid grid-cols-5 gap-2">
                   {DEMO_USER_IDS.map((userId) => {
                     const isLoggedInElsewhere = activeUserIds.includes(userId);
@@ -159,7 +168,8 @@ function ProfileLoginContent() {
                         type="button"
                         onClick={() => handleLoginAs(userId)}
                         disabled={disabled}
-                        className="flex flex-col items-center gap-1 rounded-xl border-2 border-gray-300 bg-white py-3 hover:border-gray-900 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:bg-white"
+                        className="flex flex-col items-center gap-1 rounded-xl border-2 border-gray-300 bg-white py-3 hover:border-gray-900 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:bg-white touch-manipulation"
+                        style={{ touchAction: "manipulation" }}
                         aria-label={isLoggedInElsewhere ? `${DEMO_USERS[userId].name}は別の端末でログイン中` : `${DEMO_USERS[userId].name}でログイン`}
                       >
                         <img
