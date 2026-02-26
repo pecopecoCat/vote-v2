@@ -19,30 +19,21 @@ import {
   getNewestVoteCards,
   recommendedTagList,
 } from "../../data/voteCards";
-import { getCreatedVotesForTimeline } from "../../data/createdVotes";
-import {
-  getActivity,
-  addVote as persistVote,
-  addComment as persistComment,
-  getMergedCounts,
-  getCardIdsUserCommentedOn,
-  type VoteComment,
-} from "../../data/voteCardActivity";
+import { getMergedCounts, type VoteComment } from "../../data/voteCardActivity";
+import { useSharedData } from "../../context/SharedDataContext";
 import { isCardBookmarked } from "../../data/bookmarks";
 import { getAuth, getAuthUpdatedEventName } from "../../data/auth";
 import type { VoteCardData } from "../../data/voteCards";
 
 /** stableId (seed-N / created-xxx / 0,1,...) からカードを取得 */
-function getCardByStableId(id: string): VoteCardData | null {
+function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
   if (id.startsWith("seed-")) {
     const index = parseInt(id.slice(5), 10);
     if (Number.isNaN(index) || index < 0 || index >= voteCardsData.length) return null;
     return { ...voteCardsData[index], id: `seed-${index}` };
   }
   if (id.startsWith("created-")) {
-    if (typeof window === "undefined") return null;
-    const created = getCreatedVotesForTimeline();
-    return created.find((c) => c.id === id) ?? null;
+    return createdVotesForTimeline.find((c) => c.id === id) ?? null;
   }
   const card = getVoteCardById(id);
   if (card) return { ...card, id: `seed-${id}` };
@@ -74,47 +65,42 @@ function formatCommentDate(iso: string): string {
   }
 }
 
+const emptyActivity = { countA: 0, countB: 0, comments: [] as VoteComment[], userSelectedOption: undefined as "A" | "B" | undefined };
+
 export default function CommentsPage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "0";
+  const shared = useSharedData();
+  const { createdVotesForTimeline, activity: sharedActivity, addVote: sharedAddVote, addComment: sharedAddComment } = shared;
+  const activity = sharedActivity[id] ?? emptyActivity;
+
   const [card, setCard] = useState<VoteCardData | null>(() => {
     if (id.startsWith("created-")) return null;
-    return getCardByStableId(id);
+    return getCardByStableId(id, createdVotesForTimeline);
   });
-  const [activity, setActivity] = useState<ReturnType<typeof getActivity>>(() => getActivity(id));
   const [resolved, setResolved] = useState(!id.startsWith("created-"));
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [auth, setAuth] = useState(() => getAuth());
   const isLoggedIn = auth.isLoggedIn;
+
   useEffect(() => {
-    setAuth(getAuth());
-    setActivity(getActivity(id));
-    const eventName = getAuthUpdatedEventName();
-    const handler = () => {
-      setAuth(getAuth());
-      setActivity(getActivity(id));
-    };
-    window.addEventListener(eventName, handler);
-    return () => window.removeEventListener(eventName, handler);
-  }, [id]);
+    const handler = () => setAuth(getAuth());
+    window.addEventListener(getAuthUpdatedEventName(), handler);
+    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
+  }, []);
 
   useEffect(() => {
     if (!id.startsWith("created-")) return;
-    const c = getCardByStableId(id);
+    const c = getCardByStableId(id, createdVotesForTimeline);
     setCard(c);
     setResolved(true);
-  }, [id]);
-
-  useEffect(() => {
-    setActivity(getActivity(id));
-  }, [id]);
+  }, [id, createdVotesForTimeline]);
 
   const allCards = useMemo(() => {
-    const created = getCreatedVotesForTimeline();
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
-    return [...created, ...seedWithId];
-  }, []);
+    return [...createdVotesForTimeline, ...seedWithId];
+  }, [createdVotesForTimeline]);
 
   const relatedCards = useMemo(() => {
     if (!card) return [];
@@ -127,7 +113,13 @@ export default function CommentsPage() {
 
   const bottomCards = relatedCards.length > 0 ? relatedCards : fallbackCards;
   const bottomSectionTitle = relatedCards.length > 0 ? "関連VOTE" : "新着";
-  const commentedCardIds = useMemo(() => getCardIdsUserCommentedOn(), [activity]);
+  const commentedCardIds = useMemo(
+    () =>
+      Object.entries(sharedActivity)
+        .filter(([, a]) => (a.comments ?? []).some((c) => c.user?.name === "自分"))
+        .map(([cid]) => cid),
+    [sharedActivity]
+  );
 
   const backgroundUrl = card ? backgroundForCard(card, id) : CARD_BACKGROUND_IMAGES[0];
   const merged = card ? getMergedCounts(card.countA ?? 0, card.countB ?? 0, card.commentCount ?? 0, activity) : { countA: 0, countB: 0, commentCount: 0 };
@@ -136,13 +128,11 @@ export default function CommentsPage() {
     : { type: "guest" as const };
 
   const handleVote = (side: "A" | "B") => {
-    persistVote(id, side);
-    setActivity(getActivity(id));
+    void sharedAddVote(id, side);
   };
 
   const handleCommentSubmit = (cardId: string, payload: { user: { name: string; iconUrl?: string }; text: string }) => {
-    persistComment(cardId, payload);
-    setActivity(getActivity(id));
+    void sharedAddComment(cardId, payload);
   };
 
   if (!resolved) {

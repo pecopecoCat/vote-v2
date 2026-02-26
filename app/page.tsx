@@ -19,15 +19,12 @@ import {
   CARD_BACKGROUND_IMAGES,
   recommendedTagList,
 } from "./data/voteCards";
-import { getCreatedVotesForTimeline } from "./data/createdVotes";
 import {
-  getAllActivity,
-  addVote as persistVote,
   getMergedCounts,
-  getCardIdsUserCommentedOn,
   resetAllVoteCounts,
   type CardActivity,
 } from "./data/voteCardActivity";
+import { useSharedData } from "./context/SharedDataContext";
 import { getCollections, getCollectionsUpdatedEventName, resetUser1AndUser2Collections } from "./data/collections";
 import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
 import { getAuth, getAuthUpdatedEventName } from "./data/auth";
@@ -159,24 +156,19 @@ function HomeContent() {
     else if (tabFromUrl === "myTimeline") setActiveTab("myTimeline");
   }, [tabFromUrl]);
   const [collections, setCollections] = useState(() => getCollections());
-  const [activity, setActivity] = useState<Record<string, CardActivity>>(() => {
-    ensureVoteCountsResetOnce();
-    ensureUser1User2CollectionsResetOnce();
-    return getAllActivity();
-  });
+  const shared = useSharedData();
+  const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [auth, setAuth] = useState(() => getAuth());
 
   useEffect(() => {
-    setActivity(getAllActivity());
+    ensureVoteCountsResetOnce();
+    ensureUser1User2CollectionsResetOnce();
   }, []);
 
   useEffect(() => {
-    const handler = () => {
-      setAuth(getAuth());
-      setActivity(getAllActivity());
-    };
+    const handler = () => setAuth(getAuth());
     window.addEventListener(getAuthUpdatedEventName(), handler);
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
@@ -199,13 +191,18 @@ function HomeContent() {
     return () => window.removeEventListener(eventName, handler);
   }, []);
 
-  const commentedCardIds = useMemo(() => getCardIdsUserCommentedOn(), [activity]);
+  const commentedCardIds = useMemo(
+    () =>
+      Object.entries(activity).filter(([, a]) =>
+        (a.comments ?? []).some((c) => c.user?.name === "自分")
+      ).map(([id]) => id),
+    [activity]
+  );
 
   const allCards = useMemo(() => {
-    const created = getCreatedVotesForTimeline();
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
-    return [...created, ...seedWithId];
-  }, []);
+    return [...createdVotesForTimeline, ...seedWithId];
+  }, [createdVotesForTimeline]);
 
   /** 公開カードのみ（private はリンクを知ってる人だけ＝一覧には出さない） */
   const publicCards = useMemo(
@@ -225,15 +222,16 @@ function HomeContent() {
   );
 
   /** ページ表示時点で投票済みのID（リロード・再訪問時のみ更新。投票直後は更新しない） */
-  const [votedIdsAtLoad] = useState(() => {
-    if (typeof window === "undefined") return new Set<string>();
-    const act = getAllActivity();
-    return new Set(
-      Object.entries(act)
+  const [votedIdsAtLoad, setVotedIdsAtLoad] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (votedIdsAtLoad.size > 0) return;
+    const ids = new Set(
+      Object.entries(activity)
         .filter(([, a]) => a?.userSelectedOption)
         .map(([id]) => id)
     );
-  });
+    setVotedIdsAtLoad(ids);
+  }, [activity, votedIdsAtLoad.size]);
 
   /** 急上昇中・新着では投票済みカードを除外（votedIdsAtLoad のためリロード/再訪問時のみ反映） */
   const cardsForFeed = useMemo(
@@ -315,19 +313,7 @@ function HomeContent() {
                   hasCommented={commentedCardIds.includes(cardId)}
                   initialSelectedOption={act?.userSelectedOption ?? null}
                   onVote={(id, option) => {
-                    persistVote(id, option);
-                    setActivity((prev) => {
-                      const cur = prev[id] ?? { countA: 0, countB: 0, comments: [] };
-                      return {
-                        ...prev,
-                        [id]: {
-                          countA: cur.countA + (option === "A" ? 1 : 0),
-                          countB: cur.countB + (option === "B" ? 1 : 0),
-                          comments: cur.comments ?? [],
-                          userSelectedOption: option,
-                        },
-                      };
-                    });
+                    void sharedAddVote(id, option);
                   }}
                   onBookmarkClick={setModalCardId}
                   onMoreClick={setCardOptionsCardId}

@@ -19,15 +19,8 @@ import {
   CARD_BACKGROUND_IMAGES,
   recommendedTagList,
 } from "../data/voteCards";
-import { getCreatedVotesForTimeline } from "../data/createdVotes";
-import {
-  getActivity,
-  getAllActivity,
-  addVote as persistVote,
-  getMergedCounts,
-  getCardIdsUserCommentedOn,
-  type CardActivity,
-} from "../data/voteCardActivity";
+import { getMergedCounts, type CardActivity } from "../data/voteCardActivity";
+import { useSharedData } from "../context/SharedDataContext";
 import {
   getFavoriteTags,
   toggleFavoriteTag,
@@ -130,7 +123,8 @@ function SearchContent() {
   const [searchValue, setSearchValue] = useState(tagFromUrl);
   const [activeTab, setActiveTab] = useState<"trending" | "favorite">("trending");
   const [showVoted, setShowVoted] = useState(true);
-  const [activity, setActivity] = useState<Record<string, CardActivity>>({});
+  const shared = useSharedData();
+  const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
@@ -145,13 +139,11 @@ function SearchContent() {
     : { type: "guest" };
   useEffect(() => {
     setAuth(getAuth());
-    setActivity(getAllActivity());
     setFavoriteTags(getFavoriteTags());
     setCollections(getCollections());
     setPinnedCollectionIds(getPinnedCollectionIds());
     const handler = () => {
       setAuth(getAuth());
-      setActivity(getAllActivity());
       setFavoriteTags(getFavoriteTags());
       setCollections(getCollections());
       setPinnedCollectionIds(getPinnedCollectionIds());
@@ -181,10 +173,9 @@ function SearchContent() {
 
   /** 注目タグ用の全カード（作成VOTE + シード） */
   const allCardsForTags = useMemo(() => {
-    const created = typeof window !== "undefined" ? getCreatedVotesForTimeline() : [];
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
-    return [...created, ...seedWithId];
-  }, []);
+    return [...createdVotesForTimeline, ...seedWithId];
+  }, [createdVotesForTimeline]);
 
   /** 注目タグ（スコア順：投票+1, コメント+3, bookmark+5, 新着+2, お気に入り+3） */
   const trendingTagsByScore = useMemo(
@@ -207,15 +198,20 @@ function SearchContent() {
 
   /** ハッシュタグフィルター用の全カード（作成VOTE + シード） */
   const allCardsForTagFilter = useMemo(() => {
-    const created = typeof window !== "undefined" ? getCreatedVotesForTimeline() : [];
-    return [...created, ...voteCardsData];
-  }, []);
+    return [...createdVotesForTimeline, ...voteCardsData];
+  }, [createdVotesForTimeline]);
 
   const filteredCards = useMemo(
     () => filterCardsByTag(allCardsForTagFilter, isTagFilterView ? tagFromUrl : null),
     [allCardsForTagFilter, isTagFilterView, tagFromUrl]
   );
-  const commentedCardIds = useMemo(() => getCardIdsUserCommentedOn(), [activity]);
+  const commentedCardIds = useMemo(
+    () =>
+      Object.entries(activity).filter(([, a]) =>
+        (a.comments ?? []).some((c) => c.user?.name === "自分")
+      ).map(([cid]) => cid),
+    [activity]
+  );
   const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
   const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
   useEffect(() => {
@@ -253,20 +249,8 @@ function SearchContent() {
     []
   );
   const handleVote = useCallback((cardId: string, option: "A" | "B") => {
-    persistVote(cardId, option);
-    setActivity((prev) => {
-      const cur = prev[cardId] ?? { countA: 0, countB: 0, comments: [] };
-      return {
-        ...prev,
-        [cardId]: {
-          countA: cur.countA + (option === "A" ? 1 : 0),
-          countB: cur.countB + (option === "B" ? 1 : 0),
-          comments: cur.comments ?? [],
-          userSelectedOption: option,
-        },
-      };
-    });
-  }, []);
+    void sharedAddVote(cardId, option);
+  }, [sharedAddVote]);
 
   return (
     <div

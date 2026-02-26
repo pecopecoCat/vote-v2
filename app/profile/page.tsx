@@ -5,14 +5,11 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import BottomNav from "../components/BottomNav";
 import VoteCard from "../components/VoteCard";
-import {
-  getCreatedVotes,
-  getCreatedVotesForTimeline,
-  deleteCreatedVote,
-  getCreatedVotesUpdatedEventName,
-} from "../data/createdVotes";
+import { getCreatedVotes, deleteCreatedVote, getCreatedVotesUpdatedEventName } from "../data/createdVotes";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
-import { getAllActivity, getMergedCounts, getCardIdsUserCommentedOn, getActivity, type CardActivity, type VoteComment } from "../data/voteCardActivity";
+import { getMergedCounts, type CardActivity, type VoteComment } from "../data/voteCardActivity";
+import { useSharedData } from "../context/SharedDataContext";
+import { getCurrentActivityUserId } from "../data/auth";
 import { getFavoriteTags, getFavoriteTagsUpdatedEventName } from "../data/favoriteTags";
 import {
   getCollections,
@@ -127,7 +124,8 @@ function ProfileContent() {
   const returnTo = searchParams.get("returnTo"); // 未ログインでVOTE作成から来た場合の戻り先
   const [activeTab, setActiveTab] = useState<ProfileTabId>("vote");
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [activity, setActivity] = useState<Record<string, CardActivity>>({});
+  const shared = useSharedData();
+  const { createdVotesForTimeline, activity } = shared;
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
   /** Bookmark タブでコレクション or ALL を選択中。null = TOP（リスト表示） */
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<null | "all" | string>(null);
@@ -162,15 +160,10 @@ function ProfileContent() {
   useEffect(() => {
     const handler = () => {
       setAuth(getAuth());
-      setActivity(getAllActivity());
       setFavoriteTags(getFavoriteTags());
     };
     window.addEventListener(getAuthUpdatedEventName(), handler);
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
-  }, []);
-
-  useEffect(() => {
-    setActivity(getAllActivity());
   }, []);
 
   useEffect(() => {
@@ -208,10 +201,14 @@ function ProfileContent() {
     ? { type: "sns", name: profileUser.name, iconUrl: profileUser.iconUrl }
     : { type: "guest" };
 
-  const createdVotesRaw = useMemo(
-    () => (typeof window !== "undefined" ? getCreatedVotes() : []),
-    [createdVotesRefreshKey]
-  );
+  const userId = typeof window !== "undefined" ? getCurrentActivityUserId() : "";
+  const createdVotesRaw = useMemo(() => {
+    if (typeof window === "undefined") return [];
+    if (shared.isRemote) {
+      return createdVotesForTimeline.filter((c) => c.createdByUserId === userId);
+    }
+    return getCreatedVotes();
+  }, [shared.isRemote, createdVotesForTimeline, createdVotesRefreshKey, userId]);
   const createdVotes = useMemo(() => {
     if (myVoteSortOrder === "oldest") {
       return [...createdVotesRaw].sort((a, b) => {
@@ -230,8 +227,8 @@ function ProfileContent() {
 
   /** 投票・Bookmark・コメントタブ用（全ユーザーの作ったVOTE＋シード） */
   const allCards = useMemo(
-    () => [...(typeof window !== "undefined" ? getCreatedVotesForTimeline() : []), ...seedCards],
-    [createdVotesRefreshKey, seedCards]
+    () => [...createdVotesForTimeline, ...seedCards],
+    [createdVotesForTimeline, seedCards]
   );
 
   const votedCardsRaw = useMemo(
@@ -250,7 +247,13 @@ function ProfileContent() {
     [allCards, allBookmarkedIds]
   );
 
-  const commentedCardIds = useMemo(() => getCardIdsUserCommentedOn(), [activity]);
+  const commentedCardIds = useMemo(
+    () =>
+      Object.entries(activity).filter(([, a]) =>
+        (a.comments ?? []).some((c) => c.user?.name === MY_COMMENT_USER_NAME)
+      ).map(([cid]) => cid),
+    [activity]
+  );
 
   const tabLabels: { id: ProfileTabId; label: string }[] = [
     { id: "myVOTE", label: "myVOTE" },
@@ -807,7 +810,7 @@ function ProfileContent() {
                 {commentedCardIds.map((cardId) => {
                   const card = allCards.find((c) => (c.id ?? c.question) === cardId);
                   if (!card) return null;
-                  const act = getActivity(cardId);
+                  const act = activity[cardId] ?? { countA: 0, countB: 0, comments: [] };
                   const merged = getMergedCounts(
                     card.countA ?? 0,
                     card.countB ?? 0,

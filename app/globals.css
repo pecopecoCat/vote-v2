@@ -75,6 +75,13 @@ nav[aria-label="マイページタブ"] button {
   appearance: none;
 }
 
+/* スマホ入力時の自動ズーム防止（iOS Safari は 16px 未満でフォーカス時にズームするため） */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+textarea,
+select {
+  font-size: 16px !important;
+}
+
 /* 黒ベタ内テキスト（375px基準の相対指定） */
 .vote-card-question-text {
   font-family: var(--font-noto-sans-jp), sans-serif;

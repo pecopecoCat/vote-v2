@@ -20,15 +20,10 @@ import {
 } from "../../data/collections";
 import { isCardBookmarked } from "../../data/bookmarks";
 import { getCollectionGradientClass } from "../../data/search";
-import { getCreatedVotesForTimeline } from "../../data/createdVotes";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
 import { getAuth, getAuthUpdatedEventName } from "../../data/auth";
-import {
-  getAllActivity,
-  getMergedCounts,
-  getCardIdsUserCommentedOn,
-  type CardActivity,
-} from "../../data/voteCardActivity";
+import { getMergedCounts, type CardActivity } from "../../data/voteCardActivity";
+import { useSharedData } from "../../context/SharedDataContext";
 import type { VoteCardData } from "../../data/voteCards";
 import type { CurrentUser } from "../../components/VoteCard";
 
@@ -38,16 +33,14 @@ const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   private: "非公開",
 };
 
-function getCardByStableId(id: string): VoteCardData | null {
+function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
   if (id.startsWith("seed-")) {
     const index = parseInt(id.slice(5), 10);
     if (Number.isNaN(index) || index < 0 || index >= voteCardsData.length) return null;
     return { ...voteCardsData[index], id: `seed-${index}` };
   }
   if (id.startsWith("created-")) {
-    if (typeof window === "undefined") return null;
-    const created = getCreatedVotesForTimeline();
-    return created.find((c) => c.id === id) ?? null;
+    return createdVotesForTimeline.find((c) => c.id === id) ?? null;
   }
   const index = parseInt(id, 10);
   if (!Number.isNaN(index) && index >= 0 && index < voteCardsData.length) {
@@ -66,9 +59,10 @@ function backgroundForCard(card: VoteCardData, cardId: string): string {
 export default function CollectionPage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
+  const shared = useSharedData();
+  const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [collections, setCollections] = useState<Collection[]>([]);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
-  const [activity, setActivity] = useState<Record<string, CardActivity>>({});
   const [showVoted, setShowVoted] = useState(true);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
@@ -95,31 +89,30 @@ export default function CollectionPage() {
   }, []);
 
   useEffect(() => {
-    setActivity(getAllActivity());
-  }, []);
-
-  useEffect(() => {
-    const handler = () => {
-      setAuth(getAuth());
-      setActivity(getAllActivity());
-    };
+    const handler = () => setAuth(getAuth());
     window.addEventListener(getAuthUpdatedEventName(), handler);
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
   const collection = useMemo(() => getCollectionById(id), [id, collections]);
   const isPinned = pinnedIds.includes(id);
-  const commentedCardIds = useMemo(() => getCardIdsUserCommentedOn(), [activity]);
+  const commentedCardIds = useMemo(
+    () =>
+      Object.entries(activity).filter(([, a]) =>
+        (a.comments ?? []).some((c) => c.user?.name === "自分")
+      ).map(([cid]) => cid),
+    [activity]
+  );
 
   const cardsInCollection = useMemo(() => {
     if (!collection) return [];
     return collection.cardIds
       .map((cardId) => {
-        const card = getCardByStableId(cardId);
+        const card = getCardByStableId(cardId, createdVotesForTimeline);
         return card ? { card, cardId } : null;
       })
       .filter((x): x is { card: VoteCardData; cardId: string } => x != null);
-  }, [collection]);
+  }, [collection, createdVotesForTimeline]);
 
   const cardsToShow = useMemo(() => {
     if (showVoted) return cardsInCollection;
@@ -248,6 +241,7 @@ export default function CollectionPage() {
                   bookmarked={isCardBookmarked(cardId)}
                   hasCommented={commentedCardIds.includes(cardId)}
                   initialSelectedOption={act?.userSelectedOption ?? null}
+                  onVote={(cid, option) => void sharedAddVote(cid, option)}
                   onBookmarkClick={setModalCardId}
                   onMoreClick={setCardOptionsCardId}
                   visibility={card.visibility}

@@ -23,6 +23,8 @@ export interface VoteCardData {
   id?: string;
   /** public: みんな見れる / private: リンクを知ってる人だけ見れる（擬似） */
   visibility?: "public" | "private";
+  /** 作成者ユーザーID（API共有時・マイページ「作ったVOTE」のフィルタ用） */
+  createdByUserId?: string;
   /** Aの画像URL（指定時はカード内にA/B画像エリアを表示） */
   optionAImageUrl?: string;
   /** Bの画像URL */

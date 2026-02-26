@@ -9,7 +9,25 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 3. 「Add New Project」→ このリポジトリを選択 → **Deploy**
 4. 数分で `https://○○○.vercel.app` のような URL が発行されるので、そのリンクを共有する
 
-※ ブックマーク・コレクション・投票結果などはブラウザの localStorage を使っているため、**同じ URL を開いた人ごとに別のデータ**になります（デモ・プレビュー用として問題ありません）。
+**データの保存について**
+
+- **何も設定しない場合**: ブックマーク・コレクション・投票結果・作成したVOTEなどはブラウザの **localStorage** に保存されます。端末ごとに別のデータになります（デモ・プレビュー用）。
+- **10人などで同じデータを共有してチェックしたい場合**: 下記の「共有ストア（Vercel KV）」を設定すると、**作成したVOTE・投票数・コメント**が全員で共有されます。
+
+### 共有ストア（Vercel KV）の設定（任意）
+
+複数ユーザーで同じVOTE一覧・投票結果を見たいときは、Vercel の Redis（Upstash）を用意し、環境変数を設定してください。
+
+1. [Vercel Dashboard](https://vercel.com) → プロジェクト → **Storage** で **Redis**（Upstash）を追加する  
+   または [Upstash](https://upstash.com) で Redis を作成し、REST API の URL とトークンを取得する
+2. プロジェクトのルートに `.env.local` を作成し、次を記述する（値は Vercel / Upstash の画面からコピー）:
+   ```bash
+   KV_REST_API_URL=https://xxxxx.upstash.io
+   KV_REST_API_TOKEN=AXxx...
+   ```
+3. `npm run dev` で再起動する
+
+設定後は、**作成したVOTE**と**投票・コメントの集計**が KV に保存され、同じURLにアクセスした全員で同じデータが表示されます。ブックマーク・コレクション・ログイン状態は従来どおり各端末の localStorage です。
 
 **ローカルで試すだけなら**
 

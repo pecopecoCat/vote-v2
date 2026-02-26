@@ -2,15 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 import { getCollections } from "../../data/collections";
 import { getAuth } from "../../data/auth";
-import { CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
-import { addCreatedVote } from "../../data/createdVotes";
+import { CARD_BACKGROUND_IMAGES, recommendedTagList } from "../../data/voteCards";
+import { useSharedData } from "../../context/SharedDataContext";
 import { addDraft } from "../../data/drafts";
 import SuccessModal from "../../components/SuccessModal";
 
@@ -25,6 +24,7 @@ const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 function CreateFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { addCreatedVote: sharedAddCreatedVote } = useSharedData();
   const qFromUrl = searchParams.get("q") ?? "";
 
   const [question, setQuestion] = useState(qFromUrl);
@@ -39,7 +39,6 @@ function CreateFormContent() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [showVoteCreatedModal, setShowVoteCreatedModal] = useState(false);
-  const [showDraftSavedModal, setShowDraftSavedModal] = useState(false);
   const [selectedBackgroundUrl, setSelectedBackgroundUrl] = useState<string>(
     CARD_BACKGROUND_IMAGES[0]
   );
@@ -87,9 +86,9 @@ function CreateFormContent() {
     if (!getAuth().isLoggedIn) return;
     const now = new Date().toISOString();
     const tagList = tags.length > 0 ? tags : undefined;
-    addCreatedVote({
+    const card = {
       id: `created-${Date.now()}`,
-      patternType: "yellow-loops",
+      patternType: "yellow-loops" as const,
       backgroundImageUrl: selectedBackgroundUrl,
       question: question.trim(),
       optionA: optionA.trim(),
@@ -102,10 +101,11 @@ function CreateFormContent() {
       visibility,
       optionAImageUrl: optionAImageUrl || undefined,
       optionBImageUrl: optionBImageUrl || undefined,
-    });
-    setShowVoteCreatedModal(true);
+    };
+    void sharedAddCreatedVote(card).then(() => setShowVoteCreatedModal(true));
   }, [
     canSubmit,
+    sharedAddCreatedVote,
     router,
     question,
     optionA,
@@ -122,15 +122,11 @@ function CreateFormContent() {
     router.push("/?tab=new");
   }, [router]);
 
-  const handleDraftSavedModalClose = useCallback(() => {
-    setShowDraftSavedModal(false);
-  }, []);
-
-  const handleSaveDraft = useCallback(() => {
+  const handleSaveDraftAndGoToDrafts = useCallback(() => {
     const text = question.trim() || "（未入力）";
     addDraft(text);
-    setShowDraftSavedModal(true);
-  }, [question]);
+    router.push("/drafts");
+  }, [question, router]);
 
   const handleImageSelect = useCallback(
     (side: "A" | "B", e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,12 +151,13 @@ function CreateFormContent() {
         title="VOTEを作成"
         backHref="/"
         right={
-          <Link
-            href="/drafts"
-            className="whitespace-nowrap rounded-[9999px] border-2 border-[#FFE100] bg-white px-3 py-1.5 text-sm font-bold text-gray-900"
+          <button
+            type="button"
+            onClick={handleSaveDraftAndGoToDrafts}
+            className="whitespace-nowrap rounded-[9999px] border-2 border-[#FFE100] bg-white px-3 py-2.5 text-sm font-bold text-gray-900"
           >
             下書き
-          </Link>
+          </button>
         }
       />
 
@@ -302,10 +299,10 @@ function CreateFormContent() {
           </div>
         </section>
 
-        {/* タグ付け（四角の中で展開・キーワードごとにグレー pill・取り消し×） */}
+        {/* タグ付け（候補を下に表示→選択 or 入力を完了で新規タグ） */}
         <section>
           <h2 className="mb-2 text-sm font-bold text-gray-900">タグ付け</h2>
-          <div className="rounded-xl bg-white p-5">
+          <div className="relative rounded-xl bg-white p-5">
             {tags.length > 0 && (
               <div className="mb-3 flex flex-wrap gap-2">
                 {tags.map((tag) => (
@@ -333,33 +330,57 @@ function CreateFormContent() {
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === " " || e.key === "Enter") {
+                  if (e.key === "Enter") {
                     e.preventDefault();
                     const word = tagInput.trim();
-                    if (word && !tags.includes(word)) {
-                      setTags((prev) => [...prev, word]);
+                    if (word) {
+                      if (!tags.includes(word)) setTags((prev) => [...prev, word]);
                       setTagInput("");
                     }
                   }
                 }}
-                placeholder="その他のタグを検索"
+                placeholder="タグを検索または入力"
                 className="min-w-0 flex-1 border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
               />
             </div>
             {tagInput.trim() && (
-              <button
-                type="button"
-                className="mt-2 text-xs text-gray-500 underline"
-                onClick={() => {
-                  const word = tagInput.trim();
-                  if (word && !tags.includes(word)) {
-                    setTags((prev) => [...prev, word]);
-                    setTagInput("");
-                  }
-                }}
-              >
-                追加
-              </button>
+              <ul className="absolute left-5 right-5 top-full z-10 mt-1 max-h-48 overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                {recommendedTagList
+                  .filter((t) => !tags.includes(t) && t.toLowerCase().includes(tagInput.trim().toLowerCase()))
+                  .slice(0, 10)
+                  .map((tag) => (
+                    <li key={tag}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm text-gray-900 hover:bg-gray-50"
+                        onClick={() => {
+                          if (!tags.includes(tag)) {
+                            setTags((prev) => [...prev, tag]);
+                            setTagInput("");
+                          }
+                        }}
+                      >
+                        #{tag}
+                      </button>
+                    </li>
+                  ))}
+                {tagInput.trim() &&
+                  !recommendedTagList.includes(tagInput.trim()) &&
+                  !tags.includes(tagInput.trim()) && (
+                    <li className="border-t border-gray-100">
+                      <button
+                        type="button"
+                        className="flex w-full items-center px-4 py-2.5 text-left text-sm text-gray-900 hover:bg-gray-50"
+                        onClick={() => {
+                          setTags((prev) => [...prev, tagInput.trim()]);
+                          setTagInput("");
+                        }}
+                      >
+                        「{tagInput.trim()}」を新規タグで追加
+                      </button>
+                    </li>
+                  )}
+              </ul>
             )}
           </div>
         </section>
@@ -543,11 +564,8 @@ function CreateFormContent() {
         </section>
       </main>
 
-      {/* 固定フッター: 下書き保存 + VOTEを作成 */}
-      <div className="fixed bottom-14 left-0 right-0 z-20 mx-auto max-w-lg space-y-2 px-[5.333vw] pb-2 pt-2">
-        <Button variant="outline" type="button" onClick={handleSaveDraft} className="w-full">
-          下書き保存
-        </Button>
+      {/* 固定フッター: VOTEを作成 */}
+      <div className="fixed bottom-14 left-0 right-0 z-20 mx-auto max-w-lg px-[5.333vw] pb-2 pt-2">
         <Button variant="createVote" type="button" onClick={handleSubmit} disabled={!canSubmit}>
           VOTEを作成
         </Button>
@@ -558,11 +576,6 @@ function CreateFormContent() {
         message="VOTEを作成しました"
         onClose={handleVoteCreatedModalClose}
         autoCloseSeconds={1.5}
-      />
-      <SuccessModal
-        open={showDraftSavedModal}
-        message="下書きが完了しました"
-        onClose={handleDraftSavedModalClose}
       />
 
       <BottomNav activeId="add" />
