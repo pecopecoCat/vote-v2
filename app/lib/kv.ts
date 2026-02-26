@@ -19,4 +19,6 @@ export type KVClient = {
   get: <T = unknown>(key: string) => Promise<T | null>;
   set: (key: string, value: unknown) => Promise<void>;
   del: (key: string) => Promise<number>;
+  /** キーが存在しないときだけセット。1=セットした, 0=既に存在（重複） */
+  setnx?: (key: string, value: string) => Promise<number>;
 };

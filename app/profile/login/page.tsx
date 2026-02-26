@@ -28,6 +28,8 @@ function ProfileLoginContent() {
   const [loginError, setLoginError] = useState<string | null>(null);
   /** 別端末でログイン中＝重複ログインさせないため選択不可にするID一覧 */
   const [activeUserIds, setActiveUserIds] = useState<string[]>([]);
+  /** ログイン中一覧の取得完了前はクリックさせない（重複防止のため） */
+  const [activeListLoaded, setActiveListLoaded] = useState(false);
 
   useEffect(() => {
     if (getAuth().isLoggedIn) {
@@ -37,14 +39,23 @@ function ProfileLoginContent() {
 
   /** ユーザー選択を開いたときにログイン中一覧を取得 */
   useEffect(() => {
-    if (!showUserChoice) return;
+    if (!showUserChoice) {
+      setActiveListLoaded(false);
+      return;
+    }
     let cancelled = false;
+    setActiveListLoaded(false);
     fetch("/api/active-user")
       .then((res) => res.json())
       .then((data: { userIds?: string[] }) => {
-        if (!cancelled && Array.isArray(data.userIds)) setActiveUserIds(data.userIds);
+        if (!cancelled) {
+          setActiveUserIds(Array.isArray(data.userIds) ? data.userIds : []);
+          setActiveListLoaded(true);
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setActiveListLoaded(true);
+      });
     return () => { cancelled = true; };
   }, [showUserChoice]);
 
@@ -135,10 +146,13 @@ function ProfileLoginContent() {
                   <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{loginError}</p>
                 )}
                 <p className="mb-3 text-sm font-bold text-gray-700">どれでログインする？</p>
+                {!activeListLoaded && (
+                  <p className="mb-2 text-xs text-gray-500">ログイン状況を確認中...</p>
+                )}
                 <div className="grid grid-cols-5 gap-2">
                   {DEMO_USER_IDS.map((userId) => {
                     const isLoggedInElsewhere = activeUserIds.includes(userId);
-                    const disabled = loading || isLoggedInElsewhere;
+                    const disabled = loading || !activeListLoaded || isLoggedInElsewhere;
                     return (
                       <button
                         key={userId}

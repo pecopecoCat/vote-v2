@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { getKV } from "../../lib/kv";
 import { DEMO_USER_IDS, type DemoUserId } from "../../data/auth";
 
-const KV_KEY = "vote_active_user_ids";
-const MAX_ACTIVE = 10;
+const KV_KEY_PREFIX = "vote_active_user:";
 
 const VALID_IDS = new Set<string>(DEMO_USER_IDS);
 
@@ -11,9 +10,8 @@ function isValidUserId(v: unknown): v is DemoUserId {
   return typeof v === "string" && VALID_IDS.has(v);
 }
 
-function getActiveList(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((id): id is string => typeof id === "string" && VALID_IDS.has(id));
+function activeKey(userId: string): string {
+  return KV_KEY_PREFIX + userId;
 }
 
 /** GET: 現在ログイン中のユーザーIDの一覧（最大10人） */
@@ -23,8 +21,11 @@ export async function GET(): Promise<NextResponse<{ userIds: string[] } | { erro
     return NextResponse.json({ userIds: [] });
   }
   try {
-    const raw = await kv.get<unknown>(KV_KEY);
-    const userIds = getActiveList(raw);
+    const userIds: string[] = [];
+    for (const id of DEMO_USER_IDS) {
+      const v = await kv.get<string>(activeKey(id));
+      if (v != null) userIds.push(id);
+    }
     return NextResponse.json({ userIds });
   } catch (e) {
     console.error("[api/active-user] GET error:", e);
@@ -33,7 +34,7 @@ export async function GET(): Promise<NextResponse<{ userIds: string[] } | { erro
 }
 
 /**
- * POST: ログイン時は { userId } で追加。同じ userId が既にいれば 409（二重ログイン禁止）。
+ * POST: ログイン時は { userId } で追加。setnx で原子的に判定し、同じ userId が既にいれば 409（二重ログイン禁止）。
  *       ログアウト時は { logoutUserId } でそのユーザーをリストから削除。
  */
 export async function POST(
@@ -51,9 +52,7 @@ export async function POST(
       if (!isValidUserId(logoutId)) {
         return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
       }
-      const raw = await kv.get<unknown>(KV_KEY);
-      const list = getActiveList(raw).filter((id) => id !== logoutId);
-      await kv.set(KV_KEY, list);
+      await kv.del(activeKey(logoutId));
       return NextResponse.json({ ok: true });
     }
 
@@ -65,24 +64,27 @@ export async function POST(
       return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
     }
 
-    const raw = await kv.get<unknown>(KV_KEY);
-    const list = getActiveList(raw);
-
-    if (list.includes(userId)) {
+    // 原子的に「いなければセット」。既に存在すれば 0 が返り二重ログインとみなす
+    const setnx = kv.setnx;
+    if (!setnx) {
+      // setnx が無いクライアント用フォールバック（非推奨・競合あり）
+      const v = await kv.get<string>(activeKey(userId));
+      if (v != null) {
+        return NextResponse.json(
+          { error: "このアカウントは別の端末でログイン中です。", code: "ALREADY_LOGGED_IN" },
+          { status: 409 }
+        );
+      }
+      await kv.set(activeKey(userId), "1");
+      return NextResponse.json({ ok: true });
+    }
+    const set = await setnx.call(kv, activeKey(userId), "1");
+    if (set === 0) {
       return NextResponse.json(
         { error: "このアカウントは別の端末でログイン中です。", code: "ALREADY_LOGGED_IN" },
         { status: 409 }
       );
     }
-    if (list.length >= MAX_ACTIVE) {
-      return NextResponse.json(
-        { error: "ログイン可能な人数が上限です（10人）", code: "MAX_USERS" },
-        { status: 409 }
-      );
-    }
-
-    list.push(userId);
-    await kv.set(KV_KEY, list);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/active-user] POST error:", e);
