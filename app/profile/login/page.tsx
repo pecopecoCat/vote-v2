@@ -26,12 +26,27 @@ function ProfileLoginContent() {
   const [showUserChoice, setShowUserChoice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  /** 別端末でログイン中＝重複ログインさせないため選択不可にするID一覧 */
+  const [activeUserIds, setActiveUserIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (getAuth().isLoggedIn) {
       router.replace(returnTo);
     }
   }, [router, returnTo]);
+
+  /** ユーザー選択を開いたときにログイン中一覧を取得 */
+  useEffect(() => {
+    if (!showUserChoice) return;
+    let cancelled = false;
+    fetch("/api/active-user")
+      .then((res) => res.json())
+      .then((data: { userIds?: string[] }) => {
+        if (!cancelled && Array.isArray(data.userIds)) setActiveUserIds(data.userIds);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [showUserChoice]);
 
   const handleLoginAs = useCallback(
     async (userId: DemoUserId) => {
@@ -121,26 +136,32 @@ function ProfileLoginContent() {
                 )}
                 <p className="mb-3 text-sm font-bold text-gray-700">どれでログインする？</p>
                 <div className="grid grid-cols-5 gap-2">
-                  {DEMO_USER_IDS.map((userId) => (
-                    <button
-                      key={userId}
-                      type="button"
-                      onClick={() => handleLoginAs(userId)}
-                      disabled={loading}
-                      className="flex flex-col items-center gap-1 rounded-xl border-2 border-gray-300 bg-white py-3 hover:border-gray-900 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50"
-                      aria-label={`${DEMO_USERS[userId].name}でログイン`}
-                    >
-                      <img
-                        src={DEMO_USERS[userId].iconUrl}
-                        alt=""
-                        className="h-10 w-10 rounded-full object-cover"
-                        width={40}
-                        height={40}
-                      />
-                      <span className="text-xs font-bold text-gray-900">{DEMO_USERS[userId].name}</span>
-                      <span className="text-[10px] text-gray-500">{USER_LABELS[userId]}</span>
-                    </button>
-                  ))}
+                  {DEMO_USER_IDS.map((userId) => {
+                    const isLoggedInElsewhere = activeUserIds.includes(userId);
+                    const disabled = loading || isLoggedInElsewhere;
+                    return (
+                      <button
+                        key={userId}
+                        type="button"
+                        onClick={() => handleLoginAs(userId)}
+                        disabled={disabled}
+                        className="flex flex-col items-center gap-1 rounded-xl border-2 border-gray-300 bg-white py-3 hover:border-gray-900 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:bg-white"
+                        aria-label={isLoggedInElsewhere ? `${DEMO_USERS[userId].name}は別の端末でログイン中` : `${DEMO_USERS[userId].name}でログイン`}
+                      >
+                        <img
+                          src={DEMO_USERS[userId].iconUrl}
+                          alt=""
+                          className="h-10 w-10 rounded-full object-cover"
+                          width={40}
+                          height={40}
+                        />
+                        <span className="text-xs font-bold text-gray-900">{DEMO_USERS[userId].name}</span>
+                        <span className="text-[10px] text-gray-500">
+                          {isLoggedInElsewhere ? "ログイン中" : USER_LABELS[userId]}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </>
             )}
