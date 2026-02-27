@@ -14,11 +14,7 @@ import Checkbox from "../components/Checkbox";
 import BottomNav from "../components/BottomNav";
 import type { CurrentUser } from "../components/VoteCard";
 import type { VoteCardData } from "../data/voteCards";
-import {
-  voteCardsData,
-  CARD_BACKGROUND_IMAGES,
-  recommendedTagList,
-} from "../data/voteCards";
+import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
 import { getMergedCounts, type CardActivity } from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
 import {
@@ -39,7 +35,9 @@ import { isCardBookmarked } from "../data/bookmarks";
 import { getAuth, getAuthUpdatedEventName } from "../data/auth";
 import {
   getTrendingTagsByScore,
+  popularCollections,
   searchCollections,
+  trendingTags,
   type CollectionGradient,
 } from "../data/search";
 
@@ -205,6 +203,7 @@ function SearchContent() {
     () => filterCardsByTag(allCardsForTagFilter, isTagFilterView ? tagFromUrl : null),
     [allCardsForTagFilter, isTagFilterView, tagFromUrl]
   );
+
   const commentedCardIds = useMemo(
     () =>
       Object.entries(activity).filter(([, a]) =>
@@ -214,6 +213,24 @@ function SearchContent() {
   );
   const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
   const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
+
+  /** 検索結果タイムライン用：実際にあるコレクションから1件ランダム */
+  const randomCollectionForTimeline = useMemo(() => {
+    const other = getOtherUsersCollections().map((c) => ({
+      id: c.id,
+      title: c.name,
+      gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+    }));
+    const mine = collections.map((c) => ({
+      id: c.id,
+      title: c.name,
+      gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+    }));
+    const pool = [...popularCollections, ...other, ...mine];
+    if (pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, [collections]);
+
   useEffect(() => {
     setPinnedCollectionIds(getPinnedCollectionIds());
     setCollections(getCollections());
@@ -335,12 +352,24 @@ function SearchContent() {
                   );
                 })
               )}
-              <RecommendedTags tags={recommendedTagList} />
-              <CollectionCard
-                  title={"マリオのワンダーな\nVOTE"}
+              <div className="-mx-[5.333vw]">
+                <div className="border-t border-gray-300" aria-hidden />
+                <div className="px-[5.333vw]">
+                  <RecommendedTags tags={trendingTags.map((t) => t.tag).slice(0, 10)} />
+                </div>
+              </div>
+              {randomCollectionForTimeline && (
+                <CollectionCard
+                  key={randomCollectionForTimeline.id}
+                  id={randomCollectionForTimeline.id}
+                  title={randomCollectionForTimeline.title}
+                  gradient={randomCollectionForTimeline.gradient}
                   titleVariant="blackBlock"
                   label="コレクション"
+                  href={`/collection/${randomCollectionForTimeline.id}`}
+                  timelineBanner
                 />
+              )}
             </div>
           </main>
           <BottomNav activeId="search" />

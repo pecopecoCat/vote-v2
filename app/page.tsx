@@ -14,21 +14,20 @@ import CardOptionsModal from "./components/CardOptionsModal";
 import type { CurrentUser } from "./components/VoteCard";
 import type { FeedTabId } from "./components/FeedTabs";
 import type { VoteCardData } from "./data/voteCards";
-import {
-  voteCardsData,
-  CARD_BACKGROUND_IMAGES,
-  recommendedTagList,
-} from "./data/voteCards";
+import { voteCardsData, CARD_BACKGROUND_IMAGES } from "./data/voteCards";
 import {
   getMergedCounts,
   resetAllVoteCounts,
   type CardActivity,
 } from "./data/voteCardActivity";
 import { useSharedData } from "./context/SharedDataContext";
-import { getCollections, getCollectionsUpdatedEventName, resetUser1AndUser2Collections } from "./data/collections";
+import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, resetUser1AndUser2Collections } from "./data/collections";
 import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
 import { getAuth, getAuthUpdatedEventName } from "./data/auth";
-import { popularCollections, type CollectionGradient } from "./data/search";
+import { popularCollections, trendingTags, type CollectionGradient } from "./data/search";
+
+/** HOMEタイムライン：注目のタグ（最大10件） */
+const homeTagList = trendingTags.map((t) => t.tag).slice(0, 10);
 
 /** 急上昇中：1週間のポイント制（投票+1, コメント+3, ブックマーク+3, 新規作成+5）でポイント多い順 */
 const TRENDING_POINTS = { vote: 1, comment: 3, bookmark: 3, newCreation: 5 } as const;
@@ -99,16 +98,34 @@ export type TimelineItem =
   | { type: "tags" }
   | { type: "pr"; banner: (typeof PR_BANNERS)[number] };
 
-/** タイムライン配列を組み立て（5/10/15ルール・コレクションはランダム） */
-function buildTimelineItems(cards: VoteCardData[]): TimelineItem[] {
+/** 実際にあるコレクションのプール（人気＋他ユーザー＋自分のコレクション）。ランダム表示用 */
+function getTimelineCollectionPool(collections: { id: string; name: string; gradient?: CollectionGradient }[]): { id: string; title: string; gradient: CollectionGradient }[] {
+  const other = getOtherUsersCollections().map((c) => ({
+    id: c.id,
+    title: c.name,
+    gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+  }));
+  const mine = collections.map((c) => ({
+    id: c.id,
+    title: c.name,
+    gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+  }));
+  const pool = [...popularCollections, ...other, ...mine];
+  return pool.length > 0 ? pool : [{ id: "d", title: "マリオのワンダーな\nVOTE", gradient: "orange-yellow" as CollectionGradient }];
+}
+
+/** タイムライン配列を組み立て（5/10/15ルール・コレクションは実際にあるものからランダム） */
+function buildTimelineItems(
+  cards: VoteCardData[],
+  collectionPool: { id: string; title: string; gradient: CollectionGradient }[]
+): TimelineItem[] {
   const items: TimelineItem[] = [];
   let prBannerIndex = 0;
   for (let i = 0; i < cards.length; i++) {
     const oneBased = i + 1;
     if (oneBased % COLLECTION_EVERY === 0) {
-      const pool = popularCollections.length > 0 ? popularCollections : [{ id: "d", title: "マリオのワンダーな\nVOTE", gradient: "orange-yellow" as CollectionGradient }];
-      const idx = Math.floor(Math.random() * pool.length);
-      const col = pool[idx];
+      const idx = Math.floor(Math.random() * collectionPool.length);
+      const col = collectionPool[idx];
       items.push({
         type: "collection",
         collection: { id: col.id, title: col.title, gradient: col.gradient },
@@ -274,8 +291,14 @@ function HomeContent() {
     }
   }, [activeTab, bookmarkedIds, allCards, cardsForFeed, activity]);
 
+  /** 実際にあるコレクションからランダム表示用プール */
+  const timelineCollectionPool = useMemo(() => getTimelineCollectionPool(collections), [collections]);
+
   /** タイムライン（VOTE＋5個に1つコレクション、10個につきタグ、15個につきPR） */
-  const timelineItems = useMemo(() => buildTimelineItems(cardsForTab), [cardsForTab]);
+  const timelineItems = useMemo(
+    () => buildTimelineItems(cardsForTab, timelineCollectionPool),
+    [cardsForTab, timelineCollectionPool]
+  );
 
   return (
     <div className="min-h-screen bg-[#F1F1F1]">
@@ -356,7 +379,7 @@ function HomeContent() {
               );
             }
             if (item.type === "tags") {
-              return <RecommendedTags key={`tags-${idx}`} tags={recommendedTagList} />;
+              return <RecommendedTags key={`tags-${idx}`} tags={homeTagList} />;
             }
             if (item.type === "pr") {
               return (

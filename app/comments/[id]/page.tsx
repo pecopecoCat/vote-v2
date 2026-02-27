@@ -7,6 +7,7 @@ import AppHeader from "../../components/AppHeader";
 import VoteCard from "../../components/VoteCard";
 import VoteCardCompact from "../../components/VoteCardCompact";
 import VoteCardMini from "../../components/VoteCardMini";
+import CollectionCard from "../../components/CollectionCard";
 import CardOptionsModal from "../../components/CardOptionsModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import RecommendedTags from "../../components/RecommendedTags";
@@ -17,8 +18,9 @@ import {
   CARD_BACKGROUND_IMAGES,
   getRelatedVoteCards,
   getNewestVoteCards,
-  recommendedTagList,
 } from "../../data/voteCards";
+import { getTagsSimilarTo, popularCollections, trendingTags, type CollectionGradient } from "../../data/search";
+import { getCollections, getOtherUsersCollections } from "../../data/collections";
 import { getMergedCounts, type VoteComment } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
 import { isCardBookmarked } from "../../data/bookmarks";
@@ -82,6 +84,8 @@ export default function CommentsPage() {
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [auth, setAuth] = useState(() => getAuth());
+  const [commentSortOrder, setCommentSortOrder] = useState<"newest" | "oldest">("newest");
+  const [commentSortDropdownOpen, setCommentSortDropdownOpen] = useState(false);
   const isLoggedIn = auth.isLoggedIn;
 
   useEffect(() => {
@@ -113,6 +117,30 @@ export default function CommentsPage() {
 
   const bottomCards = relatedCards.length > 0 ? relatedCards : fallbackCards;
   const bottomSectionTitle = relatedCards.length > 0 ? "関連VOTE" : "新着";
+
+  /** みんなのコメントページ：カードにタグあり→1個目に似たタグ10件、なし→注目のタグ10件 */
+  const commentsPageTagList = useMemo(() => {
+    if (!card?.tags?.length) return trendingTags.map((t) => t.tag).slice(0, 10);
+    return getTagsSimilarTo(card.tags[0], allCards, 10);
+  }, [card?.tags, allCards]);
+
+  /** みんなのコメントページ：実際にあるコレクションから1件ランダム表示 */
+  const randomCollectionForComments = useMemo(() => {
+    const other = getOtherUsersCollections().map((c) => ({
+      id: c.id,
+      title: c.name,
+      gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+    }));
+    const mine = getCollections().map((c) => ({
+      id: c.id,
+      title: c.name,
+      gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+    }));
+    const pool = [...popularCollections, ...other, ...mine];
+    if (pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, []);
+
   const commentedCardIds = useMemo(
     () =>
       Object.entries(sharedActivity)
@@ -183,34 +211,109 @@ export default function CommentsPage() {
           />
         </div>
 
-        {/* コメント見出し + 新着順 */}
-        <div className="mb-3 flex items-center justify-between border-t border-gray-200 pt-4">
+        {/* コメント見出し + 新着順（mypageと同じプルダウン） */}
+        <div className="-mx-[5.333vw] mb-3 flex items-center justify-between border-t border-gray-300 px-[5.333vw] pt-4">
           <h2 className="text-base font-bold text-gray-900">コメント</h2>
-          <button
-            type="button"
-            className="flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700"
-          >
-            新着順
-            <span className="text-[#FFE100]">▼</span>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-gray-900 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+              aria-haspopup="listbox"
+              aria-expanded={commentSortDropdownOpen}
+              onClick={() => setCommentSortDropdownOpen((o) => !o)}
+            >
+              {commentSortOrder === "newest" ? "新着順" : "古い順"}
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
+                <img
+                  src="/icons/icon_b_arrow.svg"
+                  alt=""
+                  className="h-2.5 w-2.5 shrink-0"
+                  width={10}
+                  height={8}
+                />
+              </span>
+            </button>
+            {commentSortDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  aria-hidden
+                  onClick={() => setCommentSortDropdownOpen(false)}
+                />
+                <ul
+                  className="absolute right-0 top-full z-20 mt-1 min-w-[120px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                  role="listbox"
+                >
+                  <li role="option" aria-selected={commentSortOrder === "newest"}>
+                    <button
+                      type="button"
+                      className="w-full px-4 py-2 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"
+                      onClick={() => {
+                        setCommentSortOrder("newest");
+                        setCommentSortDropdownOpen(false);
+                      }}
+                    >
+                      新着順
+                    </button>
+                  </li>
+                  <li role="option" aria-selected={commentSortOrder === "oldest"}>
+                    <button
+                      type="button"
+                      className="w-full px-4 py-2 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"
+                      onClick={() => {
+                        setCommentSortOrder("oldest");
+                        setCommentSortDropdownOpen(false);
+                      }}
+                    >
+                      古い順
+                    </button>
+                  </li>
+                </ul>
+              </>
+            )}
+          </div>
         </div>
 
         {/* コメント一覧：登録されているコメント情報（ユーザー・日付・テキスト）を表示 */}
-        <div className="border-t border-gray-200 space-y-0">
+        <div className="-mx-[5.333vw] border-t border-gray-300 space-y-0 px-[5.333vw]">
           {activity.comments.length === 0 ? (
-            <p className="py-4 text-sm text-gray-500">まだコメントはありません。</p>
+            <>
+              <p className="py-4 text-sm text-gray-500">まだコメントはありません。</p>
+              <div className="-mx-[5.333vw] border-t border-gray-300" aria-hidden />
+            </>
           ) : (
-            activity.comments.map((c) => (
-              <CommentRow key={c.id} comment={c} />
-            ))
+            [...activity.comments]
+              .sort((a, b) =>
+                commentSortOrder === "newest"
+                  ? (b.date ?? "").localeCompare(a.date ?? "")
+                  : (a.date ?? "").localeCompare(b.date ?? "")
+              )
+              .map((c) => (
+                <CommentRow key={c.id} comment={c} />
+              ))
           )}
 
-          <RecommendedTags tags={recommendedTagList} />
+          <RecommendedTags tags={commentsPageTagList} />
         </div>
+
+        {randomCollectionForComments && (
+          <div className="mt-6">
+            <CollectionCard
+              key={randomCollectionForComments.id}
+              id={randomCollectionForComments.id}
+              title={randomCollectionForComments.title}
+              gradient={randomCollectionForComments.gradient}
+              titleVariant="blackBlock"
+              label="コレクション"
+              href={`/collection/${randomCollectionForComments.id}`}
+              timelineBanner
+            />
+          </div>
+        )}
 
         {/* 一番下：関連VOTE（同じタグ+アクションあり）、なければ新着 — HOMEと同じNORMALサイズ */}
         {bottomCards.length > 0 && (
-          <section className="mt-8 border-t border-gray-200 pt-6">
+          <section className="-mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6">
             <h2 className="mb-3 text-base font-bold text-gray-900">{bottomSectionTitle}</h2>
             <div className="flex flex-col gap-6">
               {bottomCards.map((related) => {
@@ -286,7 +389,7 @@ export default function CommentsPage() {
 
 function CommentRow({ comment }: { comment: VoteComment }) {
   return (
-    <div className="flex gap-3 border-b border-gray-200 py-3 last:border-b-0">
+    <div className="-mx-[5.333vw] flex gap-3 border-b border-gray-300 px-[5.333vw] py-3 last:border-b-0">
       <div className="shrink-0">
         <span className="flex h-10 w-10 overflow-hidden rounded-full bg-gray-200">
           <img src={comment.user.iconUrl ?? "/default-avatar.png"} alt="" className="h-full w-full object-cover" />

@@ -94,6 +94,30 @@ export function getTrendingTagsByScore(
 /** 注目タグ（登録数ベースのフォールバック。getTrendingTagsByScore を検索画面で使用） */
 export const trendingTags: TrendingTag[] = getTrendingTagsFromCards();
 
+/**
+ * 指定タグと一緒に付いているタグを集計し、似たタグとして返す（先頭に指定タグ、以降は共起回数順で最大 limit 件）
+ */
+export function getTagsSimilarTo(
+  firstTag: string,
+  cards: Array<{ tags?: string[] }>,
+  limit = 10
+): string[] {
+  const count = new Map<string, number>();
+  for (const card of cards) {
+    const tags = card.tags ?? [];
+    if (!tags.includes(firstTag)) continue;
+    for (const tag of tags) {
+      if (tag === firstTag) continue;
+      count.set(tag, (count.get(tag) ?? 0) + 1);
+    }
+  }
+  const sorted = Array.from(count.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([tag]) => tag);
+  const result = [firstTag, ...sorted].filter((t, i, arr) => arr.indexOf(t) === i);
+  return result.slice(0, limit);
+}
+
 /** コレクションのグラデーション種類 */
 export type CollectionGradient =
   | "blue-cyan"

@@ -125,7 +125,7 @@ function ProfileContent() {
   const [activeTab, setActiveTab] = useState<ProfileTabId>("vote");
   const [collections, setCollections] = useState<Collection[]>([]);
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity } = shared;
+  const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
   /** Bookmark タブでコレクション or ALL を選択中。null = TOP（リスト表示） */
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<null | "all" | string>(null);
@@ -783,6 +783,8 @@ function ProfileContent() {
                             cardId={cardId}
                             bookmarked={isCardBookmarked(cardId)}
                             hasCommented={commentedCardIds.includes(cardId)}
+                            initialSelectedOption={act?.userSelectedOption ?? null}
+                            onVote={(id, option) => void sharedAddVote(id, option)}
                             onBookmarkClick={setModalCardId}
                             onMoreClick={setCardOptionsCardId}
                             visibility={card.visibility}
