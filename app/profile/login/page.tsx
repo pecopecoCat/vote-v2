@@ -6,19 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import BottomNav from "../../components/BottomNav";
 import { getAuth, loginAsDemoUser, DEMO_USERS, DEMO_USER_IDS, type DemoUserId } from "../../data/auth";
 
-const USER_LABELS: Record<DemoUserId, string> = {
-  user1: "ピンク",
-  user2: "ブルー",
-  user3: "3",
-  user4: "4",
-  user5: "5",
-  user6: "6",
-  user7: "7",
-  user8: "8",
-  user9: "9",
-  user10: "10",
-};
-
 function ProfileLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -180,9 +167,9 @@ function ProfileLoginContent() {
                           height={40}
                         />
                         <span className="text-xs font-bold text-gray-900">{DEMO_USERS[userId].name}</span>
-                        <span className="text-[10px] text-gray-500">
-                          {isLoggedInElsewhere ? "ログイン中" : USER_LABELS[userId]}
-                        </span>
+                        {isLoggedInElsewhere && (
+                          <span className="text-[10px] text-gray-500">ログイン中</span>
+                        )}
                       </button>
                     );
                   })}

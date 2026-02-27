@@ -39,6 +39,7 @@ function CreateFormContent() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [showVoteCreatedModal, setShowVoteCreatedModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedBackgroundUrl, setSelectedBackgroundUrl] = useState<string>(
     CARD_BACKGROUND_IMAGES[0]
   );
@@ -82,8 +83,9 @@ function CreateFormContent() {
     optionB.trim().length > 0;
 
   const handleSubmit = useCallback(() => {
-    if (!canSubmit) return;
+    if (!canSubmit || isSubmitting) return;
     if (!getAuth().isLoggedIn) return;
+    setIsSubmitting(true);
     const now = new Date().toISOString();
     const tagList = tags.length > 0 ? tags : undefined;
     const card = {
@@ -102,7 +104,9 @@ function CreateFormContent() {
       optionAImageUrl: optionAImageUrl || undefined,
       optionBImageUrl: optionBImageUrl || undefined,
     };
-    void sharedAddCreatedVote(card).then(() => setShowVoteCreatedModal(true));
+    void sharedAddCreatedVote(card)
+      .then(() => setShowVoteCreatedModal(true))
+      .finally(() => setIsSubmitting(false));
   }, [
     canSubmit,
     sharedAddCreatedVote,
@@ -115,6 +119,7 @@ function CreateFormContent() {
     tags,
     selectedBackgroundUrl,
     visibility,
+    isSubmitting,
   ]);
 
   const handleVoteCreatedModalClose = useCallback(() => {
@@ -566,8 +571,8 @@ function CreateFormContent() {
 
       {/* 固定フッター: VOTEを作成 */}
       <div className="fixed bottom-14 left-0 right-0 z-20 mx-auto max-w-lg px-[5.333vw] pb-2 pt-2">
-        <Button variant="createVote" type="button" onClick={handleSubmit} disabled={!canSubmit}>
-          VOTEを作成
+        <Button variant="createVote" type="button" onClick={handleSubmit} disabled={!canSubmit || isSubmitting}>
+          {isSubmitting ? "作成中..." : "VOTEを作成"}
         </Button>
       </div>
 
