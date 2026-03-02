@@ -253,10 +253,18 @@ export function getCommentIdsLikedByCurrentUser(cardId: string): string[] {
   return loadCommentLikesByMe()[cardId] ?? [];
 }
 
-/** コメントにいいねを追加（お知らせ「送ったコメントにいいね」用）。自分がいいねした一覧にも追加 */
-export function addCommentLike(cardId: string, commentId: string): void {
+/**
+ * コメントにいいねを追加。自分がいいねした一覧にも追加。
+ * currentCard を渡すとその内容を元に更新する（API取得のみで localStorage にないカードのコメントが消えないようにする）
+ */
+export function addCommentLike(
+  cardId: string,
+  commentId: string,
+  currentCard?: { countA: number; countB: number; comments: VoteComment[] }
+): void {
   const global = loadGlobal();
-  const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
+  const fromStorage = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
+  const current = currentCard ?? fromStorage;
   const comments = Array.isArray(current.comments) ? current.comments : [];
   const nextComments = comments.map((c) =>
     c.id === commentId ? { ...c, likeCount: (c.likeCount ?? 0) + 1 } : c

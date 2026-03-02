@@ -125,7 +125,7 @@ function getTimelineCollectionPool(collections: { id: string; name: string; grad
   return pool.length > 0 ? pool : [{ id: "d", title: "マリオのワンダーな\nVOTE", gradient: "orange-yellow" as CollectionGradient }];
 }
 
-/** タイムライン配列を組み立て（5/10/15ルール・コレクションは実際にあるものからランダム） */
+/** タイムライン配列を組み立て（5/10/15ルール・コレクションは位置で安定選択） */
 function buildTimelineItems(
   cards: VoteCardData[],
   collectionPool: { id: string; title: string; gradient: CollectionGradient }[]
@@ -135,8 +135,8 @@ function buildTimelineItems(
   for (let i = 0; i < cards.length; i++) {
     const oneBased = i + 1;
     if (oneBased % COLLECTION_EVERY === 0) {
-      const idx = Math.floor(Math.random() * collectionPool.length);
-      const col = collectionPool[idx];
+      const colIndex = Math.floor(oneBased / COLLECTION_EVERY) % collectionPool.length;
+      const col = collectionPool[colIndex];
       items.push({
         type: "collection",
         collection: { id: col.id, title: col.title, gradient: col.gradient },

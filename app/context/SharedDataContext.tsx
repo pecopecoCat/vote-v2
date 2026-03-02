@@ -209,8 +209,11 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, [fetchActivity]);
 
+  // いいねなどで global だけ更新されたとき、既存の activity を上書きせずマージする（API取得分が消えないように）
   useEffect(() => {
-    const handler = () => setActivity(getAllActivity());
+    const handler = () => {
+      setActivity((prev) => ({ ...prev, ...getAllActivity() }));
+    };
     window.addEventListener(ACTIVITY_GLOBAL_UPDATED_EVENT, handler);
     return () => window.removeEventListener(ACTIVITY_GLOBAL_UPDATED_EVENT, handler);
   }, []);
@@ -272,7 +275,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         return;
       }
       addVoteLocal(cardId, option);
-      setActivity(getAllActivity());
+      setActivity((prev) => ({ ...prev, ...getAllActivity() }));
     },
     [isRemote, fetchActivity]
   );
@@ -300,7 +303,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         return;
       }
       addCommentLocal(cardId, comment, parentCommentId, commenterVoteOption);
-      setActivity(getAllActivity());
+      setActivity((prev) => ({ ...prev, ...getAllActivity() }));
     },
     [isRemote, fetchActivity]
   );

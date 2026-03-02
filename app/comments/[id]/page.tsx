@@ -324,13 +324,18 @@ export default function CommentsPage() {
                 const replies = activity.comments
                   .filter((r) => r.parentId === c.id)
                   .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+                const currentCard = {
+                  countA: activity.countA ?? 0,
+                  countB: activity.countB ?? 0,
+                  comments: activity.comments ?? [],
+                };
                 return (
                   <div key={c.id}>
                     <CommentRow
                       cardId={id}
                       comment={c}
                       onLike={() => {
-                        addCommentLike(id, c.id);
+                        addCommentLike(id, c.id, currentCard);
                       }}
                       onReply={() => setReplyingToCommentId(c.id)}
                       showReplyButton
@@ -341,7 +346,7 @@ export default function CommentsPage() {
                         key={r.id}
                         cardId={id}
                         comment={r}
-                        onLike={() => addCommentLike(id, r.id)}
+                        onLike={() => addCommentLike(id, r.id, currentCard)}
                         isReply
                         isLikedByMe={likedCommentIds.includes(r.id)}
                       />
