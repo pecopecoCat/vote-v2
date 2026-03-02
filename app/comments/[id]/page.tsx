@@ -347,6 +347,8 @@ export default function CommentsPage() {
                         cardId={id}
                         comment={r}
                         onLike={() => addCommentLike(id, r.id, currentCard)}
+                        onReply={() => setReplyingToCommentId(r.id)}
+                        showReplyButton
                         isReply
                         isLikedByMe={likedCommentIds.includes(r.id)}
                       />
