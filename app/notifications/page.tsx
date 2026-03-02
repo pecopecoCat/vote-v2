@@ -68,32 +68,7 @@ function buildUserActivityItems(opts?: {
 
   const items: ActivityItem[] = [];
 
-  // 自分が投票した
-  Object.entries(activity).forEach(([cardId, a]) => {
-    if (!a.userSelectedOption) return;
-    items.push({
-      type: "voted",
-      cardId,
-      label: ACTIVITY_TYPE_LABELS.voted,
-      date: "",
-      questionPreview: getQuestion(cardId, created) || undefined,
-    });
-  });
-
-  // 自分がコメントした（最新コメントの日付で1件）
-  Object.entries(activity).forEach(([cardId, a]) => {
-    if (!Array.isArray(a.comments)) return;
-    const myComments = a.comments.filter((c) => isMyComment(c, currentUserName));
-    if (myComments.length === 0) return;
-    const latest = myComments[myComments.length - 1];
-    items.push({
-      type: "commented",
-      cardId,
-      label: ACTIVITY_TYPE_LABELS.commented,
-      date: latest.date ? formatDate(latest.date) : "",
-      questionPreview: getQuestion(cardId, created) || undefined,
-    });
-  });
+  // 自分がしたこと（投票・コメント）は通知しない。自分の作成VOTE・自分のコメントへのアクションのみ表示
 
   // 作成した2択に投票があった
   voteEvents.forEach((ev) => {
@@ -104,13 +79,14 @@ function buildUserActivityItems(opts?: {
       label: ACTIVITY_TYPE_LABELS.voted_on_mine,
       date: ev.date ? formatDate(ev.date) : "",
       questionPreview: getQuestion(ev.cardId, created) || undefined,
+      actorVote: ev.option,
     });
   });
 
   // 作成した2択にコメントがあった（他人のコメントのみ・最新の日付で1件 per カード）
   Object.entries(activity).forEach(([cardId, a]) => {
     if (!myCreatedCardIds.has(cardId) || !Array.isArray(a.comments)) return;
-    const others = a.comments.filter((c) => !isMyComment(c, currentUserName));
+    const others = a.comments.filter((c) => !c.parentId && !isMyComment(c, currentUserName));
     if (others.length === 0) return;
     const latest = others[others.length - 1];
     items.push({
@@ -119,7 +95,36 @@ function buildUserActivityItems(opts?: {
       label: ACTIVITY_TYPE_LABELS.comment_on_mine,
       date: latest.date ? formatDate(latest.date) : "",
       questionPreview: getQuestion(cardId, created) || undefined,
+      actorName: latest.user?.name,
+      actorIconUrl: latest.user?.iconUrl,
+      commentPreview: latest.text,
+      // コメント保存時に記録したA/B。未記録の既存コメントは "A" を表示
+      actorVote: latest.userVoteOption ?? "A",
     });
+  });
+
+  // あなたのコメントに返信があった（〇〇さんが、あなたのコメントにコメントしました）
+  Object.entries(activity).forEach(([cardId, a]) => {
+    if (!Array.isArray(a.comments)) return;
+    const myCommentIds = new Set(
+      a.comments.filter((c) => isMyComment(c, currentUserName)).map((c) => c.id)
+    );
+    if (myCommentIds.size === 0) return;
+    a.comments
+      .filter((c) => c.parentId && myCommentIds.has(c.parentId))
+      .forEach((reply) => {
+        items.push({
+          type: "reply_to_my_comment",
+          cardId,
+          label: ACTIVITY_TYPE_LABELS.reply_to_my_comment,
+          date: reply.date ? formatDate(reply.date) : "",
+          questionPreview: getQuestion(cardId, created) || undefined,
+          actorName: reply.user?.name,
+          actorIconUrl: reply.user?.iconUrl,
+          commentPreview: reply.text,
+          actorVote: reply.userVoteOption ?? "A",
+        });
+      });
   });
 
   // 作成した2択がブックマークされた
@@ -134,7 +139,7 @@ function buildUserActivityItems(opts?: {
     });
   });
 
-  // 設定した投票期間が終わった
+  // 設定した投票期間が終わった（投票結果が決定しました！）
   const now = new Date().toISOString();
   created.forEach((c) => {
     const periodEnd = c.periodEnd;
@@ -143,7 +148,7 @@ function buildUserActivityItems(opts?: {
     items.push({
       type: "period_ended",
       cardId,
-      label: ACTIVITY_TYPE_LABELS.period_ended,
+      label: "投票結果が決定しました！",
       date: formatDate(periodEnd),
       questionPreview: c.question,
     });
@@ -162,6 +167,7 @@ function buildUserActivityItems(opts?: {
         label: ACTIVITY_TYPE_LABELS.liked_my_comment,
         date: c.date ? formatDate(c.date) : "",
         questionPreview: getQuestion(cardId, created) || undefined,
+        commentPreview: c.text,
       });
     });
   });
@@ -179,9 +185,10 @@ function buildUserActivityItems(opts?: {
       voted: 2,
       voted_on_mine: 3,
       comment_on_mine: 4,
-      bookmark_on_mine: 5,
-      period_ended: 6,
-      liked_my_comment: 7,
+      reply_to_my_comment: 5,
+      bookmark_on_mine: 6,
+      period_ended: 7,
+      liked_my_comment: 8,
     };
     return (order[a.type] ?? 8) - (order[b.type] ?? 8);
   });
@@ -242,6 +249,84 @@ export default function NotificationsPage() {
   );
 }
 
+function getActivityLabel(item: ActivityItem): string {
+  if (item.actorName) {
+    if (item.type === "comment_on_mine") return `${item.actorName}さんが、あなたのトピックにコメントしました`;
+    if (item.type === "reply_to_my_comment") return `${item.actorName}さんが、あなたのコメントにコメントしました`;
+  }
+  return item.label;
+}
+
+/** アイコン左上に表示するA or Bバッジ（選択した回答）12px・白枠1px */
+function ABBadge({ option }: { option: "A" | "B" }) {
+  const isA = option === "A";
+  return (
+    <span
+      className="absolute left-0 top-0 z-10 box-border flex items-center justify-center rounded-full border border-white text-[8px] font-bold leading-none text-white shadow-sm"
+      style={{
+        width: 12,
+        height: 12,
+        minWidth: 12,
+        minHeight: 12,
+        backgroundColor: isA ? "#E63E48" : "#3273E3",
+      }}
+      aria-hidden
+    >
+      {option}
+    </span>
+  );
+}
+
+function ActivityIcon({ item }: { item: ActivityItem }) {
+  const iconClass = "h-10 w-10 shrink-0 overflow-hidden rounded-full";
+  const bgClass = "flex items-center justify-center bg-gray-900 text-white";
+  const actorVote = item.actorVote;
+
+  switch (item.type) {
+    case "voted_on_mine":
+      return (
+        <span className="relative h-10 w-10 shrink-0 overflow-visible">
+          <span className={`${iconClass} ${bgClass}`}>
+            <img src="/icons/white_vote.svg" alt="" className="h-5 w-5" width={20} height={20} />
+          </span>
+          {actorVote === "A" || actorVote === "B" ? <ABBadge option={actorVote} /> : null}
+        </span>
+      );
+    case "comment_on_mine":
+    case "reply_to_my_comment":
+      return (
+        <span className="relative h-10 w-10 shrink-0 overflow-visible">
+          <span className={`${iconClass} flex items-center justify-center bg-gray-100`}>
+            <img
+              src={item.actorIconUrl ?? "/default-avatar.png"}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          </span>
+          {actorVote === "A" || actorVote === "B" ? <ABBadge option={actorVote} /> : null}
+        </span>
+      );
+    case "liked_my_comment":
+      return (
+        <span className={`${iconClass} flex items-center justify-center bg-gray-200`}>
+          <img src="/icons/good.svg" alt="" className="h-5 w-5" width={20} height={17} />
+        </span>
+      );
+    case "period_ended":
+      return (
+        <span className={`${iconClass} ${bgClass}`}>
+          <img src="/icons/cal.svg" alt="" className="h-5 w-5" width={20} height={20} />
+        </span>
+      );
+    default:
+      return (
+        <span className={`${iconClass} ${bgClass}`}>
+          <CheckIcon className="h-5 w-5" />
+        </span>
+      );
+  }
+}
+
 function ActivityList({ items }: { items: ActivityItem[] }) {
   if (items.length === 0) {
     return (
@@ -252,27 +337,28 @@ function ActivityList({ items }: { items: ActivityItem[] }) {
   }
   return (
     <ul className="divide-y divide-gray-200 rounded-xl bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.08)]">
-      {items.map((item, i) => (
-        <li key={`${item.cardId}-${item.type}-${i}`}>
-          <Link
-            href={`/comments/${item.cardId}`}
-            className="flex gap-3 px-4 py-4 transition-colors hover:bg-gray-50"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white">
-              <CheckIcon className="h-5 w-5" />
-            </span>
-            <div className="min-w-0 flex-1 text-left">
-              <p className="text-sm font-medium text-gray-900">{item.label}</p>
-              {item.date && <p className="mt-0.5 text-xs text-gray-500">{item.date}</p>}
-              {item.questionPreview && (
-                <div className="mt-2 rounded-lg bg-gray-100 px-3 py-2">
-                  <p className="text-xs text-gray-700">{item.questionPreview}</p>
-                </div>
-              )}
-            </div>
-          </Link>
-        </li>
-      ))}
+      {items.map((item, i) => {
+        const preview = item.commentPreview ?? item.questionPreview;
+        return (
+          <li key={`${item.cardId}-${item.type}-${i}`}>
+            <Link
+              href={`/comments/${item.cardId}`}
+              className="flex gap-3 px-4 py-4 transition-colors hover:bg-gray-50"
+            >
+              <ActivityIcon item={item} />
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-sm font-medium text-gray-900">{getActivityLabel(item)}</p>
+                {item.date && <p className="mt-0.5 text-xs text-gray-500">{item.date}</p>}
+                {preview && (
+                  <div className="mt-2 rounded-lg bg-gray-100 px-3 py-2">
+                    <p className="text-xs text-gray-700 line-clamp-2">{preview}</p>
+                  </div>
+                )}
+              </div>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }

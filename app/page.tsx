@@ -30,6 +30,11 @@ import {
   addHiddenUser,
   getHiddenUsersUpdatedEventName,
 } from "./data/hiddenUsers";
+import {
+  getHiddenCardIds,
+  addHiddenCard,
+  getHiddenCardsUpdatedEventName,
+} from "./data/hiddenCards";
 import { popularCollections, trendingTags, type CollectionGradient } from "./data/search";
 
 /** HOMEタイムライン：注目のタグ（最大10件） */
@@ -186,12 +191,18 @@ function HomeContent() {
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
+  const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
   const [auth, setAuth] = useState(() => getAuth());
 
   useEffect(() => {
     const handler = () => setHiddenUserIds(getHiddenUserIds());
     window.addEventListener(getHiddenUsersUpdatedEventName(), handler);
     return () => window.removeEventListener(getHiddenUsersUpdatedEventName(), handler);
+  }, []);
+  useEffect(() => {
+    const handler = () => setHiddenCardIds(getHiddenCardIds());
+    window.addEventListener(getHiddenCardsUpdatedEventName(), handler);
+    return () => window.removeEventListener(getHiddenCardsUpdatedEventName(), handler);
   }, []);
 
   useEffect(() => {
@@ -236,13 +247,16 @@ function HomeContent() {
     return [...createdVotesForTimeline, ...seedWithId];
   }, [createdVotesForTimeline]);
 
-  /** 非表示にしたユーザーのカードを除外 */
+  /** 非表示にしたユーザー・カードを除外 */
   const allCardsFiltered = useMemo(
     () =>
-      allCards.filter(
-        (c) => !c.createdByUserId || !hiddenUserIds.includes(c.createdByUserId)
-      ),
-    [allCards, hiddenUserIds]
+      allCards.filter((c) => {
+        const cardId = c.id ?? c.question;
+        if (hiddenCardIds.includes(cardId)) return false;
+        if (c.createdByUserId && hiddenUserIds.includes(c.createdByUserId)) return false;
+        return true;
+      }),
+    [allCards, hiddenUserIds, hiddenCardIds]
   );
 
   /** 公開カードのみ（private はリンクを知ってる人だけ＝一覧には出さない） */
@@ -445,10 +459,10 @@ function HomeContent() {
             const card = allCards.find(
               (c) => (c.id ?? c.question) === cardId
             );
-            if (card?.createdByUserId) {
-              addHiddenUser(card.createdByUserId);
-              setHiddenUserIds(getHiddenUserIds());
-            }
+            if (card?.createdByUserId) addHiddenUser(card.createdByUserId);
+            addHiddenCard(cardId);
+            setHiddenUserIds(getHiddenUserIds());
+            setHiddenCardIds(getHiddenCardIds());
             setCardOptionsCardId(null);
           }}
           onReport={(cardId) => {

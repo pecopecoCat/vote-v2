@@ -22,11 +22,18 @@ import {
 } from "../../data/voteCards";
 import { getTagsSimilarTo, popularCollections, trendingTags, type CollectionGradient } from "../../data/search";
 import { getCollections, getOtherUsersCollections } from "../../data/collections";
-import { getMergedCounts, type VoteComment } from "../../data/voteCardActivity";
+import {
+  getMergedCounts,
+  addCommentLike,
+  getCommentIdsLikedByCurrentUser,
+  COMMENT_LIKES_BY_ME_UPDATED_EVENT,
+  type VoteComment,
+} from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
 import { isCardBookmarked } from "../../data/bookmarks";
 import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../../data/auth";
 import { addHiddenUser } from "../../data/hiddenUsers";
+import { addHiddenCard } from "../../data/hiddenCards";
 import type { VoteCardData } from "../../data/voteCards";
 
 /** stableId (seed-N / created-xxx / 0,1,...) からカードを取得 */
@@ -90,7 +97,15 @@ export default function CommentsPage() {
   const [auth, setAuth] = useState(() => getAuth());
   const [commentSortOrder, setCommentSortOrder] = useState<"newest" | "oldest">("newest");
   const [commentSortDropdownOpen, setCommentSortDropdownOpen] = useState(false);
+  const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
+  const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
   const isLoggedIn = auth.isLoggedIn;
+
+  useEffect(() => {
+    const handler = () => setLikedCommentIds(getCommentIdsLikedByCurrentUser(id));
+    window.addEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
+  }, [id]);
 
   useEffect(() => {
     const handler = () => setAuth(getAuth());
@@ -163,8 +178,15 @@ export default function CommentsPage() {
     void sharedAddVote(id, side);
   };
 
-  const handleCommentSubmit = (cardId: string, payload: { user: { name: string; iconUrl?: string }; text: string }) => {
-    void sharedAddComment(cardId, payload);
+  const handleCommentSubmit = (
+    cardId: string,
+    payload: { user: { name: string; iconUrl?: string }; text: string },
+    parentCommentId?: string
+  ) => {
+    const commenterVote = activity.userSelectedOption;
+    void sharedAddComment(cardId, payload, parentCommentId, commenterVote).then(() =>
+      setReplyingToCommentId(null)
+    );
   };
 
   if (!resolved) {
@@ -283,7 +305,7 @@ export default function CommentsPage() {
           </div>
         </div>
 
-        {/* コメント一覧：登録されているコメント情報（ユーザー・日付・テキスト）を表示 */}
+        {/* コメント一覧：トップレベル＋返信を表示。返信・いいね対応 */}
         <div className="-mx-[5.333vw] border-t border-gray-300 space-y-0 px-[5.333vw]">
           {activity.comments.length === 0 ? (
             <>
@@ -291,15 +313,43 @@ export default function CommentsPage() {
               <div className="-mx-[5.333vw] border-t border-gray-300" aria-hidden />
             </>
           ) : (
-            [...activity.comments]
-              .sort((a, b) =>
+            (() => {
+              const topLevel = activity.comments.filter((c) => !c.parentId);
+              const sortedTop = [...topLevel].sort((a, b) =>
                 commentSortOrder === "newest"
                   ? (b.date ?? "").localeCompare(a.date ?? "")
                   : (a.date ?? "").localeCompare(b.date ?? "")
-              )
-              .map((c) => (
-                <CommentRow key={c.id} comment={c} />
-              ))
+              );
+              return sortedTop.map((c) => {
+                const replies = activity.comments
+                  .filter((r) => r.parentId === c.id)
+                  .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+                return (
+                  <div key={c.id}>
+                    <CommentRow
+                      cardId={id}
+                      comment={c}
+                      onLike={() => {
+                        addCommentLike(id, c.id);
+                      }}
+                      onReply={() => setReplyingToCommentId(c.id)}
+                      showReplyButton
+                      isLikedByMe={likedCommentIds.includes(c.id)}
+                    />
+                    {replies.map((r) => (
+                      <CommentRow
+                        key={r.id}
+                        cardId={id}
+                        comment={r}
+                        onLike={() => addCommentLike(id, r.id)}
+                        isReply
+                        isLikedByMe={likedCommentIds.includes(r.id)}
+                      />
+                    ))}
+                  </div>
+                );
+              });
+            })()
           )}
 
           <RecommendedTags tags={commentsPageTagList} />
@@ -373,13 +423,22 @@ export default function CommentsPage() {
         )}
       </main>
 
-      {/* ページ下：コメント入力（ログイン後かつ投票後のみ可能） */}
+      {/* ページ下：未ログイン時は「ログインしてコメントしよう!」ボタン、ログイン時は入力欄 */}
       <CommentInput
         cardId={id}
-        onCommentSubmit={handleCommentSubmit}
+        onCommentSubmit={(cardId, payload) =>
+          handleCommentSubmit(cardId, payload, replyingToCommentId ?? undefined)
+        }
         disabled={!isLoggedIn || activity.userSelectedOption == null}
         disabledPlaceholder={!isLoggedIn ? "ログインするとコメントできます" : undefined}
         currentUser={currentUser.type === "sns" ? { name: currentUser.name ?? "自分", iconUrl: currentUser.iconUrl } : undefined}
+        showLoginButton={!isLoggedIn}
+        loginReturnTo={`/comments/${id}`}
+        replyToUserName={
+          replyingToCommentId
+            ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.name
+            : undefined
+        }
       />
 
       {cardOptionsCardId != null && (
@@ -390,6 +449,7 @@ export default function CommentsPage() {
           onHide={(cid) => {
             const target = cid === id ? card : allCards.find((c) => (c.id ?? c.question) === cid);
             if (target?.createdByUserId) addHiddenUser(target.createdByUserId);
+            addHiddenCard(cid);
             setCardOptionsCardId(null);
           }}
           onReport={(cid) => {
@@ -417,9 +477,30 @@ export default function CommentsPage() {
   );
 }
 
-function CommentRow({ comment }: { comment: VoteComment }) {
+function CommentRow({
+  cardId,
+  comment,
+  onLike,
+  onReply,
+  showReplyButton = false,
+  isReply = false,
+  isLikedByMe = false,
+}: {
+  cardId: string;
+  comment: VoteComment;
+  onLike?: () => void;
+  onReply?: () => void;
+  showReplyButton?: boolean;
+  isReply?: boolean;
+  isLikedByMe?: boolean;
+}) {
+  const replyCount = comment.replyCount ?? 0;
+  const likeCount = comment.likeCount ?? 0;
   return (
-    <div className="-mx-[5.333vw] flex gap-3 border-b border-gray-300 px-[5.333vw] py-3 last:border-b-0">
+    <div
+      className={`-mx-[5.333vw] flex gap-3 border-b border-gray-300 px-[5.333vw] py-3 last:border-b-0 ${isReply ? "pl-[5.333vw]" : ""}`}
+      style={isReply ? { paddingLeft: "calc(5.333vw + 2rem)" } : undefined}
+    >
       <div className="shrink-0">
         <span className="flex h-10 w-10 overflow-hidden rounded-full bg-gray-200">
           <img src={comment.user.iconUrl ?? "/default-avatar.png"} alt="" className="h-full w-full object-cover" />
@@ -428,7 +509,38 @@ function CommentRow({ comment }: { comment: VoteComment }) {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-gray-800">{comment.user.name}</p>
         <p className="mt-0.5 text-sm text-[#191919]">{comment.text}</p>
-        <p className="mt-1 text-xs text-gray-500">{formatCommentDate(comment.date)}</p>
+        <p className="mt-1 flex items-center gap-4 text-xs text-gray-500">
+          {showReplyButton && (
+            <button
+              type="button"
+              className="flex items-center gap-1 hover:underline"
+              onClick={onReply}
+            >
+              <img src="/icons/comment.svg" alt="" className="h-4 w-4" />
+              {replyCount}
+            </button>
+          )}
+          {!showReplyButton && replyCount > 0 && (
+            <span className="flex items-center gap-1">
+              <img src="/icons/comment.svg" alt="" className="h-4 w-4" />
+              {replyCount}
+            </span>
+          )}
+          <button
+            type="button"
+            className="flex items-center gap-1 hover:underline"
+            onClick={onLike}
+            aria-label="いいね"
+          >
+            <img
+              src="/icons/good.svg"
+              alt=""
+              className="h-4 w-4"
+              style={isLikedByMe ? { filter: "brightness(0) saturate(100%) invert(18%) sepia(98%) saturate(7000%) hue-rotate(348deg)" } : undefined}
+            />
+            <span style={isLikedByMe ? { color: "#F2063C" } : undefined}>{likeCount}</span>
+          </button>
+        </p>
       </div>
       <button type="button" className="shrink-0 text-[var(--color-brand-logo)] hover:opacity-80" aria-label="その他">
         <MoreIcon className="h-5 w-5" />

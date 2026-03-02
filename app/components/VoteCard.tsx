@@ -433,6 +433,8 @@ export default function VoteCard({
           </div>
         </div>
       )}
+      {/* タグなしの場合の下マージン */}
+      {tags.length === 0 && <div className="pb-4" aria-hidden />}
     </article>
   );
 }

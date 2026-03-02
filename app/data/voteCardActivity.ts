@@ -8,7 +8,7 @@
 
 import { getCurrentActivityUserId } from "./auth";
 
-/** コメント1件：コメントしたユーザー・日付・テキスト・いいね数 */
+/** コメント1件：コメントしたユーザー・日付・テキスト・いいね数・返信先 */
 export interface VoteComment {
   id: string;
   /** コメントしたユーザー */
@@ -19,6 +19,12 @@ export interface VoteComment {
   text: string;
   /** いいね数（お知らせ「送ったコメントにいいね」用） */
   likeCount?: number;
+  /** 返信先コメントID（省略時はトップレベルコメント） */
+  parentId?: string;
+  /** このコメントへの返信数 */
+  replyCount?: number;
+  /** コメントしたユーザーがそのカードで選んだA or B（お知らせのアイコン用） */
+  userVoteOption?: "A" | "B";
 }
 
 /** カードごとの活動：投票数（総数）・コメント一覧 ＋ 現在ユーザーの選択（表示用） */
@@ -43,7 +49,10 @@ interface GlobalCardData {
 const GLOBAL_STORAGE_KEY = "vote_card_activity_global";
 const USER_STORAGE_KEY_PREFIX = "vote_card_activity_";
 const VOTE_EVENTS_KEY = "vote_vote_events";
+const COMMENT_LIKES_BY_ME_KEY_PREFIX = "vote_comment_likes_by_me_";
 const MAX_VOTE_EVENTS = 100;
+export const ACTIVITY_GLOBAL_UPDATED_EVENT = "vote_activity_global_updated";
+export const COMMENT_LIKES_BY_ME_UPDATED_EVENT = "vote_comment_likes_by_me_updated";
 
 function getUserStorageKey(): string {
   return USER_STORAGE_KEY_PREFIX + getCurrentActivityUserId();
@@ -65,6 +74,7 @@ function saveGlobal(data: Record<string, GlobalCardData>): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(data));
+    window.dispatchEvent(new Event(ACTIVITY_GLOBAL_UPDATED_EVENT));
   } catch {
     // ignore
   }
@@ -123,6 +133,8 @@ export function getAllActivity(): Record<string, CardActivity> {
 export interface VoteEvent {
   cardId: string;
   date: string;
+  /** 投票した選択肢（お知らせでA/Bバッジ表示用） */
+  option?: "A" | "B";
 }
 
 function loadVoteEvents(): VoteEvent[] {
@@ -167,14 +179,16 @@ export function addVote(cardId: string, option: "A" | "B"): void {
   saveUserSelections({ ...user, [cardId]: { userSelectedOption: option } });
 
   const events = loadVoteEvents();
-  events.push({ cardId, date: new Date().toISOString() });
+  events.push({ cardId, date: new Date().toISOString(), option });
   saveVoteEvents(events);
 }
 
-/** コメントを追加：総数側に登録（全ユーザー共通） */
+/** コメントを追加：総数側に登録（全ユーザー共通）。parentId 指定時は返信として追加し親の replyCount を+1。commenterVoteOption はお知らせのA/Bバッジ用 */
 export function addComment(
   cardId: string,
-  comment: { user: { name: string; iconUrl?: string }; text: string }
+  comment: { user: { name: string; iconUrl?: string }; text: string },
+  parentCommentId?: string,
+  commenterVoteOption?: "A" | "B"
 ): void {
   const global = loadGlobal();
   const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
@@ -185,16 +199,61 @@ export function addComment(
     date: new Date().toISOString(),
     text: comment.text,
     likeCount: 0,
+    parentId: parentCommentId,
+    replyCount: 0,
+    userVoteOption: commenterVoteOption,
   };
+  let nextComments = [...comments, newComment];
+  if (parentCommentId) {
+    nextComments = nextComments.map((c) =>
+      c.id === parentCommentId
+        ? { ...c, replyCount: (c.replyCount ?? 0) + 1 }
+        : c
+    );
+  }
   const next: GlobalCardData = {
     countA: current.countA ?? 0,
     countB: current.countB ?? 0,
-    comments: [...comments, newComment],
+    comments: nextComments,
   };
   saveGlobal({ ...global, [cardId]: next });
 }
 
-/** コメントにいいねを追加（お知らせ「送ったコメントにいいね」用） */
+function loadCommentLikesByMe(): Record<string, string[]> {
+  if (typeof window === "undefined") return {};
+  try {
+    const key = COMMENT_LIKES_BY_ME_KEY_PREFIX + getCurrentActivityUserId();
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return {};
+    const result: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (Array.isArray(v)) result[k] = v;
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+function saveCommentLikesByMe(data: Record<string, string[]>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const key = COMMENT_LIKES_BY_ME_KEY_PREFIX + getCurrentActivityUserId();
+    window.localStorage.setItem(key, JSON.stringify(data));
+    window.dispatchEvent(new Event(COMMENT_LIKES_BY_ME_UPDATED_EVENT));
+  } catch {
+    // ignore
+  }
+}
+
+/** 現在のユーザーがいいねしたコメントID一覧（カードごと）。コメント一覧で赤表示用 */
+export function getCommentIdsLikedByCurrentUser(cardId: string): string[] {
+  return loadCommentLikesByMe()[cardId] ?? [];
+}
+
+/** コメントにいいねを追加（お知らせ「送ったコメントにいいね」用）。自分がいいねした一覧にも追加 */
 export function addCommentLike(cardId: string, commentId: string): void {
   const global = loadGlobal();
   const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
@@ -206,6 +265,11 @@ export function addCommentLike(cardId: string, commentId: string): void {
     ...global,
     [cardId]: { countA: current.countA, countB: current.countB, comments: nextComments },
   });
+  const byMe = loadCommentLikesByMe();
+  const cardLikes = byMe[cardId] ?? [];
+  if (!cardLikes.includes(commentId)) {
+    saveCommentLikesByMe({ ...byMe, [cardId]: [...cardLikes, commentId] });
+  }
 }
 
 /** 自分がコメントしたカードID一覧（総数側のコメントで user.name が「自分」のもの） */

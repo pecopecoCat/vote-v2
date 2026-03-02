@@ -28,6 +28,11 @@ import {
   addHiddenUser,
   getHiddenUsersUpdatedEventName,
 } from "../data/hiddenUsers";
+import {
+  getHiddenCardIds,
+  addHiddenCard,
+  getHiddenCardsUpdatedEventName,
+} from "../data/hiddenCards";
 import type { VoteCardData } from "../data/voteCards";
 import type { CurrentUser } from "../components/VoteCard";
 import VoteCardMini from "../components/VoteCardMini";
@@ -79,11 +84,11 @@ function ProfileCommentRow({ comment }: { comment: VoteComment }) {
         <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1">
             <img src="/icons/comment.svg" alt="" className="h-4 w-4" />
-            0
+            {comment.replyCount ?? 0}
           </span>
           <span className="flex items-center gap-1">
             <img src="/icons/good.svg" alt="" className="h-4 w-4" />
-            0
+            {comment.likeCount ?? 0}
           </span>
         </div>
       </div>
@@ -141,6 +146,7 @@ function ProfileContent() {
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
+  const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
   /** コレクション設定モーダル（新規追加 or 編集） */
   const [showCollectionSettings, setShowCollectionSettings] = useState(false);
   /** 編集中のコレクション（null = 新規追加） */
@@ -212,6 +218,11 @@ function ProfileContent() {
     window.addEventListener(getHiddenUsersUpdatedEventName(), handler);
     return () => window.removeEventListener(getHiddenUsersUpdatedEventName(), handler);
   }, []);
+  useEffect(() => {
+    const handler = () => setHiddenCardIds(getHiddenCardIds());
+    window.addEventListener(getHiddenCardsUpdatedEventName(), handler);
+    return () => window.removeEventListener(getHiddenCardsUpdatedEventName(), handler);
+  }, []);
 
   const profileUser = auth.user ?? MOCK_USER;
   const currentUser: CurrentUser = auth.isLoggedIn
@@ -249,13 +260,16 @@ function ProfileContent() {
     [createdVotesForTimeline, seedCards]
   );
 
-  /** 非表示にしたユーザーのカードを除外 */
+  /** 非表示にしたユーザー・カードを除外 */
   const allCardsFiltered = useMemo(
     () =>
-      allCards.filter(
-        (c) => !c.createdByUserId || !hiddenUserIds.includes(c.createdByUserId)
-      ),
-    [allCards, hiddenUserIds]
+      allCards.filter((c) => {
+        const cardId = c.id ?? c.question;
+        if (hiddenCardIds.includes(cardId)) return false;
+        if (c.createdByUserId && hiddenUserIds.includes(c.createdByUserId)) return false;
+        return true;
+      }),
+    [allCards, hiddenUserIds, hiddenCardIds]
   );
 
   const votedCardsRaw = useMemo(
@@ -950,10 +964,10 @@ function ProfileContent() {
             const card = allCards.find(
               (c) => (c.id ?? c.question) === cardId
             );
-            if (card?.createdByUserId) {
-              addHiddenUser(card.createdByUserId);
-              setHiddenUserIds(getHiddenUserIds());
-            }
+            if (card?.createdByUserId) addHiddenUser(card.createdByUserId);
+            addHiddenCard(cardId);
+            setHiddenUserIds(getHiddenUserIds());
+            setHiddenCardIds(getHiddenCardIds());
             setCardOptionsCardId(null);
           }}
           onReport={(cardId) => {

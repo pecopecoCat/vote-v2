@@ -19,6 +19,7 @@ import {
   getAllActivity,
   addVote as addVoteLocal,
   addComment as addCommentLocal,
+  ACTIVITY_GLOBAL_UPDATED_EVENT,
 } from "../data/voteCardActivity";
 import { getCurrentActivityUserId, getAuthUpdatedEventName } from "../data/auth";
 
@@ -80,7 +81,7 @@ function buildActivityFromApi(
 }
 
 /** 作成者向け通知用（API から取得） */
-export type VoteEvent = { cardId: string; date: string };
+export type VoteEvent = { cardId: string; date: string; option?: "A" | "B" };
 export type BookmarkEvent = { cardId: string; date: string };
 
 export interface SharedDataContextValue {
@@ -98,10 +99,12 @@ export interface SharedDataContextValue {
   addCreatedVote: (card: VoteCardData) => Promise<void>;
   /** 投票（API 時は POST してから再取得） */
   addVote: (cardId: string, option: "A" | "B") => Promise<void>;
-  /** コメント追加（API 時は POST してから再取得） */
+  /** コメント追加（API 時は POST してから再取得）。parentCommentId 指定時は返信として追加。commenterVoteOption はお知らせのA/Bバッジ用 */
   addComment: (
     cardId: string,
-    comment: { user: { name: string; iconUrl?: string }; text: string }
+    comment: { user: { name: string; iconUrl?: string }; text: string },
+    parentCommentId?: string,
+    commenterVoteOption?: "A" | "B"
   ) => Promise<void>;
   /** ブックマークしたときに API に記録（作成者向け通知用・isRemote 時のみ） */
   recordBookmarkEvent: (cardId: string) => Promise<void>;
@@ -126,7 +129,12 @@ export function useSharedData(): SharedDataContextValue {
         if (typeof window === "undefined") return;
         addVoteLocal(cardId, option);
       },
-      addComment: async () => {},
+      addComment: async (
+        _cardId: string,
+        _comment: { user: { name: string; iconUrl?: string }; text: string },
+        _parentCommentId?: string,
+        _commenterVoteOption?: "A" | "B"
+      ) => {},
       recordBookmarkEvent: async () => {},
     };
   }
@@ -201,6 +209,12 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, [fetchActivity]);
 
+  useEffect(() => {
+    const handler = () => setActivity(getAllActivity());
+    window.addEventListener(ACTIVITY_GLOBAL_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(ACTIVITY_GLOBAL_UPDATED_EVENT, handler);
+  }, []);
+
   /** キャッシュクリア後などで bfcache から復元されたとき、localStorage が空なのに古いログイン状態が残るのを防ぐ */
   useEffect(() => {
     const syncAuth = () => {
@@ -266,18 +280,26 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const addComment = useCallback(
     async (
       cardId: string,
-      comment: { user: { name: string; iconUrl?: string }; text: string }
+      comment: { user: { name: string; iconUrl?: string }; text: string },
+      parentCommentId?: string,
+      commenterVoteOption?: "A" | "B"
     ) => {
       if (isRemote) {
         const res = await fetch(ACTIVITY_API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "comment", cardId, comment }),
+          body: JSON.stringify({
+            type: "comment",
+            cardId,
+            comment,
+            parentCommentId,
+            commenterVoteOption,
+          }),
         });
         if (res.ok) await fetchActivity();
         return;
       }
-      addCommentLocal(cardId, comment);
+      addCommentLocal(cardId, comment, parentCommentId, commenterVoteOption);
       setActivity(getAllActivity());
     },
     [isRemote, fetchActivity]

@@ -23,6 +23,7 @@ export default function RecommendedTags({ tags }: RecommendedTagsProps) {
           </Link>
         ))}
       </div>
+      <div className="mt-4 border-b border-gray-300" aria-hidden />
     </section>
   );
 }

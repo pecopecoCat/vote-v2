@@ -5,33 +5,43 @@ export type ActivityType =
   | "created"              // 2択作成した
   | "voted"                // 投票した
   | "commented"            // コメントした
-  | "voted_on_mine"        // 作成した2択に投票された
-  | "comment_on_mine"      // 作成した2択にコメントが来た
+  | "voted_on_mine"        // あなたのトピックに投票された
+  | "comment_on_mine"      // 〇〇があなたのトピックにコメントした
+  | "reply_to_my_comment"  // 〇〇があなたのコメントにコメントした
   | "bookmark_on_mine"     // 作成した2択がブックマークされた
-  | "period_ended"         // 設定した投票期間が終わった
-  | "liked_my_comment";    // 自分が送ったコメントにいいねがついた
+  | "period_ended"         // 投票結果が決定しました
+  | "liked_my_comment";    // あなたのコメントにいいねされた
 
 export interface ActivityItem {
   type: ActivityType;
   /** リンク先のVOTEカードID（/comments/[cardId]） */
   cardId: string;
-  /** 表示ラベル */
+  /** 表示ラベル（actorName がある場合は「〇〇さんが…」で上書き表示） */
   label: string;
   date: string;
   /** 2択のお題プレビュー（任意） */
   questionPreview?: string;
+  /** アクションしたユーザー名（コメントした人等） */
+  actorName?: string;
+  /** アクションしたユーザーのアイコンURL */
+  actorIconUrl?: string;
+  /** コメント本文プレビュー（グレー枠に表示） */
+  commentPreview?: string;
+  /** アクションした人が選んだA or B（アイコン左上バッジ表示用） */
+  actorVote?: "A" | "B";
 }
 
-/** アクティビティ種別の表示ラベル */
+/** アクティビティ種別の表示ラベル（画像参考） */
 export const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {
   created: "2択を作成しました",
   voted: "投票しました",
   commented: "コメントしました",
-  voted_on_mine: "作成した2択に投票がありました",
-  comment_on_mine: "作成した2択にコメントがありました",
+  voted_on_mine: "あなたのトピックに投票されました",
+  comment_on_mine: "作成した2択にコメントがありました", // 実際は actorName で「〇〇さんが、あなたのトピックにコメントしました」
   bookmark_on_mine: "作成した2択がブックマークされました",
-  period_ended: "設定した投票期間が終わりました",
-  liked_my_comment: "送ったコメントにいいねがつきました",
+  period_ended: "投票結果が決定しました！",
+  liked_my_comment: "あなたのコメントにいいねされました",
+  reply_to_my_comment: "あなたのコメントにコメントしました", // 実際は actorName で「〇〇さんが、あなたのコメントにコメントしました」
 };
 
 /** デモ用：アクティビティ一覧（SNSログイン時表示用） */
@@ -84,6 +94,15 @@ export const MOCK_ACTIVITIES: ActivityItem[] = [
     label: ACTIVITY_TYPE_LABELS.period_ended,
     date: "2024.10.10",
     questionPreview: "物買う時どっち派？",
+  },
+  {
+    type: "reply_to_my_comment",
+    cardId: "seed-1",
+    label: "johnさんが、あなたのコメントにコメントしました",
+    date: "2024.10.12",
+    questionPreview: "いいと思うよ! 離れて気づくこともある",
+    actorName: "john",
+    commentPreview: "いいと思うよ! 離れて気づくこともある",
   },
 ];
 

@@ -17,10 +17,13 @@ export type GlobalCardData = {
     date: string;
     text: string;
     likeCount?: number;
+    parentId?: string;
+    replyCount?: number;
+    userVoteOption?: "A" | "B";
   }>;
 };
 
-export type VoteEvent = { cardId: string; date: string };
+export type VoteEvent = { cardId: string; date: string; option?: "A" | "B" };
 export type BookmarkEvent = { cardId: string; date: string };
 
 /** GET ?userId= → { global, userSelections, voteEvents, bookmarkEvents } */
@@ -92,9 +95,9 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       const userKey = KV_USER_PREFIX + userId;
       const userData = (await kv.get<Record<string, { userSelectedOption?: "A" | "B" }>>(userKey)) ?? {};
       await kv.set(userKey, { ...userData, [cardId]: { userSelectedOption: option } });
-      // 作成者向け通知用：投票イベントを記録
+      // 作成者向け通知用：投票イベントを記録（A/Bバッジ表示用に option も保存）
       const events = (await kv.get<VoteEvent[]>(KV_VOTE_EVENTS)) ?? [];
-      events.push({ cardId, date: new Date().toISOString() });
+      events.push({ cardId, date: new Date().toISOString(), option });
       await kv.set(KV_VOTE_EVENTS, events.slice(-MAX_EVENTS));
       return NextResponse.json({ ok: true });
     }
@@ -102,25 +105,38 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
     if (type === "comment") {
       const cardId = body.cardId as string;
       const comment = body.comment as { user?: { name: string; iconUrl?: string }; text?: string };
+      const parentCommentId = body.parentCommentId as string | undefined;
+      const commenterVoteOption = body.commenterVoteOption as "A" | "B" | undefined;
       if (!cardId || !comment?.user?.name || typeof comment.text !== "string") {
         return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
       }
       const global = (await kv.get<Record<string, GlobalCardData>>(KV_GLOBAL)) ?? {};
       const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
       const comments = Array.isArray(current.comments) ? current.comments : [];
-      const newComment = {
-        id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-        user: comment.user,
-        date: new Date().toISOString(),
-        text: comment.text,
-        likeCount: 0,
-      };
+      let nextComments: GlobalCardData["comments"] = [
+        ...comments,
+        {
+          id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          user: comment.user,
+          date: new Date().toISOString(),
+          text: comment.text,
+          likeCount: 0,
+          parentId: parentCommentId,
+          replyCount: 0,
+          userVoteOption: commenterVoteOption === "A" || commenterVoteOption === "B" ? commenterVoteOption : undefined,
+        },
+      ];
+      if (parentCommentId) {
+        nextComments = nextComments.map((c) =>
+          c.id === parentCommentId ? { ...c, replyCount: (c.replyCount ?? 0) + 1 } : c
+        );
+      }
       await kv.set(KV_GLOBAL, {
         ...global,
         [cardId]: {
           countA: current.countA,
           countB: current.countB,
-          comments: [...comments, newComment],
+          comments: nextComments,
         },
       });
       return NextResponse.json({ ok: true });

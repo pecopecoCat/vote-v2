@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 
 export interface CommentSubmitPayload {
   user: { name: string; iconUrl?: string };
@@ -18,9 +19,24 @@ interface CommentInputProps {
   disabledPlaceholder?: string;
   /** ログインユーザー（指定時はコメント送信時の表示名・アイコンに反映） */
   currentUser?: { name: string; iconUrl?: string };
+  /** 未ログイン時に true の場合、入力欄の代わりに「ログインしてコメントしよう!」ボタンを表示 */
+  showLoginButton?: boolean;
+  /** ログインボタン押下後の戻り先（例: /comments/seed-0） */
+  loginReturnTo?: string;
+  /** 返信先のユーザー名（指定時はプレースホルダーを「○○へリプライ」に） */
+  replyToUserName?: string;
 }
 
-export default function CommentInput({ cardId, onCommentSubmit, disabled = false, disabledPlaceholder, currentUser }: CommentInputProps) {
+export default function CommentInput({
+  cardId,
+  onCommentSubmit,
+  disabled = false,
+  disabledPlaceholder,
+  currentUser,
+  showLoginButton = false,
+  loginReturnTo = "/profile",
+  replyToUserName,
+}: CommentInputProps) {
   const [value, setValue] = useState("");
   const submittingRef = useRef(false);
 
@@ -45,6 +61,22 @@ export default function CommentInput({ cardId, onCommentSubmit, disabled = false
     }
   };
 
+  if (showLoginButton) {
+    const href = loginReturnTo ? `/profile/login?returnTo=${encodeURIComponent(loginReturnTo)}` : "/profile/login";
+    return (
+      <div className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 py-3">
+        <div className="mx-auto max-w-lg">
+          <Link
+            href={href}
+            className="block w-full rounded-xl bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 hover:opacity-90"
+          >
+            ログインしてコメントしよう!
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 pt-3">
       <form
@@ -53,7 +85,13 @@ export default function CommentInput({ cardId, onCommentSubmit, disabled = false
       >
         <input
           type="text"
-          placeholder={disabled ? (disabledPlaceholder ?? "投票してコメントしよう!") : "選んだ理由は？"}
+          placeholder={
+            disabled
+              ? (disabledPlaceholder ?? "投票してコメントしよう!")
+              : replyToUserName
+                ? `${replyToUserName}へリプライ`
+                : "選んだ理由は？"
+          }
           value={value}
           onChange={(e) => !disabled && setValue(e.target.value)}
           onKeyDown={handleKeyDown}
