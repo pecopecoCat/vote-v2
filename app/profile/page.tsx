@@ -10,7 +10,7 @@ import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
 import { getMergedCounts, type CardActivity, type VoteComment } from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
 import { getCurrentActivityUserId } from "../data/auth";
-import { getFavoriteTags, getFavoriteTagsUpdatedEventName } from "../data/favoriteTags";
+import { getFavoriteTags, getFavoriteTagsUpdatedEventName, removeFavoriteTag } from "../data/favoriteTags";
 import {
   getCollections,
   getCollectionsUpdatedEventName,
@@ -149,6 +149,8 @@ function ProfileContent() {
   const [collectionMenuOpenId, setCollectionMenuOpenId] = useState<string | null>(null);
   /** myVOTE 編集モード（カード削除用） */
   const [isMyVoteEditMode, setIsMyVoteEditMode] = useState(false);
+  /** お気に入りタグ編集モード（タグ削除用） */
+  const [isFavoriteTagsEditMode, setIsFavoriteTagsEditMode] = useState(false);
   /** 作ったVOTE一覧の再取得用 */
   const [createdVotesRefreshKey, setCreatedVotesRefreshKey] = useState(0);
   /** myVOTE 並び順 */
@@ -394,24 +396,72 @@ function ProfileContent() {
         <div className="mt-4">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1 text-sm font-bold text-gray-900">
-              <img src="/icons/heart.svg" alt="" className="h-4 w-4" width={18} height={16} />
+              <img
+                src={favoriteTags.length > 0 ? "/icons/icon_heart_on_gray.svg" : "/icons/icon_heart.svg"}
+                alt=""
+                className="h-4 w-4"
+                width={18}
+                height={16}
+              />
               お気に入りタグ
             </span>
-            <button type="button" className="text-sm font-bold text-gray-700 no-underline">
-              編集
-            </button>
-          </div>
-          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-            {favoriteTags.map((tag) => (
-              <Link
-                key={tag}
-                href={`/search?tag=${encodeURIComponent(tag)}`}
-                className="profile-favorite-tag shrink-0 rounded-full bg-white/60 px-4 py-2 text-[13px] text-[#191919]"
+            {isFavoriteTagsEditMode ? (
+              <button
+                type="button"
+                className="text-sm font-bold text-gray-700 no-underline"
+                onClick={() => setIsFavoriteTagsEditMode(false)}
               >
-                {tag}
-              </Link>
-            ))}
+                保存
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="text-sm font-bold text-gray-700 no-underline"
+                onClick={() => setIsFavoriteTagsEditMode(true)}
+              >
+                編集
+              </button>
+            )}
           </div>
+          {isFavoriteTagsEditMode ? (
+            <div className="mt-2 flex flex-wrap gap-2 pb-1">
+              {favoriteTags.length === 0 ? (
+                <p className="py-3 text-sm text-gray-500">お気に入りタグがありません。</p>
+              ) : (
+                favoriteTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="profile-favorite-tag inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/60 pl-4 pr-1.5 py-2 text-[13px] text-[#191919]"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                      aria-label={`${tag} を削除`}
+                      onClick={() => {
+                        removeFavoriteTag(tag);
+                        setFavoriteTags(getFavoriteTags());
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+              {favoriteTags.map((tag) => (
+                <Link
+                  key={tag}
+                  href={`/search?tag=${encodeURIComponent(tag)}`}
+                  className="profile-favorite-tag shrink-0 rounded-full bg-white/60 px-4 py-2 text-[13px] text-[#191919]"
+                >
+                  {tag}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

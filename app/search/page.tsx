@@ -449,7 +449,13 @@ function SearchContent() {
                   >
                     <span className="flex-1" aria-hidden />
                     <span className="inline-flex items-center justify-center gap-1">
-                      <HeartIcon className="h-4 w-4 shrink-0" />
+                      <img
+                        src={favoriteTags.length > 0 ? "/icons/icon_heart_on_gray.svg" : "/icons/icon_heart.svg"}
+                        alt=""
+                        className="h-4 w-4 shrink-0"
+                        width={18}
+                        height={16}
+                      />
                       お気に入りタグ
                     </span>
                     {activeTab === "favorite" && (
@@ -698,10 +704,3 @@ function ChevronDownIcon({ className }: { className?: string }) {
   );
 }
 
-function HeartIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-    </svg>
-  );
-}
