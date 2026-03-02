@@ -140,6 +140,28 @@ export function setLineLogin(user?: LineAuthUser): void {
   });
 }
 
+const LAST_LOGGED_IN_USER_KEY = "vote_last_logged_in_user_id";
+
+/** この端末で最後にログインしたユーザーID（ログイン画面で「ログイン中」解除用） */
+export function getLastLoggedInUserId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = window.localStorage.getItem(LAST_LOGGED_IN_USER_KEY);
+    return typeof v === "string" && v.length > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearLastLoggedInUserId(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(LAST_LOGGED_IN_USER_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 /** 簡易デモ：user1..user10 のいずれかでログイン（保存済みニックネーム・アイコンがあれば復元） */
 export function loginAsDemoUser(userId: DemoUserId): void {
   const defaultUser = DEMO_USERS[userId];
@@ -155,6 +177,13 @@ export function loginAsDemoUser(userId: DemoUserId): void {
     user,
     userId,
   });
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(LAST_LOGGED_IN_USER_KEY, userId);
+    } catch {
+      // ignore
+    }
+  }
 }
 
 /** ログイン中のプロフィール（ニックネーム・アイコン）を更新（user1/user2 の場合は永続化してログアウト後も保持） */
@@ -176,6 +205,7 @@ export function updateCurrentUserProfile(updates: Partial<LineAuthUser>): void {
 export function logout(): void {
   regenerateGuestId();
   save({ isLoggedIn: false });
+  clearLastLoggedInUserId();
 }
 
 /**

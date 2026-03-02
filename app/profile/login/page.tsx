@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import BottomNav from "../../components/BottomNav";
-import { getAuth, loginAsDemoUser, DEMO_USERS, DEMO_USER_IDS, type DemoUserId } from "../../data/auth";
+import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, DEMO_USERS, DEMO_USER_IDS, type DemoUserId } from "../../data/auth";
 
 function ProfileLoginContent() {
   const router = useRouter();
@@ -23,6 +23,18 @@ function ProfileLoginContent() {
   useEffect(() => {
     if (getAuth().isLoggedIn) {
       router.replace(returnTo);
+      return;
+    }
+    // ログアウトせずに閉じた場合、サーバーの「ログイン中」を解除（この端末で最後にログインしたユーザー）
+    const lastId = getLastLoggedInUserId();
+    if (lastId && DEMO_USER_IDS.includes(lastId as DemoUserId)) {
+      fetch("/api/active-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logoutUserId: lastId }),
+      })
+        .then(() => clearLastLoggedInUserId())
+        .catch(() => clearLastLoggedInUserId());
     }
   }, [router, returnTo]);
 
