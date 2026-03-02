@@ -24,7 +24,7 @@ import {
 import { useSharedData } from "./context/SharedDataContext";
 import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, resetUser1AndUser2Collections } from "./data/collections";
 import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
-import { getAuth, getAuthUpdatedEventName } from "./data/auth";
+import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "./data/auth";
 import {
   getHiddenUserIds,
   addHiddenUser,
@@ -183,6 +183,7 @@ function HomeContent() {
   const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   const [auth, setAuth] = useState(() => getAuth());
@@ -379,10 +380,14 @@ function HomeContent() {
                     void sharedAddVote(id, option);
                   }}
                   onBookmarkClick={setModalCardId}
-                  onMoreClick={setCardOptionsCardId}
+                  onMoreClick={() => {
+                    setCardOptionsCardId(cardId);
+                    setCardOptionsIsOwnCard(card.createdByUserId === getCurrentActivityUserId());
+                  }}
                   visibility={card.visibility}
                   optionAImageUrl={card.optionAImageUrl}
                   optionBImageUrl={card.optionBImageUrl}
+                  periodEnd={card.periodEnd}
                 />
               );
             }
@@ -434,6 +439,7 @@ function HomeContent() {
       {cardOptionsCardId != null && (
         <CardOptionsModal
           cardId={cardOptionsCardId}
+          isOwnCard={cardOptionsIsOwnCard}
           onClose={() => setCardOptionsCardId(null)}
           onHide={(cardId) => {
             const card = allCards.find(

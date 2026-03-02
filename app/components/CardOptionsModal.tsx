@@ -3,6 +3,8 @@
 export interface CardOptionsModalProps {
   cardId: string | null;
   onClose: () => void;
+  /** 自分で作ったカードのとき true。このとき「非表示する」「報告する」は表示しない */
+  isOwnCard?: boolean;
   onShare?: (cardId: string) => void;
   onHide?: (cardId: string) => void;
   onReport?: (cardId: string) => void;
@@ -11,6 +13,7 @@ export interface CardOptionsModalProps {
 export default function CardOptionsModal({
   cardId,
   onClose,
+  isOwnCard = false,
   onShare,
   onHide,
   onReport,
@@ -27,7 +30,7 @@ export default function CardOptionsModal({
     onClose();
   };
 
-  const items = [
+  const allItems = [
     {
       label: "シェアする",
       icon: <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />,
@@ -50,6 +53,8 @@ export default function CardOptionsModal({
       },
     },
   ];
+
+  const items = isOwnCard ? allItems.slice(0, 1) : allItems;
 
   return (
     <>

@@ -10,6 +10,16 @@ const patternClasses: Record<VoteCardPattern, string> = {
   "orange-purple": "vote-pattern-orange-purple",
 };
 
+function getPeriodEndLabel(periodEnd: string): string {
+  const end = new Date(periodEnd);
+  if (Number.isNaN(end.getTime())) return "";
+  const now = new Date();
+  if (end <= now) return "投票期間終了";
+  const diffMs = end.getTime() - now.getTime();
+  const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+  return `投票終了まで${days}日`;
+}
+
 export interface VoteCardCompactProps {
   backgroundImageUrl?: string;
   patternType: VoteCardPattern;
@@ -38,6 +48,8 @@ export interface VoteCardCompactProps {
   /** ブックマークタップ時（コレクション選択モーダル用。指定時はタップでこのコールバックのみ呼ぶ） */
   onBookmarkClick?: (cardId: string) => void;
   cardId?: string;
+  /** 投票期間終了日時（ISO）。設定時はタグ下に「投票終了までX日」または「投票期間終了」を表示 */
+  periodEnd?: string;
 }
 
 export default function VoteCardCompact({
@@ -61,6 +73,7 @@ export default function VoteCardCompact({
   onMoreClick,
   onBookmarkClick,
   cardId,
+  periodEnd,
 }: VoteCardCompactProps) {
   const useImage = Boolean(backgroundImageUrl);
   const patternClass = patternClasses[patternType];
@@ -230,6 +243,15 @@ export default function VoteCardCompact({
               #{tag}
             </span>
           ))}
+        </div>
+      )}
+
+      {periodEnd && getPeriodEndLabel(periodEnd) && (
+        <div
+          className="px-3 pb-2 text-[15px]"
+          style={{ color: "#8A8A8A" }}
+        >
+          {getPeriodEndLabel(periodEnd)}
         </div>
       )}
     </article>

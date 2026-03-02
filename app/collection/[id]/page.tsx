@@ -22,7 +22,7 @@ import {
 import { isCardBookmarked } from "../../data/bookmarks";
 import { getCollectionGradientClass } from "../../data/search";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
-import { getAuth, getAuthUpdatedEventName } from "../../data/auth";
+import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../../data/auth";
 import { addHiddenUser } from "../../data/hiddenUsers";
 import { getMergedCounts, type CardActivity } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
@@ -67,6 +67,7 @@ export default function CollectionPage() {
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [showVoted, setShowVoted] = useState(true);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [auth, setAuth] = useState(() => getAuth());
@@ -246,10 +247,14 @@ export default function CollectionPage() {
                   initialSelectedOption={act?.userSelectedOption ?? null}
                   onVote={(cid, option) => void sharedAddVote(cid, option)}
                   onBookmarkClick={setModalCardId}
-                  onMoreClick={setCardOptionsCardId}
+                  onMoreClick={() => {
+                    setCardOptionsCardId(cardId);
+                    setCardOptionsIsOwnCard(card.createdByUserId === getCurrentActivityUserId());
+                  }}
                   visibility={card.visibility}
                   optionAImageUrl={card.optionAImageUrl}
                   optionBImageUrl={card.optionBImageUrl}
+                  periodEnd={card.periodEnd}
                 />
               );
             })}
@@ -262,6 +267,7 @@ export default function CollectionPage() {
       {cardOptionsCardId != null && (
         <CardOptionsModal
           cardId={cardOptionsCardId}
+          isOwnCard={cardOptionsIsOwnCard}
           onClose={() => setCardOptionsCardId(null)}
           onHide={(cardId) => {
             const entry = cardsInCollection.find(({ cardId: cid }) => cid === cardId);

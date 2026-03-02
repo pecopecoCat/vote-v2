@@ -33,7 +33,7 @@ import {
   PINNED_UPDATED_EVENT,
 } from "../data/collections";
 import { isCardBookmarked } from "../data/bookmarks";
-import { getAuth, getAuthUpdatedEventName } from "../data/auth";
+import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../data/auth";
 import {
   getHiddenUserIds,
   addHiddenUser,
@@ -131,6 +131,7 @@ function SearchContent() {
   const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   const [modalCardId, setModalCardId] = useState<string | null>(null);
@@ -376,10 +377,14 @@ function SearchContent() {
                       initialSelectedOption={act?.userSelectedOption ?? null}
                       onVote={handleVote}
                       onBookmarkClick={setModalCardId}
-                      onMoreClick={setCardOptionsCardId}
+                      onMoreClick={() => {
+                        setCardOptionsCardId(cardId);
+                        setCardOptionsIsOwnCard(card.createdByUserId === getCurrentActivityUserId());
+                      }}
                       visibility={card.visibility}
                       optionAImageUrl={card.optionAImageUrl}
                       optionBImageUrl={card.optionBImageUrl}
+                      periodEnd={card.periodEnd}
                     />
                   );
                 })
@@ -630,6 +635,7 @@ function SearchContent() {
       {cardOptionsCardId != null && (
         <CardOptionsModal
           cardId={cardOptionsCardId}
+          isOwnCard={cardOptionsIsOwnCard}
           onClose={() => setCardOptionsCardId(null)}
           onHide={(cardId) => {
             const card = allCardsForTagFilter.find(

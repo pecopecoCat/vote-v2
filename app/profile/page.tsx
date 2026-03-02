@@ -138,6 +138,7 @@ function ProfileContent() {
   /** ブックマーク先選択モーダルを開くカードID */
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   /** コレクション設定モーダル（新規追加 or 編集） */
@@ -216,13 +217,11 @@ function ProfileContent() {
     : { type: "guest" };
 
   const userId = typeof window !== "undefined" ? getCurrentActivityUserId() : "";
+  /** myVOTEタブ用：常に localStorage の「自分が作ったVOTE」を表示（削除後に確実に反映するため） */
   const createdVotesRaw = useMemo(() => {
     if (typeof window === "undefined") return [];
-    if (shared.isRemote) {
-      return createdVotesForTimeline.filter((c) => c.createdByUserId === userId);
-    }
     return getCreatedVotes();
-  }, [shared.isRemote, createdVotesForTimeline, createdVotesRefreshKey, userId]);
+  }, [createdVotesRefreshKey]);
   const createdVotes = useMemo(() => {
     if (myVoteSortOrder === "oldest") {
       return [...createdVotesRaw].sort((a, b) => {
@@ -555,10 +554,14 @@ function ProfileContent() {
                         bookmarked={isCardBookmarked(cardId)}
                         hasCommented={commentedCardIds.includes(cardId)}
                         onBookmarkClick={setModalCardId}
-                        onMoreClick={setCardOptionsCardId}
+                        onMoreClick={() => {
+                          setCardOptionsCardId(cardId);
+                          setCardOptionsIsOwnCard(true);
+                        }}
                         visibility={card.visibility}
                         optionAImageUrl={card.optionAImageUrl}
                         optionBImageUrl={card.optionBImageUrl}
+                        periodEnd={card.periodEnd}
                       />
                     </div>
                   );
@@ -663,10 +666,14 @@ function ProfileContent() {
                       bookmarked={isCardBookmarked(cardId)}
                       hasCommented={commentedCardIds.includes(cardId)}
                       onBookmarkClick={setModalCardId}
-                      onMoreClick={setCardOptionsCardId}
+                      onMoreClick={() => {
+                        setCardOptionsCardId(cardId);
+                        setCardOptionsIsOwnCard(card.createdByUserId === userId);
+                      }}
                       visibility={card.visibility}
                       optionAImageUrl={card.optionAImageUrl}
                       optionBImageUrl={card.optionBImageUrl}
+                      periodEnd={card.periodEnd}
                     />
                   );
                 })}
@@ -800,10 +807,14 @@ function ProfileContent() {
                             initialSelectedOption={act?.userSelectedOption ?? null}
                             onVote={(id, option) => void sharedAddVote(id, option)}
                             onBookmarkClick={setModalCardId}
-                            onMoreClick={setCardOptionsCardId}
+                            onMoreClick={() => {
+                              setCardOptionsCardId(cardId);
+                              setCardOptionsIsOwnCard(card.createdByUserId === userId);
+                            }}
                             visibility={card.visibility}
                             optionAImageUrl={card.optionAImageUrl}
                             optionBImageUrl={card.optionBImageUrl}
+                            periodEnd={card.periodEnd}
                           />
                         );
                       })}
@@ -849,6 +860,7 @@ function ProfileContent() {
                           selectedSide={act.userSelectedOption}
                           userIconUrl={currentUser.iconUrl ?? "/default-avatar.png"}
                           hasCommented
+                          periodEnd={card.periodEnd}
                         />
                         <div className="border-t border-gray-100 px-[5.333vw] py-3">
                           {myComments.map((comment) => (
@@ -879,6 +891,7 @@ function ProfileContent() {
       {cardOptionsCardId != null && (
         <CardOptionsModal
           cardId={cardOptionsCardId}
+          isOwnCard={cardOptionsIsOwnCard}
           onClose={() => setCardOptionsCardId(null)}
           onHide={(cardId) => {
             const card = allCards.find(

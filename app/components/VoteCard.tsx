@@ -63,6 +63,8 @@ export interface VoteCardProps {
   optionAImageUrl?: string;
   /** Bの画像URL */
   optionBImageUrl?: string;
+  /** 投票期間終了日時（ISO文字列）。設定時はタグ下に「投票終了までX日」または「投票期間終了」を表示 */
+  periodEnd?: string;
 }
 
 const patternClasses: Record<VoteCardPattern, string> = {
@@ -72,6 +74,17 @@ const patternClasses: Record<VoteCardPattern, string> = {
   "yellow-loops": "vote-pattern-yellow-loops",
   "orange-purple": "vote-pattern-orange-purple",
 };
+
+/** 投票期間終了日時（ISO）から表示文言を返す。「投票終了までX日」または「投票期間終了」 */
+function getPeriodEndLabel(periodEnd: string): string {
+  const end = new Date(periodEnd);
+  if (Number.isNaN(end.getTime())) return "";
+  const now = new Date();
+  if (end <= now) return "投票期間終了";
+  const diffMs = end.getTime() - now.getTime();
+  const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+  return `投票終了まで${days}日`;
+}
 
 export default function VoteCard({
   backgroundImageUrl,
@@ -98,6 +111,7 @@ export default function VoteCard({
   onMoreClick,
   optionAImageUrl,
   optionBImageUrl,
+  periodEnd,
 }: VoteCardProps) {
   const patternClass = patternClasses[patternType];
   const useImage = Boolean(backgroundImageUrl);
@@ -374,7 +388,7 @@ export default function VoteCard({
       {/* タグ（画像がある場合は上に10px間隔。タグブロックの下0.78em＝0.6em×1.3） */}
       {tags.length > 0 && (
         <div
-          className={`flex flex-wrap gap-2 px-[4.27vw] ${(optionAImageUrl != null || optionBImageUrl != null) ? "pt-[10px]" : ""} ${!readMoreText ? "pb-[0.78em]" : ""}`}
+          className={`flex flex-wrap gap-2 px-[4.27vw] ${(optionAImageUrl != null || optionBImageUrl != null) ? "pt-[10px]" : ""} ${!readMoreText && !periodEnd ? "pb-[0.78em]" : ""}`}
         >
           {tags.map((tag) => (
             <Link
@@ -385,6 +399,16 @@ export default function VoteCard({
               #{tag}
             </Link>
           ))}
+        </div>
+      )}
+
+      {/* 投票期間（タグの下・薄いグレー15px。「追加したいコレクションを選択」と同じ色 #8A8A8A） */}
+      {periodEnd && getPeriodEndLabel(periodEnd) && (
+        <div
+          className={`px-[4.27vw] ${tags.length > 0 ? "pt-1" : "pt-2"} pb-[0.78em] text-[15px]`}
+          style={{ color: "#8A8A8A" }}
+        >
+          {getPeriodEndLabel(periodEnd)}
         </div>
       )}
 

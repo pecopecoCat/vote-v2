@@ -25,7 +25,7 @@ import { getCollections, getOtherUsersCollections } from "../../data/collections
 import { getMergedCounts, type VoteComment } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
 import { isCardBookmarked } from "../../data/bookmarks";
-import { getAuth, getAuthUpdatedEventName } from "../../data/auth";
+import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../../data/auth";
 import { addHiddenUser } from "../../data/hiddenUsers";
 import type { VoteCardData } from "../../data/voteCards";
 
@@ -84,6 +84,7 @@ export default function CommentsPage() {
   });
   const [resolved, setResolved] = useState(!id.startsWith("created-"));
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [auth, setAuth] = useState(() => getAuth());
@@ -211,7 +212,11 @@ export default function CommentsPage() {
             cardId={id}
             bookmarked={isCardBookmarked(id)}
             onBookmarkClick={setModalCardId}
-            onMoreClick={setCardOptionsCardId}
+            onMoreClick={() => {
+              setCardOptionsCardId(id);
+              setCardOptionsIsOwnCard((card?.createdByUserId ?? "") === getCurrentActivityUserId());
+            }}
+            periodEnd={card?.periodEnd}
           />
         </div>
 
@@ -352,10 +357,14 @@ export default function CommentsPage() {
                       void sharedAddVote(cid, option);
                     }}
                     onBookmarkClick={setModalCardId}
-                    onMoreClick={setCardOptionsCardId}
+                    onMoreClick={() => {
+                      setCardOptionsCardId(relatedId);
+                      setCardOptionsIsOwnCard(related.createdByUserId === getCurrentActivityUserId());
+                    }}
                     visibility={related.visibility}
                     optionAImageUrl={related.optionAImageUrl}
                     optionBImageUrl={related.optionBImageUrl}
+                    periodEnd={related.periodEnd}
                   />
                 );
               })}
@@ -376,6 +385,7 @@ export default function CommentsPage() {
       {cardOptionsCardId != null && (
         <CardOptionsModal
           cardId={cardOptionsCardId}
+          isOwnCard={cardOptionsIsOwnCard}
           onClose={() => setCardOptionsCardId(null)}
           onHide={(cid) => {
             const target = cid === id ? card : allCards.find((c) => (c.id ?? c.question) === cid);

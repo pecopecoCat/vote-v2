@@ -183,12 +183,11 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   }, [fetchActivity]);
 
   useEffect(() => {
-    if (isRemote) return;
     const name = getCreatedVotesUpdatedEventName();
     const handler = () => setCreatedVotesForTimeline(getCreatedVotesForTimeline());
     window.addEventListener(name, handler);
     return () => window.removeEventListener(name, handler);
-  }, [isRemote]);
+  }, []);
 
   const addCreatedVote = useCallback(
     async (card: VoteCardData) => {

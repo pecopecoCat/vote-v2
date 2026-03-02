@@ -88,6 +88,9 @@ function CreateFormContent() {
     setIsSubmitting(true);
     const now = new Date().toISOString();
     const tagList = tags.length > 0 ? tags : undefined;
+    const periodEnd = useVotePeriod
+      ? new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999).toISOString()
+      : undefined;
     const card = {
       id: `created-${Date.now()}`,
       patternType: "yellow-loops" as const,
@@ -103,6 +106,7 @@ function CreateFormContent() {
       visibility,
       optionAImageUrl: optionAImageUrl || undefined,
       optionBImageUrl: optionBImageUrl || undefined,
+      periodEnd,
     };
     void sharedAddCreatedVote(card)
       .then(() => setShowVoteCreatedModal(true))
@@ -120,6 +124,10 @@ function CreateFormContent() {
     selectedBackgroundUrl,
     visibility,
     isSubmitting,
+    useVotePeriod,
+    endYear,
+    endMonth,
+    endDay,
   ]);
 
   const handleVoteCreatedModalClose = useCallback(() => {
