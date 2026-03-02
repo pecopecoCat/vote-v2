@@ -92,15 +92,36 @@ export function getOtherUsersCollections(): Collection[] {
   return OTHER_USERS_COLLECTIONS;
 }
 
-/** IDでコレクションを取得（自コレクション優先、なければ他ユーザー分） */
+/**
+ * popularCollections の id（"1"～"7"）やタイムライン用フォールバック（"d"）を
+ * 実在する OTHER_USERS_COLLECTIONS の id にマッピング。
+ * バナータップで「ページがない」を防ぐため。
+ */
+const POPULAR_ID_TO_OTHER_INDEX: Record<string, number> = {
+  "1": 0,
+  "2": 1,
+  "3": 2,
+  "4": 3,
+  "5": 4,
+  "6": 5,
+  "7": 6,
+  "d": 4, // フォールバック「マリオのワンダーなVOTE」→ グルメな2択
+};
+
+/** IDでコレクションを取得（自コレクション優先、人気idのマッピング、他ユーザー分） */
 export function getCollectionById(id: string): Collection | null {
   const mine = load(getCurrentActivityUserId()).find((c) => c.id === id);
   if (mine) return mine;
+  const otherIndex = POPULAR_ID_TO_OTHER_INDEX[id];
+  if (otherIndex !== undefined && OTHER_USERS_COLLECTIONS[otherIndex]) {
+    return OTHER_USERS_COLLECTIONS[otherIndex];
+  }
   return OTHER_USERS_COLLECTIONS.find((c) => c.id === id) ?? null;
 }
 
-/** コレクションが他ユーザー作成か */
+/** コレクションが他ユーザー作成か（人気id "1"～"7", "d" のマッピング分も含む） */
 export function isOtherUsersCollection(collectionId: string): boolean {
+  if (collectionId in POPULAR_ID_TO_OTHER_INDEX) return true;
   return OTHER_USERS_COLLECTIONS.some((c) => c.id === collectionId);
 }
 

@@ -9,6 +9,7 @@ import VoteCardCompact from "../../components/VoteCardCompact";
 import VoteCardMini from "../../components/VoteCardMini";
 import CollectionCard from "../../components/CollectionCard";
 import CardOptionsModal from "../../components/CardOptionsModal";
+import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import RecommendedTags from "../../components/RecommendedTags";
 import CommentInput from "../../components/CommentInput";
@@ -25,6 +26,7 @@ import { getMergedCounts, type VoteComment } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
 import { isCardBookmarked } from "../../data/bookmarks";
 import { getAuth, getAuthUpdatedEventName } from "../../data/auth";
+import { addHiddenUser } from "../../data/hiddenUsers";
 import type { VoteCardData } from "../../data/voteCards";
 
 /** stableId (seed-N / created-xxx / 0,1,...) からカードを取得 */
@@ -82,6 +84,7 @@ export default function CommentsPage() {
   });
   const [resolved, setResolved] = useState(!id.startsWith("created-"));
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [auth, setAuth] = useState(() => getAuth());
   const [commentSortOrder, setCommentSortOrder] = useState<"newest" | "oldest">("newest");
@@ -208,6 +211,7 @@ export default function CommentsPage() {
             cardId={id}
             bookmarked={isCardBookmarked(id)}
             onBookmarkClick={setModalCardId}
+            onMoreClick={setCardOptionsCardId}
           />
         </div>
 
@@ -373,6 +377,22 @@ export default function CommentsPage() {
         <CardOptionsModal
           cardId={cardOptionsCardId}
           onClose={() => setCardOptionsCardId(null)}
+          onHide={(cid) => {
+            const target = cid === id ? card : allCards.find((c) => (c.id ?? c.question) === cid);
+            if (target?.createdByUserId) addHiddenUser(target.createdByUserId);
+            setCardOptionsCardId(null);
+          }}
+          onReport={(cid) => {
+            setReportCardId(cid);
+            setCardOptionsCardId(null);
+          }}
+        />
+      )}
+
+      {reportCardId != null && (
+        <ReportViolationModal
+          cardId={reportCardId}
+          onClose={() => setReportCardId(null)}
         />
       )}
 

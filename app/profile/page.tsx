@@ -23,6 +23,11 @@ import {
 import { getBookmarkIds, isCardBookmarked, getBookmarksUpdatedEventName } from "../data/bookmarks";
 import { getCollectionGradientStyle } from "../data/search";
 import { getAuth, getAuthUpdatedEventName } from "../data/auth";
+import {
+  getHiddenUserIds,
+  addHiddenUser,
+  getHiddenUsersUpdatedEventName,
+} from "../data/hiddenUsers";
 import type { VoteCardData } from "../data/voteCards";
 import type { CurrentUser } from "../components/VoteCard";
 import VoteCardMini from "../components/VoteCardMini";
@@ -31,6 +36,7 @@ import Button from "../components/Button";
 import CollectionSettingsModal from "../components/CollectionSettingsModal";
 import CollectionOptionsModal from "../components/CollectionOptionsModal";
 import CardOptionsModal from "../components/CardOptionsModal";
+import ReportViolationModal from "../components/ReportViolationModal";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   member: "メンバー限定",
@@ -132,6 +138,8 @@ function ProfileContent() {
   /** ブックマーク先選択モーダルを開くカードID */
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [reportCardId, setReportCardId] = useState<string | null>(null);
+  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   /** コレクション設定モーダル（新規追加 or 編集） */
   const [showCollectionSettings, setShowCollectionSettings] = useState(false);
   /** 編集中のコレクション（null = 新規追加） */
@@ -196,6 +204,12 @@ function ProfileContent() {
     return () => window.removeEventListener(eventName, handler);
   }, []);
 
+  useEffect(() => {
+    const handler = () => setHiddenUserIds(getHiddenUserIds());
+    window.addEventListener(getHiddenUsersUpdatedEventName(), handler);
+    return () => window.removeEventListener(getHiddenUsersUpdatedEventName(), handler);
+  }, []);
+
   const profileUser = auth.user ?? MOCK_USER;
   const currentUser: CurrentUser = auth.isLoggedIn
     ? { type: "sns", name: profileUser.name, iconUrl: profileUser.iconUrl }
@@ -231,9 +245,18 @@ function ProfileContent() {
     [createdVotesForTimeline, seedCards]
   );
 
+  /** 非表示にしたユーザーのカードを除外 */
+  const allCardsFiltered = useMemo(
+    () =>
+      allCards.filter(
+        (c) => !c.createdByUserId || !hiddenUserIds.includes(c.createdByUserId)
+      ),
+    [allCards, hiddenUserIds]
+  );
+
   const votedCardsRaw = useMemo(
-    () => allCards.filter((c) => activity[c.id ?? ""]?.userSelectedOption),
-    [allCards, activity]
+    () => allCardsFiltered.filter((c) => activity[c.id ?? ""]?.userSelectedOption),
+    [allCardsFiltered, activity]
   );
   const votedCards = useMemo(() => {
     const list = [...votedCardsRaw];
@@ -243,8 +266,8 @@ function ProfileContent() {
 
   const allBookmarkedIds = useMemo(() => getBookmarkIds(), [collections, bookmarkRefreshKey, auth]);
   const bookmarkedCards = useMemo(
-    () => allCards.filter((c) => allBookmarkedIds.includes(c.id ?? "")),
-    [allCards, allBookmarkedIds]
+    () => allCardsFiltered.filter((c) => allBookmarkedIds.includes(c.id ?? "")),
+    [allCardsFiltered, allBookmarkedIds]
   );
 
   const commentedCardIds = useMemo(
@@ -505,17 +528,14 @@ function ProfileContent() {
                       {isMyVoteEditMode && (
                         <button
                           type="button"
-                          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white text-blue-600"
-                          style={{ boxShadow: "0 1px 1px rgba(0,0,0,0.15)" }}
+                          className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-bold text-red-600 shadow-md hover:bg-red-50"
                           aria-label="このVOTEを削除"
                           onClick={() => {
                             deleteCreatedVote(cardId);
                             setCreatedVotesRefreshKey((k) => k + 1);
                           }}
                         >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
+                          ×
                         </button>
                       )}
                       <VoteCard
@@ -738,7 +758,7 @@ function ProfileContent() {
                   const ids = selectedBookmarkId === "all"
                     ? allBookmarkedIds
                     : (collections.find((c) => c.id === selectedBookmarkId)?.cardIds ?? []);
-                  const cardsToShow = allCards.filter((c) => ids.includes(c.id ?? ""));
+                  const cardsToShow = allCardsFiltered.filter((c) => ids.includes(c.id ?? ""));
                   if (cardsToShow.length === 0) {
                     return (
                       <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
@@ -804,7 +824,7 @@ function ProfileContent() {
             ) : (
               <div className="flex flex-col gap-4">
                 {commentedCardIds.map((cardId) => {
-                  const card = allCards.find((c) => (c.id ?? c.question) === cardId);
+                  const card = allCardsFiltered.find((c) => (c.id ?? c.question) === cardId);
                   if (!card) return null;
                   const act = activity[cardId] ?? { countA: 0, countB: 0, comments: [] };
                   const merged = getMergedCounts(
@@ -860,6 +880,27 @@ function ProfileContent() {
         <CardOptionsModal
           cardId={cardOptionsCardId}
           onClose={() => setCardOptionsCardId(null)}
+          onHide={(cardId) => {
+            const card = allCards.find(
+              (c) => (c.id ?? c.question) === cardId
+            );
+            if (card?.createdByUserId) {
+              addHiddenUser(card.createdByUserId);
+              setHiddenUserIds(getHiddenUserIds());
+            }
+            setCardOptionsCardId(null);
+          }}
+          onReport={(cardId) => {
+            setReportCardId(cardId);
+            setCardOptionsCardId(null);
+          }}
+        />
+      )}
+
+      {reportCardId != null && (
+        <ReportViolationModal
+          cardId={reportCardId}
+          onClose={() => setReportCardId(null)}
         />
       )}
 

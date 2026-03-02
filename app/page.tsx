@@ -11,6 +11,7 @@ import BottomNav from "./components/BottomNav";
 import FeedTabs from "./components/FeedTabs";
 import BookmarkCollectionModal from "./components/BookmarkCollectionModal";
 import CardOptionsModal from "./components/CardOptionsModal";
+import ReportViolationModal from "./components/ReportViolationModal";
 import type { CurrentUser } from "./components/VoteCard";
 import type { FeedTabId } from "./components/FeedTabs";
 import type { VoteCardData } from "./data/voteCards";
@@ -24,6 +25,11 @@ import { useSharedData } from "./context/SharedDataContext";
 import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, resetUser1AndUser2Collections } from "./data/collections";
 import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
 import { getAuth, getAuthUpdatedEventName } from "./data/auth";
+import {
+  getHiddenUserIds,
+  addHiddenUser,
+  getHiddenUsersUpdatedEventName,
+} from "./data/hiddenUsers";
 import { popularCollections, trendingTags, type CollectionGradient } from "./data/search";
 
 /** HOMEタイムライン：注目のタグ（最大10件） */
@@ -177,7 +183,15 @@ function HomeContent() {
   const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [reportCardId, setReportCardId] = useState<string | null>(null);
+  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   const [auth, setAuth] = useState(() => getAuth());
+
+  useEffect(() => {
+    const handler = () => setHiddenUserIds(getHiddenUserIds());
+    window.addEventListener(getHiddenUsersUpdatedEventName(), handler);
+    return () => window.removeEventListener(getHiddenUsersUpdatedEventName(), handler);
+  }, []);
 
   useEffect(() => {
     ensureVoteCountsResetOnce();
@@ -221,10 +235,19 @@ function HomeContent() {
     return [...createdVotesForTimeline, ...seedWithId];
   }, [createdVotesForTimeline]);
 
+  /** 非表示にしたユーザーのカードを除外 */
+  const allCardsFiltered = useMemo(
+    () =>
+      allCards.filter(
+        (c) => !c.createdByUserId || !hiddenUserIds.includes(c.createdByUserId)
+      ),
+    [allCards, hiddenUserIds]
+  );
+
   /** 公開カードのみ（private はリンクを知ってる人だけ＝一覧には出さない） */
   const publicCards = useMemo(
-    () => allCards.filter((c) => c.visibility !== "private"),
-    [allCards]
+    () => allCardsFiltered.filter((c) => c.visibility !== "private"),
+    [allCardsFiltered]
   );
 
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
@@ -280,7 +303,7 @@ function HomeContent() {
       case "new":
         return sortByNewest(cardsForFeed);
       case "myTimeline": {
-        return allCards
+        return allCardsFiltered
           .filter((card) => bookmarkedIds.has(card.id ?? ""))
           .sort((a, b) =>
             (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0")
@@ -289,7 +312,7 @@ function HomeContent() {
       default:
         return publicCards;
     }
-  }, [activeTab, bookmarkedIds, allCards, cardsForFeed, activity]);
+  }, [activeTab, bookmarkedIds, allCardsFiltered, cardsForFeed, activity]);
 
   /** 実際にあるコレクションからランダム表示用プール */
   const timelineCollectionPool = useMemo(() => getTimelineCollectionPool(collections), [collections]);
@@ -412,6 +435,27 @@ function HomeContent() {
         <CardOptionsModal
           cardId={cardOptionsCardId}
           onClose={() => setCardOptionsCardId(null)}
+          onHide={(cardId) => {
+            const card = allCards.find(
+              (c) => (c.id ?? c.question) === cardId
+            );
+            if (card?.createdByUserId) {
+              addHiddenUser(card.createdByUserId);
+              setHiddenUserIds(getHiddenUserIds());
+            }
+            setCardOptionsCardId(null);
+          }}
+          onReport={(cardId) => {
+            setReportCardId(cardId);
+            setCardOptionsCardId(null);
+          }}
+        />
+      )}
+
+      {reportCardId != null && (
+        <ReportViolationModal
+          cardId={reportCardId}
+          onClose={() => setReportCardId(null)}
         />
       )}
     </div>

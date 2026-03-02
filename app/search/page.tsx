@@ -8,6 +8,7 @@ import CollectionCard from "../components/CollectionCard";
 import RecommendedTags from "../components/RecommendedTags";
 import VoteCard from "../components/VoteCard";
 import CardOptionsModal from "../components/CardOptionsModal";
+import ReportViolationModal from "../components/ReportViolationModal";
 import BookmarkCollectionModal from "../components/BookmarkCollectionModal";
 import TagMenuModal, { type TagMenuVariant } from "../components/TagMenuModal";
 import Checkbox from "../components/Checkbox";
@@ -33,6 +34,11 @@ import {
 } from "../data/collections";
 import { isCardBookmarked } from "../data/bookmarks";
 import { getAuth, getAuthUpdatedEventName } from "../data/auth";
+import {
+  getHiddenUserIds,
+  addHiddenUser,
+  getHiddenUsersUpdatedEventName,
+} from "../data/hiddenUsers";
 import {
   getTrendingTagsByScore,
   popularCollections,
@@ -125,6 +131,8 @@ function SearchContent() {
   const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [reportCardId, setReportCardId] = useState<string | null>(null);
+  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [tagMenu, setTagMenu] = useState<{ tag: string; variant: TagMenuVariant } | null>(null);
   const [hiddenTagsVersion, setHiddenTagsVersion] = useState(0);
@@ -175,10 +183,25 @@ function SearchContent() {
     return [...createdVotesForTimeline, ...seedWithId];
   }, [createdVotesForTimeline]);
 
+  useEffect(() => {
+    const handler = () => setHiddenUserIds(getHiddenUserIds());
+    window.addEventListener(getHiddenUsersUpdatedEventName(), handler);
+    return () => window.removeEventListener(getHiddenUsersUpdatedEventName(), handler);
+  }, []);
+
+  /** 非表示ユーザーを除いたカード（タグフィルター・表示用） */
+  const allCardsForTagsFiltered = useMemo(
+    () =>
+      allCardsForTags.filter(
+        (c) => !c.createdByUserId || !hiddenUserIds.includes(c.createdByUserId)
+      ),
+    [allCardsForTags, hiddenUserIds]
+  );
+
   /** 注目タグ（スコア順：投票+1, コメント+3, bookmark+5, 新着+2, お気に入り+3） */
   const trendingTagsByScore = useMemo(
-    () => getTrendingTagsByScore(allCardsForTags, activity, favoriteTags),
-    [allCardsForTags, activity, favoriteTags]
+    () => getTrendingTagsByScore(allCardsForTagsFiltered, activity, favoriteTags),
+    [allCardsForTagsFiltered, activity, favoriteTags]
   );
 
   /** 注目タグ（興味がないで非表示にしたタグを除く） */
@@ -194,14 +217,23 @@ function SearchContent() {
     return trendingTagsByScore.filter((t) => t.tag.toLowerCase().includes(q));
   }, [query, trendingTagsByScore]);
 
-  /** ハッシュタグフィルター用の全カード（作成VOTE + シード） */
+  /** ハッシュタグフィルター用の全カード（作成VOTE + シード、ID付き） */
   const allCardsForTagFilter = useMemo(() => {
-    return [...createdVotesForTimeline, ...voteCardsData];
+    const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: c.id ?? `seed-${i}` }));
+    return [...createdVotesForTimeline, ...seedWithId];
   }, [createdVotesForTimeline]);
 
+  const allCardsForTagFilterFiltered = useMemo(
+    () =>
+      allCardsForTagFilter.filter(
+        (c) => !c.createdByUserId || !hiddenUserIds.includes(c.createdByUserId)
+      ),
+    [allCardsForTagFilter, hiddenUserIds]
+  );
+
   const filteredCards = useMemo(
-    () => filterCardsByTag(allCardsForTagFilter, isTagFilterView ? tagFromUrl : null),
-    [allCardsForTagFilter, isTagFilterView, tagFromUrl]
+    () => filterCardsByTag(allCardsForTagFilterFiltered, isTagFilterView ? tagFromUrl : null),
+    [allCardsForTagFilterFiltered, isTagFilterView, tagFromUrl]
   );
 
   const commentedCardIds = useMemo(
@@ -599,6 +631,27 @@ function SearchContent() {
         <CardOptionsModal
           cardId={cardOptionsCardId}
           onClose={() => setCardOptionsCardId(null)}
+          onHide={(cardId) => {
+            const card = allCardsForTagFilter.find(
+              (c) => (c.id ?? c.question) === cardId
+            );
+            if (card?.createdByUserId) {
+              addHiddenUser(card.createdByUserId);
+              setHiddenUserIds(getHiddenUserIds());
+            }
+            setCardOptionsCardId(null);
+          }}
+          onReport={(cardId) => {
+            setReportCardId(cardId);
+            setCardOptionsCardId(null);
+          }}
+        />
+      )}
+
+      {reportCardId != null && (
+        <ReportViolationModal
+          cardId={reportCardId}
+          onClose={() => setReportCardId(null)}
         />
       )}
 

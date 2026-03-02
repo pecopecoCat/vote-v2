@@ -17,14 +17,21 @@ export default function CardOptionsModal({
 }: CardOptionsModalProps) {
   if (cardId == null) return null;
 
+  const handleShare = () => {
+    if (typeof window !== "undefined") {
+      const url = `${window.location.origin}/comments/${cardId}`;
+      const shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=VOTE`;
+      window.open(shareUrl, "_blank", "noopener,noreferrer");
+    }
+    onShare?.(cardId);
+    onClose();
+  };
+
   const items = [
     {
       label: "シェアする",
       icon: <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />,
-      onClick: () => {
-        onShare?.(cardId);
-        onClose();
-      },
+      onClick: handleShare,
     },
     {
       label: "非表示する",

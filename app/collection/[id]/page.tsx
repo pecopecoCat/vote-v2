@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import VoteCard from "../../components/VoteCard";
 import CardOptionsModal from "../../components/CardOptionsModal";
+import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import BottomNav from "../../components/BottomNav";
 import Checkbox from "../../components/Checkbox";
@@ -22,6 +23,7 @@ import { isCardBookmarked } from "../../data/bookmarks";
 import { getCollectionGradientClass } from "../../data/search";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
 import { getAuth, getAuthUpdatedEventName } from "../../data/auth";
+import { addHiddenUser } from "../../data/hiddenUsers";
 import { getMergedCounts, type CardActivity } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
 import type { VoteCardData } from "../../data/voteCards";
@@ -65,6 +67,7 @@ export default function CollectionPage() {
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [showVoted, setShowVoted] = useState(true);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
+  const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [auth, setAuth] = useState(() => getAuth());
   const currentUser: CurrentUser = auth.isLoggedIn && auth.user
@@ -260,6 +263,24 @@ export default function CollectionPage() {
         <CardOptionsModal
           cardId={cardOptionsCardId}
           onClose={() => setCardOptionsCardId(null)}
+          onHide={(cardId) => {
+            const entry = cardsInCollection.find(({ cardId: cid }) => cid === cardId);
+            if (entry?.card.createdByUserId) {
+              addHiddenUser(entry.card.createdByUserId);
+            }
+            setCardOptionsCardId(null);
+          }}
+          onReport={(cardId) => {
+            setReportCardId(cardId);
+            setCardOptionsCardId(null);
+          }}
+        />
+      )}
+
+      {reportCardId != null && (
+        <ReportViolationModal
+          cardId={reportCardId}
+          onClose={() => setReportCardId(null)}
         />
       )}
 
