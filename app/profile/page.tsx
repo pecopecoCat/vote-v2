@@ -217,11 +217,14 @@ function ProfileContent() {
     : { type: "guest" };
 
   const userId = typeof window !== "undefined" ? getCurrentActivityUserId() : "";
-  /** myVOTEタブ用：常に localStorage の「自分が作ったVOTE」を表示（削除後に確実に反映するため） */
+  /** myVOTEタブ用：API利用時はContextから、それ以外はlocalStorageから「自分が作ったVOTE」を表示 */
   const createdVotesRaw = useMemo(() => {
     if (typeof window === "undefined") return [];
+    if (shared.isRemote) {
+      return createdVotesForTimeline.filter((c) => c.createdByUserId === userId);
+    }
     return getCreatedVotes();
-  }, [createdVotesRefreshKey]);
+  }, [shared.isRemote, createdVotesForTimeline, createdVotesRefreshKey, userId]);
   const createdVotes = useMemo(() => {
     if (myVoteSortOrder === "oldest") {
       return [...createdVotesRaw].sort((a, b) => {

@@ -127,11 +127,7 @@ function ProfileLoginContent() {
             {!showUserChoice ? (
               <button
                 type="button"
-                onPointerDown={(e) => {
-                  if (e.button !== 0) return;
-                  e.currentTarget.releasePointerCapture?.(e.pointerId);
-                  openUserChoice();
-                }}
+                onClick={() => openUserChoice()}
                 disabled={openingUserChoice}
                 className="w-full rounded-xl bg-gray-900 py-4 text-center text-base font-bold text-white hover:opacity-90 touch-manipulation disabled:opacity-70 disabled:cursor-wait"
                 style={{ touchAction: "manipulation" }}
