@@ -108,6 +108,8 @@ export interface SharedDataContextValue {
   ) => Promise<void>;
   /** ブックマークしたときに API に記録（作成者向け通知用・isRemote 時のみ） */
   recordBookmarkEvent: (cardId: string) => Promise<void>;
+  /** 作成VOTEを一覧から除外（mypageの×削除でUI即時反映用） */
+  removeCreatedVote: (cardId: string) => void;
 }
 
 const SharedDataContext = createContext<SharedDataContextValue | null>(null);
@@ -136,6 +138,7 @@ export function useSharedData(): SharedDataContextValue {
         _commenterVoteOption?: "A" | "B"
       ) => {},
       recordBookmarkEvent: async () => {},
+      removeCreatedVote: () => {},
     };
   }
   return ctx;
@@ -325,6 +328,12 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     [isRemote, fetchActivity]
   );
 
+  const removeCreatedVote = useCallback((cardId: string) => {
+    setCreatedVotesForTimeline((prev) =>
+      prev.filter((c) => (c.id ?? c.question) !== cardId)
+    );
+  }, []);
+
   const value: SharedDataContextValue = {
     createdVotesForTimeline,
     activity,
@@ -335,6 +344,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     addVote,
     addComment,
     recordBookmarkEvent,
+    removeCreatedVote,
   };
 
   return (

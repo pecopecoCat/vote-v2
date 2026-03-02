@@ -136,7 +136,7 @@ function ProfileContent() {
   const [activeTab, setActiveTab] = useState<ProfileTabId>("vote");
   const [collections, setCollections] = useState<Collection[]>([]);
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
+  const { createdVotesForTimeline, activity, addVote: sharedAddVote, removeCreatedVote: sharedRemoveCreatedVote } = shared;
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
   /** Bookmark タブでコレクション or ALL を選択中。null = TOP（リスト表示） */
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<null | "all" | string>(null);
@@ -228,6 +228,8 @@ function ProfileContent() {
   const currentUser: CurrentUser = auth.isLoggedIn
     ? { type: "sns", name: profileUser.name, iconUrl: profileUser.iconUrl }
     : { type: "guest" };
+  /** 自分のコメント判定用：ログイン時は表示名、未ログイン時は「自分」 */
+  const myCommentUserName = auth.isLoggedIn ? (auth.user?.name ?? "") : MY_COMMENT_USER_NAME;
 
   const userId = typeof window !== "undefined" ? getCurrentActivityUserId() : "";
   /** myVOTEタブ用：API利用時はContextから、それ以外はlocalStorageから「自分が作ったVOTE」を表示 */
@@ -291,9 +293,9 @@ function ProfileContent() {
   const commentedCardIds = useMemo(
     () =>
       Object.entries(activity).filter(([, a]) =>
-        (a.comments ?? []).some((c) => c.user?.name === MY_COMMENT_USER_NAME)
+        (a.comments ?? []).some((c) => c.user?.name === myCommentUserName)
       ).map(([cid]) => cid),
-    [activity]
+    [activity, myCommentUserName]
   );
 
   const tabLabels: { id: ProfileTabId; label: string }[] = [
@@ -596,8 +598,11 @@ function ProfileContent() {
                           type="button"
                           className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-bold text-red-600 shadow-md hover:bg-red-50"
                           aria-label="このVOTEを削除"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             deleteCreatedVote(cardId);
+                            sharedRemoveCreatedVote(cardId);
                             setCreatedVotesRefreshKey((k) => k + 1);
                           }}
                         >
@@ -911,7 +916,7 @@ function ProfileContent() {
                     card.commentCount ?? 0,
                     act
                   );
-                  const myComments = (act.comments ?? []).filter((c) => c.user?.name === MY_COMMENT_USER_NAME);
+                  const myComments = (act.comments ?? []).filter((c) => c.user?.name === myCommentUserName);
                   return (
                     <Link key={cardId} href={`/comments/${cardId}`} className="block">
                       <div className="rounded-2xl bg-white shadow-sm">
@@ -929,11 +934,11 @@ function ProfileContent() {
                           hasCommented
                           periodEnd={card.periodEnd}
                         />
-                        <div className="border-t border-gray-100 px-[5.333vw] py-3">
-                          {myComments.map((comment) => (
-                            <ProfileCommentRow key={comment.id} comment={comment} />
-                          ))}
-                        </div>
+                      </div>
+                      <div className="border-t border-gray-100 px-[5.333vw] py-3">
+                        {myComments.map((comment) => (
+                          <ProfileCommentRow key={comment.id} comment={comment} />
+                        ))}
                       </div>
                     </Link>
                   );
