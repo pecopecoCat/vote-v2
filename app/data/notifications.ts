@@ -19,6 +19,8 @@ export interface ActivityItem {
   /** 表示ラベル（actorName がある場合は「〇〇さんが…」で上書き表示） */
   label: string;
   date: string;
+  /** ソート用の日時（ISO文字列）。最新順で使う */
+  dateIso?: string;
   /** 2択のお題プレビュー（任意） */
   questionPreview?: string;
   /** アクションしたユーザー名（コメントした人等） */

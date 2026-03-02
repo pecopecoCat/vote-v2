@@ -78,6 +78,7 @@ function buildUserActivityItems(opts?: {
       cardId: ev.cardId,
       label: ACTIVITY_TYPE_LABELS.voted_on_mine,
       date: ev.date ? formatDate(ev.date) : "",
+      dateIso: ev.date ?? undefined,
       questionPreview: getQuestion(ev.cardId, created) || undefined,
       actorVote: ev.option,
     });
@@ -94,6 +95,7 @@ function buildUserActivityItems(opts?: {
       cardId,
       label: ACTIVITY_TYPE_LABELS.comment_on_mine,
       date: latest.date ? formatDate(latest.date) : "",
+      dateIso: latest.date ?? undefined,
       questionPreview: getQuestion(cardId, created) || undefined,
       actorName: latest.user?.name,
       actorIconUrl: latest.user?.iconUrl,
@@ -118,6 +120,7 @@ function buildUserActivityItems(opts?: {
           cardId,
           label: ACTIVITY_TYPE_LABELS.reply_to_my_comment,
           date: reply.date ? formatDate(reply.date) : "",
+          dateIso: reply.date ?? undefined,
           questionPreview: getQuestion(cardId, created) || undefined,
           actorName: reply.user?.name,
           actorIconUrl: reply.user?.iconUrl,
@@ -135,6 +138,7 @@ function buildUserActivityItems(opts?: {
       cardId: ev.cardId,
       label: ACTIVITY_TYPE_LABELS.bookmark_on_mine,
       date: ev.date ? formatDate(ev.date) : "",
+      dateIso: ev.date ?? undefined,
       questionPreview: getQuestion(ev.cardId, created) || undefined,
     });
   });
@@ -150,6 +154,7 @@ function buildUserActivityItems(opts?: {
       cardId,
       label: "投票結果が決定しました！",
       date: formatDate(periodEnd),
+      dateIso: periodEnd,
       questionPreview: c.question,
     });
   });
@@ -166,16 +171,17 @@ function buildUserActivityItems(opts?: {
         cardId,
         label: ACTIVITY_TYPE_LABELS.liked_my_comment,
         date: c.date ? formatDate(c.date) : "",
+        dateIso: c.date ?? undefined,
         questionPreview: getQuestion(cardId, created) || undefined,
         commentPreview: c.text,
       });
     });
   });
 
-  // 日付降順（ISO で比較し、日付なしは後ろ）
+  // 最新順（dateIso で比較。日付なしは後ろ）
   items.sort((a, b) => {
-    const dateA = a.date ? new Date(a.date).toISOString() : "";
-    const dateB = b.date ? new Date(b.date).toISOString() : "";
+    const dateA = a.dateIso ?? "";
+    const dateB = b.dateIso ?? "";
     if (dateA && dateB) return dateB.localeCompare(dateA);
     if (dateA) return -1;
     if (dateB) return 1;

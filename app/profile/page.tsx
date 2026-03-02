@@ -298,6 +298,19 @@ function ProfileContent() {
     [activity, myCommentUserName]
   );
 
+  /** コメントタブ用：自分のコメントの最新日時でカードを最新順に並べる */
+  const commentedCardIdsNewestFirst = useMemo(() => {
+    return [...commentedCardIds].sort((cardIdA, cardIdB) => {
+      const actA = activity[cardIdA] ?? { comments: [] };
+      const actB = activity[cardIdB] ?? { comments: [] };
+      const myA = (actA.comments ?? []).filter((c) => c.user?.name === myCommentUserName);
+      const myB = (actB.comments ?? []).filter((c) => c.user?.name === myCommentUserName);
+      const latestA = myA.length ? Math.max(...myA.map((c) => new Date(c.date ?? 0).getTime())) : 0;
+      const latestB = myB.length ? Math.max(...myB.map((c) => new Date(c.date ?? 0).getTime())) : 0;
+      return latestB - latestA;
+    });
+  }, [commentedCardIds, activity, myCommentUserName]);
+
   const tabLabels: { id: ProfileTabId; label: string }[] = [
     { id: "myVOTE", label: "myVOTE" },
     { id: "vote", label: "投票" },
@@ -905,8 +918,8 @@ function ProfileContent() {
                 <p className="text-sm text-gray-500">コメントしたVOTEがここに表示されます。</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-4">
-                {commentedCardIds.map((cardId) => {
+              <div className="flex flex-col divide-y divide-gray-300">
+                {commentedCardIdsNewestFirst.map((cardId) => {
                   const card = allCardsFiltered.find((c) => (c.id ?? c.question) === cardId);
                   if (!card) return null;
                   const act = activity[cardId] ?? { countA: 0, countB: 0, comments: [] };
@@ -918,7 +931,7 @@ function ProfileContent() {
                   );
                   const myComments = (act.comments ?? []).filter((c) => c.user?.name === myCommentUserName);
                   return (
-                    <Link key={cardId} href={`/comments/${cardId}`} className="block">
+                    <Link key={cardId} href={`/comments/${cardId}`} className="block py-4 first:pt-0">
                       <div className="rounded-2xl bg-white shadow-sm">
                         <VoteCardMini
                           backgroundImageUrl={backgroundForCard(card, cardId)}
