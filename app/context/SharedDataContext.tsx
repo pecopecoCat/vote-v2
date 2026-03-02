@@ -182,6 +182,25 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, [fetchActivity]);
 
+  /** キャッシュクリア後などで bfcache から復元されたとき、localStorage が空なのに古いログイン状態が残るのを防ぐ */
+  useEffect(() => {
+    const syncAuth = () => {
+      window.dispatchEvent(new CustomEvent(getAuthUpdatedEventName()));
+    };
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) syncAuth();
+    };
+    const onVisibilityChange = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") syncAuth();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
   useEffect(() => {
     const name = getCreatedVotesUpdatedEventName();
     const handler = () => setCreatedVotesForTimeline(getCreatedVotesForTimeline());
