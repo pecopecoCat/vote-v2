@@ -16,6 +16,7 @@ import {
   getBookmarksUpdatedEventName,
 } from "../data/bookmarks";
 import { getCollectionGradientStyle, type CollectionGradient } from "../data/search";
+import { useSharedData } from "../context/SharedDataContext";
 import { useEffect, useState } from "react";
 import Button from "./Button";
 import CollectionSettingsModal from "./CollectionSettingsModal";
@@ -34,6 +35,7 @@ export default function BookmarkCollectionModal({
   onCollectionsUpdated,
   isLoggedIn = false,
 }: BookmarkCollectionModalProps) {
+  const shared = useSharedData();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
@@ -43,8 +45,11 @@ export default function BookmarkCollectionModal({
 
   /** モーダルを開いた＝Bookmarkに登録（まとめはコレクションで） */
   useEffect(() => {
-    if (isLoggedIn && cardId) addBookmark(cardId);
-  }, [isLoggedIn, cardId]);
+    if (isLoggedIn && cardId) {
+      addBookmark(cardId);
+      if (shared.isRemote) void shared.recordBookmarkEvent(cardId);
+    }
+  }, [isLoggedIn, cardId, shared.isRemote, shared.recordBookmarkEvent]);
 
   useEffect(() => {
     const eventName = getCollectionsUpdatedEventName();

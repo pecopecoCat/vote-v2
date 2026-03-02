@@ -79,11 +79,19 @@ function buildActivityFromApi(
   return result;
 }
 
+/** 作成者向け通知用（API から取得） */
+export type VoteEvent = { cardId: string; date: string };
+export type BookmarkEvent = { cardId: string; date: string };
+
 export interface SharedDataContextValue {
   /** タイムライン用：全ユーザーの作成VOTE（API 時は全員分・未設定時は localStorage の user1+user2） */
   createdVotesForTimeline: VoteCardData[];
   /** カードID → 活動（投票数・コメント・現在ユーザーの選択） */
   activity: Record<string, CardActivity>;
+  /** 作成者向け通知：誰かが投票したカードのイベント一覧（API 時のみ） */
+  voteEvents: VoteEvent[];
+  /** 作成者向け通知：誰かがブックマークしたカードのイベント一覧（API 時のみ） */
+  bookmarkEvents: BookmarkEvent[];
   /** true = KV 経由で他ユーザーと共有中 */
   isRemote: boolean;
   /** 作成VOTEを追加（API 時は POST してから再取得） */
@@ -95,6 +103,8 @@ export interface SharedDataContextValue {
     cardId: string,
     comment: { user: { name: string; iconUrl?: string }; text: string }
   ) => Promise<void>;
+  /** ブックマークしたときに API に記録（作成者向け通知用・isRemote 時のみ） */
+  recordBookmarkEvent: (cardId: string) => Promise<void>;
 }
 
 const SharedDataContext = createContext<SharedDataContextValue | null>(null);
@@ -105,6 +115,8 @@ export function useSharedData(): SharedDataContextValue {
     return {
       createdVotesForTimeline: typeof window !== "undefined" ? getCreatedVotesForTimeline() : [],
       activity: typeof window !== "undefined" ? getAllActivity() : {},
+      voteEvents: [],
+      bookmarkEvents: [],
       isRemote: false,
       addCreatedVote: async (card) => {
         if (typeof window === "undefined") return;
@@ -115,6 +127,7 @@ export function useSharedData(): SharedDataContextValue {
         addVoteLocal(cardId, option);
       },
       addComment: async () => {},
+      recordBookmarkEvent: async () => {},
     };
   }
   return ctx;
@@ -127,6 +140,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [activity, setActivity] = useState<Record<string, CardActivity>>(() =>
     typeof window !== "undefined" ? getAllActivity() : {}
   );
+  const [voteEvents, setVoteEvents] = useState<VoteEvent[]>([]);
+  const [bookmarkEvents, setBookmarkEvents] = useState<BookmarkEvent[]>([]);
   const [isRemote, setIsRemote] = useState(false);
 
   const fetchCreatedVotes = useCallback(async (): Promise<boolean> => {
@@ -155,10 +170,14 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       const data = (await res.json()) as {
         global?: Record<string, { countA?: number; countB?: number; comments?: CardActivity["comments"] }>;
         userSelections?: Record<string, "A" | "B">;
+        voteEvents?: VoteEvent[];
+        bookmarkEvents?: BookmarkEvent[];
       };
       const global = data?.global && typeof data.global === "object" ? data.global : {};
       const userSelections = data?.userSelections && typeof data.userSelections === "object" ? data.userSelections : {};
       setActivity(buildActivityFromApi(global, userSelections));
+      setVoteEvents(Array.isArray(data?.voteEvents) ? data.voteEvents : []);
+      setBookmarkEvents(Array.isArray(data?.bookmarkEvents) ? data.bookmarkEvents : []);
       return true;
     } catch {
       return false;
@@ -264,13 +283,33 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     [isRemote, fetchActivity]
   );
 
+  const recordBookmarkEvent = useCallback(
+    async (cardId: string) => {
+      if (!isRemote) return;
+      try {
+        const res = await fetch(ACTIVITY_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "bookmark", cardId }),
+        });
+        if (res.ok) await fetchActivity();
+      } catch {
+        // ignore
+      }
+    },
+    [isRemote, fetchActivity]
+  );
+
   const value: SharedDataContextValue = {
     createdVotesForTimeline,
     activity,
+    voteEvents,
+    bookmarkEvents,
     isRemote,
     addCreatedVote,
     addVote,
     addComment,
+    recordBookmarkEvent,
   };
 
   return (

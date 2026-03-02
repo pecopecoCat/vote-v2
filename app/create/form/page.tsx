@@ -6,7 +6,7 @@ import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
-import { getCollections } from "../../data/collections";
+import { getCollections, addCardToCollection } from "../../data/collections";
 import { getAuth } from "../../data/auth";
 import { CARD_BACKGROUND_IMAGES, recommendedTagList } from "../../data/voteCards";
 import { useSharedData } from "../../context/SharedDataContext";
@@ -109,7 +109,12 @@ function CreateFormContent() {
       periodEnd,
     };
     void sharedAddCreatedVote(card)
-      .then(() => setShowVoteCreatedModal(true))
+      .then(() => {
+        if (selectedCollectionId.trim()) {
+          addCardToCollection(selectedCollectionId.trim(), card.id);
+        }
+        setShowVoteCreatedModal(true);
+      })
       .finally(() => setIsSubmitting(false));
   }, [
     canSubmit,
@@ -128,6 +133,7 @@ function CreateFormContent() {
     endYear,
     endMonth,
     endDay,
+    selectedCollectionId,
   ]);
 
   const handleVoteCreatedModalClose = useCallback(() => {

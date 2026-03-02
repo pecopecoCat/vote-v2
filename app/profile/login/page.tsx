@@ -69,6 +69,17 @@ function ProfileLoginContent() {
       setLoginError(null);
       setLoading(true);
       try {
+        // キャッシュクリア後は lastLoggedInUserId が残らないため、サーバーに「ログイン中」が残ることがある。
+        // この端末で「このユーザーでログインする」と選んだ場合は、先にサーバー側を解除してからログインする（取りこぼし解消）。
+        const needTakeOver =
+          activeUserIds.includes(userId) && getLastLoggedInUserId() === null;
+        if (needTakeOver) {
+          await fetch("/api/active-user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ logoutUserId: userId }),
+          });
+        }
         const res = await fetch("/api/active-user", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -86,7 +97,7 @@ function ProfileLoginContent() {
         setLoading(false);
       }
     },
-    [returnTo, router]
+    [returnTo, router, activeUserIds]
   );
 
   return (
@@ -155,7 +166,12 @@ function ProfileLoginContent() {
                 <p className="mb-3 text-sm font-bold text-gray-700">どれでログインする？</p>
                 <div className="grid grid-cols-5 gap-2">
                   {DEMO_USER_IDS.map((userId) => {
-                    const isLoggedInElsewhere = activeUserIds.includes(userId);
+                    const lastId = getLastLoggedInUserId();
+                    // キャッシュクリア後は lastId が無いため「どれが別端末か」判定できない → すべて選択可にしてタップで取りこぼし解除
+                    const isLoggedInElsewhere =
+                      activeUserIds.includes(userId) &&
+                      lastId != null &&
+                      lastId !== userId;
                     const disabled = loading || !activeListLoaded || isLoggedInElsewhere;
                     return (
                       <button

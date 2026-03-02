@@ -9,15 +9,19 @@ import {
   MOCK_ANNOUNCEMENTS,
   type ActivityItem,
 } from "../data/notifications";
-import { getAuth, getAuthUpdatedEventName } from "../data/auth";
+import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../data/auth";
 import { getCreatedVotes } from "../data/createdVotes";
 import {
   getAllActivity,
   getVoteEvents,
   type VoteComment,
+  type CardActivity,
 } from "../data/voteCardActivity";
 import { getBookmarkEvents } from "../data/bookmarks";
 import { voteCardsData } from "../data/voteCards";
+import { useSharedData } from "../context/SharedDataContext";
+import type { VoteEvent, BookmarkEvent } from "../context/SharedDataContext";
+import type { VoteCardData } from "../data/voteCards";
 
 const MY_COMMENT_USER_NAME = "自分";
 
@@ -47,14 +51,19 @@ function isMyComment(c: VoteComment, currentUserName: string | undefined): boole
 }
 
 /** ユーザーのアクティビティを実データから組み立て。日付降順。 */
-function buildUserActivityItems(): ActivityItem[] {
+function buildUserActivityItems(opts?: {
+  created?: VoteCardData[];
+  activity?: Record<string, CardActivity>;
+  voteEvents?: VoteEvent[];
+  bookmarkEvents?: BookmarkEvent[];
+}): ActivityItem[] {
   if (typeof window === "undefined") return [];
   const auth = getAuth();
   const currentUserName = auth.user?.name;
-  const created = getCreatedVotes();
-  const activity = getAllActivity();
-  const voteEvents = getVoteEvents();
-  const bookmarkEvents = getBookmarkEvents();
+  const created = opts?.created ?? getCreatedVotes();
+  const activity = opts?.activity ?? getAllActivity();
+  const voteEvents = opts?.voteEvents ?? getVoteEvents();
+  const bookmarkEvents = opts?.bookmarkEvents ?? getBookmarkEvents();
   const myCreatedCardIds = new Set(created.map((c) => c.id ?? c.question));
 
   const items: ActivityItem[] = [];
@@ -181,24 +190,42 @@ function buildUserActivityItems(): ActivityItem[] {
 }
 
 export default function NotificationsPage() {
+  const shared = useSharedData();
   const [activeTab, setActiveTab] = useState<NotificationTabId>("activity");
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+  const refreshActivityItems = () => {
+    if (shared.isRemote) {
+      const userId = getCurrentActivityUserId();
+      const myCreated = shared.createdVotesForTimeline.filter((c) => c.createdByUserId === userId);
+      setActivityItems(
+        buildUserActivityItems({
+          created: myCreated,
+          activity: shared.activity,
+          voteEvents: shared.voteEvents,
+          bookmarkEvents: shared.bookmarkEvents,
+        })
+      );
+    } else {
+      setActivityItems(buildUserActivityItems());
+    }
+  };
+
   useEffect(() => {
     setIsLoggedIn(getAuth().isLoggedIn);
-    setActivityItems(buildUserActivityItems());
+    refreshActivityItems();
     const handler = () => {
       setIsLoggedIn(getAuth().isLoggedIn);
-      setActivityItems(buildUserActivityItems());
+      refreshActivityItems();
     };
     window.addEventListener(getAuthUpdatedEventName(), handler);
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
   useEffect(() => {
-    setActivityItems(buildUserActivityItems());
-  }, [activeTab]);
+    refreshActivityItems();
+  }, [activeTab, shared.isRemote, shared.createdVotesForTimeline, shared.activity, shared.voteEvents, shared.bookmarkEvents]);
 
   return (
     <div className="min-h-screen pb-[50px]">

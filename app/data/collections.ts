@@ -294,12 +294,24 @@ export function isPinnedCollection(collectionId: string): boolean {
   return loadPinnedIds(getCurrentActivityUserId()).includes(collectionId);
 }
 
-/** ピン留めをトグル（検索画面にピン留め） */
+/** ピン留めの最大数（これ以上は古い順に解除） */
+export const MAX_PINNED_COLLECTIONS = 10;
+
+/** ピン留めをトグル（検索画面にピン留め）。最大 MAX_PINNED_COLLECTIONS 件で、超えた場合は古い順に解除。 */
 export function togglePinnedCollection(collectionId: string): void {
   const userId = getCurrentActivityUserId();
   const current = loadPinnedIds(userId);
   const has = current.includes(collectionId);
-  const next = has ? current.filter((id) => id !== collectionId) : [...current, collectionId];
+  let next: string[];
+  if (has) {
+    next = current.filter((id) => id !== collectionId);
+  } else {
+    if (current.length >= MAX_PINNED_COLLECTIONS) {
+      next = [...current.slice(1), collectionId];
+    } else {
+      next = [...current, collectionId];
+    }
+  }
   savePinnedIds(userId, next);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(PINNED_UPDATED_EVENT));

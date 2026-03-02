@@ -3,6 +3,9 @@ import { getKV } from "../../lib/kv";
 
 const KV_GLOBAL = "vote_activity_global";
 const KV_USER_PREFIX = "vote_activity_user_";
+const KV_VOTE_EVENTS = "vote_activity_vote_events";
+const KV_BOOKMARK_EVENTS = "vote_activity_bookmark_events";
+const MAX_EVENTS = 200;
 
 /** クライアントの voteCardActivity の GlobalCardData と同じ形 */
 export type GlobalCardData = {
@@ -17,7 +20,10 @@ export type GlobalCardData = {
   }>;
 };
 
-/** GET ?userId= → { global, userSelections } */
+export type VoteEvent = { cardId: string; date: string };
+export type BookmarkEvent = { cardId: string; date: string };
+
+/** GET ?userId= → { global, userSelections, voteEvents, bookmarkEvents } */
 export async function GET(request: Request): Promise<NextResponse<Record<string, unknown> | { error: string }>> {
   const kv = await getKV();
   if (!kv) {
@@ -25,9 +31,11 @@ export async function GET(request: Request): Promise<NextResponse<Record<string,
   }
   const userId = new URL(request.url).searchParams.get("userId") ?? "";
   try {
-    const [global, userRaw] = await Promise.all([
+    const [global, userRaw, voteEvents, bookmarkEvents] = await Promise.all([
       kv.get<Record<string, GlobalCardData>>(KV_GLOBAL),
       userId ? kv.get<Record<string, { userSelectedOption?: "A" | "B" }>>(KV_USER_PREFIX + userId) : null,
+      kv.get<VoteEvent[]>(KV_VOTE_EVENTS),
+      kv.get<BookmarkEvent[]>(KV_BOOKMARK_EVENTS),
     ]);
     const globalData = global && typeof global === "object" ? global : {};
     const userSelections: Record<string, "A" | "B"> = {};
@@ -39,7 +47,14 @@ export async function GET(request: Request): Promise<NextResponse<Record<string,
         }
       }
     }
-    return NextResponse.json({ global: globalData, userSelections });
+    const voteList = Array.isArray(voteEvents) ? voteEvents : [];
+    const bookmarkList = Array.isArray(bookmarkEvents) ? bookmarkEvents : [];
+    return NextResponse.json({
+      global: globalData,
+      userSelections,
+      voteEvents: voteList,
+      bookmarkEvents: bookmarkList,
+    });
   } catch (e) {
     console.error("[api/activity] GET error:", e);
     return NextResponse.json({ error: "KV_ERROR" }, { status: 500 });
@@ -77,6 +92,10 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       const userKey = KV_USER_PREFIX + userId;
       const userData = (await kv.get<Record<string, { userSelectedOption?: "A" | "B" }>>(userKey)) ?? {};
       await kv.set(userKey, { ...userData, [cardId]: { userSelectedOption: option } });
+      // 作成者向け通知用：投票イベントを記録
+      const events = (await kv.get<VoteEvent[]>(KV_VOTE_EVENTS)) ?? [];
+      events.push({ cardId, date: new Date().toISOString() });
+      await kv.set(KV_VOTE_EVENTS, events.slice(-MAX_EVENTS));
       return NextResponse.json({ ok: true });
     }
 
@@ -104,6 +123,17 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
           comments: [...comments, newComment],
         },
       });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (type === "bookmark") {
+      const cardId = body.cardId as string;
+      if (!cardId || typeof cardId !== "string") {
+        return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+      }
+      const events = (await kv.get<BookmarkEvent[]>(KV_BOOKMARK_EVENTS)) ?? [];
+      events.push({ cardId, date: new Date().toISOString() });
+      await kv.set(KV_BOOKMARK_EVENTS, events.slice(-MAX_EVENTS));
       return NextResponse.json({ ok: true });
     }
 

@@ -139,6 +139,8 @@ function SearchContent() {
   const [hiddenTagsVersion, setHiddenTagsVersion] = useState(0);
   /** 注目タグの表示件数（初期10件、もっと表示するで10件ずつ追加） */
   const [trendingTagsVisibleCount, setTrendingTagsVisibleCount] = useState(10);
+  const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
+  const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
   const [auth, setAuth] = useState(() => getAuth());
   const isLoggedIn = auth.isLoggedIn;
   const currentUser: CurrentUser = auth.isLoggedIn && auth.user
@@ -176,7 +178,36 @@ function SearchContent() {
 
   const query = searchValue.trim();
   const isSearching = query.length > 0;
-  const matchedCollections = useMemo(() => searchCollections(query), [query]);
+  const matchedCollectionsRaw = useMemo(() => searchCollections(query), [query]);
+  /** 検索時コレクション：ピン留めを上に表示 */
+  const matchedCollections = useMemo(
+    () =>
+      [...matchedCollectionsRaw].sort((a, b) => {
+        const aPin = pinnedCollectionIds.includes(a.id);
+        const bPin = pinnedCollectionIds.includes(b.id);
+        if (aPin && !bPin) return -1;
+        if (!aPin && bPin) return 1;
+        if (aPin && bPin)
+          return pinnedCollectionIds.indexOf(a.id) - pinnedCollectionIds.indexOf(b.id);
+        return 0;
+      }),
+    [matchedCollectionsRaw, pinnedCollectionIds]
+  );
+
+  /** 人気コレクション（他＋自分の）：ピン留めを上に表示 */
+  const collectionsForSection = useMemo(() => {
+    const other = getOtherUsersCollections();
+    const combined = [...other, ...collections];
+    return combined.sort((a, b) => {
+      const aPin = pinnedCollectionIds.includes(a.id);
+      const bPin = pinnedCollectionIds.includes(b.id);
+      if (aPin && !bPin) return -1;
+      if (!aPin && bPin) return 1;
+      if (aPin && bPin)
+        return pinnedCollectionIds.indexOf(a.id) - pinnedCollectionIds.indexOf(b.id);
+      return 0;
+    });
+  }, [collections, pinnedCollectionIds]);
 
   /** 注目タグ用の全カード（作成VOTE + シード） */
   const allCardsForTags = useMemo(() => {
@@ -244,8 +275,6 @@ function SearchContent() {
       ).map(([cid]) => cid),
     [activity]
   );
-  const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
-  const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
 
   /** 検索結果タイムライン用：実際にあるコレクションから1件ランダム */
   const randomCollectionForTimeline = useMemo(() => {
@@ -552,7 +581,7 @@ function SearchContent() {
               </section>
             )}
 
-            {/* コレクション（他ユーザー登録分＋自分のコレクション） */}
+            {/* コレクション（他ユーザー登録分＋自分のコレクション・ピン留めを上に表示） */}
             <section>
               <div className="border-t border-gray-200 px-[5.333vw] pt-6">
                 <h2 className="text-left text-[18px] font-black text-gray-900">
@@ -560,30 +589,21 @@ function SearchContent() {
                 </h2>
               </div>
               <div className="flex flex-col gap-3 px-[5.333vw] pb-2 pt-4">
-                {getOtherUsersCollections().map((col, i) => (
-                  <CollectionCard
-                    key={col.id}
-                    id={col.id}
-                    title={col.name}
-                    gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
-                    showPin={pinnedCollectionIds.includes(col.id)}
-                    href={`/collection/${col.id}`}
-                  />
-                ))}
-                {collections.map((col, i) => (
-                  <CollectionCard
-                    key={col.id}
-                    id={col.id}
-                    title={col.name}
-                    gradient={col.gradient ?? PINNED_GRADIENTS[(getOtherUsersCollections().length + i) % PINNED_GRADIENTS.length]}
-                    showPin={pinnedCollectionIds.includes(col.id)}
-                    href={`/collection/${col.id}`}
-                  />
-                ))}
-                {getOtherUsersCollections().length === 0 && collections.length === 0 && (
+                {collectionsForSection.length === 0 ? (
                   <p className="py-6 text-center text-sm text-gray-500">
                     {isLoggedIn ? "コレクションがありません。マイページで作成しよう。" : "ログインするとコレクションを表示できます。"}
                   </p>
+                ) : (
+                  collectionsForSection.map((col, i) => (
+                    <CollectionCard
+                      key={col.id}
+                      id={col.id}
+                      title={col.name}
+                      gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
+                      showPin={pinnedCollectionIds.includes(col.id)}
+                      href={`/collection/${col.id}`}
+                    />
+                  ))
                 )}
               </div>
             </section>
