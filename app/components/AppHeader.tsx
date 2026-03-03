@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 export type AppHeaderType = "logo" | "search" | "hashtag" | "title";
 
 export interface AppHeaderLogoProps {
@@ -71,9 +69,14 @@ export default function AppHeader(props: AppHeaderProps) {
   }
 
   if (props.type === "title") {
-    const { title, backHref, right } = props;
-    const BackButton = () => {
-      const icon = (
+    const { title, right } = props;
+    const BackButton = () => (
+      <button
+        type="button"
+        className="flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]"
+        aria-label="1つ前のページに戻る"
+        onClick={() => window.history.back()}
+      >
         <img
           src="/icons/icon_back.svg"
           alt=""
@@ -81,29 +84,8 @@ export default function AppHeader(props: AppHeaderProps) {
           width={8}
           height={18}
         />
-      );
-      if (backHref != null) {
-        return (
-          <Link
-            href={backHref}
-            className="flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]"
-            aria-label="戻る"
-          >
-            {icon}
-          </Link>
-        );
-      }
-      return (
-        <button
-          type="button"
-          className="flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]"
-          aria-label="戻る"
-          onClick={() => window.history.back()}
-        >
-          {icon}
-        </button>
-      );
-    };
+      </button>
+    );
     return (
       <header className={`sticky top-0 z-40 relative flex ${HEADER_HEIGHT} items-center bg-[#FFE100] pl-2.5 pr-[5.333vw] shadow-sm`} aria-label={title}>
         <BackButton />
@@ -119,10 +101,14 @@ export default function AppHeader(props: AppHeaderProps) {
 
   const isSearch = props.type === "search";
   const placeholder = isSearch ? "気になるキーワードで検索" : "ハッシュタグ";
-  const backHref = "backHref" in props ? props.backHref : undefined;
 
-  const BackButton = () => {
-    const icon = (
+  const BackButton = () => (
+    <button
+      type="button"
+      className="flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]"
+      aria-label="1つ前のページに戻る"
+      onClick={() => window.history.back()}
+    >
       <img
         src="/icons/icon_back.svg"
         alt=""
@@ -130,29 +116,8 @@ export default function AppHeader(props: AppHeaderProps) {
         width={8}
         height={18}
       />
-    );
-    if (backHref != null) {
-      return (
-        <Link
-          href={backHref}
-          className="flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]"
-          aria-label="戻る"
-        >
-          {icon}
-        </Link>
-      );
-    }
-    return (
-      <button
-        type="button"
-        className="flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]"
-        aria-label="戻る"
-        onClick={() => window.history.back()}
-      >
-        {icon}
-      </button>
-    );
-  };
+    </button>
+  );
 
   return (
     <header

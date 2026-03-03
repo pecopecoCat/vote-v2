@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 export interface SearchHeaderProps {
   /** 検索窓の値（タグ名やキーワード） */
   value: string;
@@ -9,8 +7,6 @@ export interface SearchHeaderProps {
   onChange?: (value: string) => void;
   /** 検索送信時（Enter や実行時） */
   onSubmit?: (value: string) => void;
-  /** 戻る先 URL（未指定時は history.back） */
-  backHref?: string;
   placeholder?: string;
 }
 
@@ -18,29 +14,18 @@ export default function SearchHeader({
   value,
   onChange,
   onSubmit,
-  backHref,
   placeholder = "検索",
 }: SearchHeaderProps) {
   return (
     <header className="sticky top-0 z-20 flex items-center gap-2 bg-[#FFE100] px-[5.333vw] py-3 shadow-sm">
-      {backHref != null ? (
-        <Link
-          href={backHref}
-          className="flex h-10 w-10 shrink-0 items-center justify-center text-gray-700"
-          aria-label="戻る"
-        >
-          <BackIcon className="h-6 w-6" />
-        </Link>
-      ) : (
-        <button
-          type="button"
-          className="flex h-10 w-10 shrink-0 items-center justify-center text-gray-700"
-          aria-label="戻る"
-          onClick={() => window.history.back()}
-        >
-          <BackIcon className="h-6 w-6" />
-        </button>
-      )}
+      <button
+        type="button"
+        className="flex h-10 w-10 shrink-0 items-center justify-center text-gray-700"
+        aria-label="1つ前のページに戻る"
+        onClick={() => window.history.back()}
+      >
+        <BackIcon className="h-6 w-6" />
+      </button>
       <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-white px-3 py-2 shadow-sm">
         <MagnifyIcon className="h-5 w-5 shrink-0 text-gray-400" />
         <input
