@@ -173,10 +173,17 @@ export function getDisplayUserForDemo(userId: DemoUserId): { name: string; iconU
   };
 }
 
-/** 簡易デモ：user1..user10 のいずれかでログイン（保存済みニックネーム・アイコンがあれば復元） */
-export function loginAsDemoUser(userId: DemoUserId): void {
+/** 簡易デモ：user1..user10 のいずれかでログイン（localStorage 優先、なければ API から復元） */
+export async function loginAsDemoUser(userId: DemoUserId): Promise<void> {
   const defaultUser = DEMO_USERS[userId];
-  const saved = loadSavedProfile(userId);
+  let saved = loadSavedProfile(userId);
+  if (!saved) {
+    const apiProfile = await fetchUserProfileFromApi(userId);
+    if (apiProfile) {
+      saved = apiProfile;
+      saveProfile(userId, { name: saved.name ?? defaultUser.name, iconUrl: saved.iconUrl ?? defaultUser.iconUrl });
+    }
+  }
   const user: LineAuthUser = saved
     ? {
         name: saved.name ?? defaultUser.name,
@@ -197,7 +204,35 @@ export function loginAsDemoUser(userId: DemoUserId): void {
   }
 }
 
-/** ログイン中のプロフィール（ニックネーム・アイコン）を更新（user1/user2 の場合は永続化してログアウト後も保持） */
+/** APIからニックネームを取得（キャッシュクリア後も復元用） */
+export async function fetchUserProfileFromApi(userId: DemoUserId): Promise<Partial<LineAuthUser> | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const res = await fetch(`/api/user-profile?userId=${encodeURIComponent(userId)}`);
+    if (res.status !== 200) return null;
+    const data = (await res.json()) as { name?: string; iconUrl?: string };
+    if (!data || (data.name === undefined && data.iconUrl === undefined)) return null;
+    return { name: data.name, iconUrl: data.iconUrl };
+  } catch {
+    return null;
+  }
+}
+
+/** APIにニックネームを保存（キャッシュクリア後も保持） */
+async function saveProfileToApi(userId: DemoUserId, profile: LineAuthUser): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    await fetch("/api/user-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, name: profile.name, iconUrl: profile.iconUrl }),
+    });
+  } catch {
+    // ignore
+  }
+}
+
+/** ログイン中のプロフィール（ニックネーム・アイコン）を更新（localStorage + API に永続化） */
 export function updateCurrentUserProfile(updates: Partial<LineAuthUser>): void {
   const state = load();
   if (!state.isLoggedIn || !state.user) return;
@@ -209,6 +244,7 @@ export function updateCurrentUserProfile(updates: Partial<LineAuthUser>): void {
   const userId = state.userId ?? (state.user && DEMO_USER_IDS.includes(state.user.name as DemoUserId) ? (state.user.name as DemoUserId) : null);
   if (userId) {
     saveProfile(userId, nextUser);
+    void saveProfileToApi(userId, nextUser);
   }
 }
 

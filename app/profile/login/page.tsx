@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import BottomNav from "../../components/BottomNav";
-import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, getDisplayUserForDemo, DEMO_USER_IDS, type DemoUserId } from "../../data/auth";
+import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, getDisplayUserForDemo, fetchUserProfileFromApi, DEMO_USER_IDS, DEMO_USERS, type DemoUserId } from "../../data/auth";
 
 const USER_MEMOS: Record<DemoUserId, string> = {
   user1: "普通",
@@ -32,6 +32,8 @@ function ProfileLoginContent() {
   const [activeListLoaded, setActiveListLoaded] = useState(false);
   /** ユーザー選択を開くためにAPI取得中か */
   const [openingUserChoice, setOpeningUserChoice] = useState(false);
+  /** APIから取得したニックネーム（キャッシュクリア後も復元用） */
+  const [profilesFromApi, setProfilesFromApi] = useState<Record<string, { name?: string; iconUrl?: string }>>({});
 
   useEffect(() => {
     if (getAuth().isLoggedIn) {
@@ -58,23 +60,32 @@ function ProfileLoginContent() {
     setActiveListLoaded(false);
     setShowUserChoice(false);
     let cancelled = false;
-    fetch("/api/active-user")
-      .then((res) => res.json())
-      .then((data: { userIds?: string[] }) => {
+    const loadActiveAndProfiles = async () => {
+      try {
+        const [activeRes, ...profileResults] = await Promise.all([
+          fetch("/api/active-user").then((r) => r.json()) as Promise<{ userIds?: string[] }>,
+          ...DEMO_USER_IDS.map((uid) => fetchUserProfileFromApi(uid)),
+        ]);
+        if (cancelled) return;
+        setActiveUserIds(Array.isArray(activeRes.userIds) ? activeRes.userIds : []);
+        const profiles: Record<string, { name?: string; iconUrl?: string }> = {};
+        DEMO_USER_IDS.forEach((uid, i) => {
+          const p = profileResults[i];
+          if (p && (p.name || p.iconUrl !== undefined)) profiles[uid] = p;
+        });
+        setProfilesFromApi(profiles);
+        setActiveListLoaded(true);
+        setShowUserChoice(true);
+      } catch {
         if (!cancelled) {
-          setActiveUserIds(Array.isArray(data.userIds) ? data.userIds : []);
           setActiveListLoaded(true);
           setShowUserChoice(true);
         }
+      } finally {
         if (!cancelled) setOpeningUserChoice(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setActiveListLoaded(true);
-          setShowUserChoice(true);
-          setOpeningUserChoice(false);
-        }
-      });
+      }
+    };
+    void loadActiveAndProfiles();
   }, [openingUserChoice]);
 
   const handleLoginAs = useCallback(
@@ -104,7 +115,7 @@ function ProfileLoginContent() {
           return;
         }
         if (!res.ok) return;
-        loginAsDemoUser(userId);
+        await loginAsDemoUser(userId);
         router.replace(returnTo);
       } finally {
         setLoading(false);
@@ -180,7 +191,12 @@ function ProfileLoginContent() {
                 <div className="grid grid-cols-5 gap-2">
                   {DEMO_USER_IDS.map((userId) => {
                     const lastId = getLastLoggedInUserId();
-                    const displayUser = getDisplayUserForDemo(userId);
+                    const apiProfile = profilesFromApi[userId];
+                    const localProfile = getDisplayUserForDemo(userId);
+                    const defaultUser = DEMO_USERS[userId];
+                    const displayUser = apiProfile?.name || apiProfile?.iconUrl !== undefined
+                      ? { name: apiProfile.name ?? defaultUser.name, iconUrl: apiProfile.iconUrl ?? defaultUser.iconUrl }
+                      : localProfile;
                     const memo = USER_MEMOS[userId];
                     // キャッシュクリア後は lastId が無いため「どれが別端末か」判定できない → すべて選択可にしてタップで取りこぼし解除
                     const isLoggedInElsewhere =

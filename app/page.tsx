@@ -364,6 +364,12 @@ function HomeContent() {
                 ブックマークした投稿がここに表示されます。
               </p>
             </div>
+          ) : (activeTab === "trending" || activeTab === "new") && cardsForTab.length === 0 ? (
+            <div className="rounded-[2rem] bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
+              <p className="text-sm text-gray-600">
+                まだ投票できる投稿がありません。
+              </p>
+            </div>
           ) : null}
 
           {deferredTimelineItems.map((item, idx) => {
