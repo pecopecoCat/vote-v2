@@ -283,17 +283,18 @@ function ABBadge({ option }: { option: "A" | "B" }) {
   );
 }
 
+const ICON_WHITE = { filter: "brightness(0) invert(1)" };
+
 function ActivityIcon({ item }: { item: ActivityItem }) {
-  const iconClass = "h-10 w-10 shrink-0 overflow-hidden rounded-full";
-  const bgClass = "flex items-center justify-center bg-gray-900 text-white";
+  const iconClass = "h-10 w-10 shrink-0 overflow-hidden rounded-full flex items-center justify-center";
   const actorVote = item.actorVote;
 
   switch (item.type) {
     case "voted_on_mine":
       return (
         <span className="relative h-10 w-10 shrink-0 overflow-visible">
-          <span className={`${iconClass} ${bgClass}`}>
-            <img src="/icons/white_vote.svg" alt="" className="h-5 w-5" width={20} height={20} />
+          <span className={iconClass} style={{ backgroundColor: "#FFE100" }}>
+            <img src="/icons/vote_icon_dark.svg" alt="" className="h-5 w-5" width={20} height={20} />
           </span>
           {actorVote === "A" || actorVote === "B" ? <ABBadge option={actorVote} /> : null}
         </span>
@@ -302,7 +303,7 @@ function ActivityIcon({ item }: { item: ActivityItem }) {
     case "reply_to_my_comment":
       return (
         <span className="relative h-10 w-10 shrink-0 overflow-visible">
-          <span className={`${iconClass} flex items-center justify-center bg-gray-100`}>
+          <span className={`${iconClass} bg-gray-100`}>
             <img
               src={item.actorIconUrl ?? "/default-avatar.png"}
               alt=""
@@ -314,20 +315,26 @@ function ActivityIcon({ item }: { item: ActivityItem }) {
       );
     case "liked_my_comment":
       return (
-        <span className={`${iconClass} flex items-center justify-center bg-gray-200`}>
-          <img src="/icons/good.svg" alt="" className="h-5 w-5" width={20} height={17} />
+        <span className={iconClass} style={{ backgroundColor: "#F08B8B" }}>
+          <img src="/icons/good.svg" alt="" className="h-5 w-5" width={20} height={17} style={ICON_WHITE} />
         </span>
       );
     case "period_ended":
       return (
-        <span className={`${iconClass} ${bgClass}`}>
-          <img src="/icons/cal.svg" alt="" className="h-5 w-5" width={20} height={20} />
+        <span className={iconClass} style={{ backgroundColor: "#98D4BB" }}>
+          <img src="/icons/cal.svg" alt="" className="h-5 w-5" width={20} height={20} style={ICON_WHITE} />
+        </span>
+      );
+    case "bookmark_on_mine":
+      return (
+        <span className={iconClass} style={{ backgroundColor: "#E67E22" }}>
+          <img src="/icons/bookmark.svg" alt="" className="h-5 w-5" width={20} height={20} style={ICON_WHITE} />
         </span>
       );
     default:
       return (
-        <span className={`${iconClass} ${bgClass}`}>
-          <CheckIcon className="h-5 w-5" />
+        <span className={iconClass} style={{ backgroundColor: "#191919" }}>
+          <CheckIcon className="h-5 w-5 text-white" />
         </span>
       );
   }
