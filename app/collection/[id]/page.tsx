@@ -31,9 +31,9 @@ import type { VoteCardData } from "../../data/voteCards";
 import type { CurrentUser } from "../../components/VoteCard";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
-  member: "メンバー限定",
-  public: "公開",
-  private: "非公開",
+  public: "公開：みんな見れる",
+  private: "非公開：自分だけ",
+  member: "メンバー限定：リンク知ってる人は見れる",
 };
 
 function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
