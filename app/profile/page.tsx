@@ -44,9 +44,9 @@ import CardOptionsModal from "../components/CardOptionsModal";
 import ReportViolationModal from "../components/ReportViolationModal";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
-  public: "公開：みんな見れる",
-  private: "非公開：自分だけ",
-  member: "メンバー限定：リンク知ってる人は見れる",
+  public: "公開",
+  private: "非公開",
+  member: "メンバー限定",
 };
 
 const MOCK_USER = {

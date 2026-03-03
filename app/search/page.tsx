@@ -596,7 +596,7 @@ function SearchContent() {
               <div className="flex flex-col gap-3 px-[5.333vw] pb-2 pt-4">
                 {collectionsForSection.length === 0 ? (
                   <p className="py-6 text-center text-sm text-gray-500">
-                    {isLoggedIn ? "コレクションがありません。マイページで作成しよう。" : "ログインするとコレクションを表示できます。"}
+                    {isLoggedIn ? "コレクションがありません。マイページで作成しよう。" : "コレクションはありません。"}
                   </p>
                 ) : (
                   collectionsForSection.map((col, i) => (

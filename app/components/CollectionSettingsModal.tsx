@@ -5,9 +5,9 @@ import type { Collection, CollectionVisibility } from "../data/collections";
 import { COLLECTION_GRADIENT_OPTIONS, type CollectionGradient } from "../data/search";
 
 const VISIBILITY_OPTIONS: { value: CollectionVisibility; label: string }[] = [
-  { value: "public", label: "公開：みんな見れる" },
-  { value: "private", label: "非公開：自分だけ" },
-  { value: "member", label: "メンバー限定：リンク知ってる人は見れる" },
+  { value: "public", label: "公開" },
+  { value: "private", label: "非公開" },
+  { value: "member", label: "メンバー限定" },
 ];
 
 export interface CollectionSettingsModalProps {

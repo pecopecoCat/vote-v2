@@ -29,11 +29,12 @@ import { getMergedCounts, type CardActivity } from "../../data/voteCardActivity"
 import { useSharedData } from "../../context/SharedDataContext";
 import type { VoteCardData } from "../../data/voteCards";
 import type { CurrentUser } from "../../components/VoteCard";
+import type { CollectionGradient } from "../../data/search";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
-  public: "公開：みんな見れる",
-  private: "非公開：自分だけ",
-  member: "メンバー限定：リンク知ってる人は見れる",
+  public: "公開",
+  private: "非公開",
+  member: "メンバー限定",
 };
 
 function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
@@ -103,7 +104,51 @@ export default function CollectionPage() {
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
-  const collection = useMemo(() => getCollectionById(id), [id, collections]);
+  const localCollection = useMemo(() => getCollectionById(id), [id, collections]);
+  const [collectionFromApi, setCollectionFromApi] = useState<Collection | null>(null);
+  const [apiFetchFailed, setApiFetchFailed] = useState(false);
+
+  useEffect(() => {
+    if (!id || localCollection) {
+      setCollectionFromApi(null);
+      setApiFetchFailed(false);
+      return;
+    }
+    let cancelled = false;
+    setApiFetchFailed(false);
+    fetch(`/api/collection/${encodeURIComponent(id)}`)
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          setApiFetchFailed(true);
+          return;
+        }
+        return res.json();
+      })
+      .then((data: { id?: string; name?: string; color?: string; gradient?: string; visibility?: string; cardIds?: string[] }) => {
+        if (cancelled || !data?.id) return;
+        const grad = data.gradient as string | undefined;
+        const validGradients: CollectionGradient[] = ["blue-cyan", "pink-purple", "purple-pink", "orange-yellow", "green-yellow", "cyan-aqua"];
+        const gradient = grad && validGradients.includes(grad as CollectionGradient) ? (grad as CollectionGradient) : undefined;
+        setCollectionFromApi({
+          id: data.id,
+          name: String(data.name ?? ""),
+          color: String(data.color ?? "#E5E7EB"),
+          gradient,
+          visibility: (data.visibility as CollectionVisibility) ?? "public",
+          cardIds: Array.isArray(data.cardIds) ? data.cardIds : [],
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setApiFetchFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, localCollection]);
+
+  const collection = localCollection ?? collectionFromApi;
+  const isFromApi = !!collectionFromApi && !localCollection;
   const isPinned = pinnedIds.includes(id);
   const commentedCardIds = useMemo(
     () =>
@@ -134,11 +179,21 @@ export default function CollectionPage() {
   };
 
   if (!collection) {
+    if (!apiFetchFailed && !localCollection && id) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#F1F1F1]">
+          <p className="text-gray-600">読み込み中...</p>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F1F1F1]">
         <div className="px-6 text-center">
           <p className="text-gray-600">コレクションが見つかりませんでした。</p>
-          <Link href="/profile" className="mt-4 inline-block text-blue-600 underline">
+          <Link href="/search" className="mt-4 inline-block text-blue-600 underline">
+            検索へ
+          </Link>
+          <Link href="/profile" className="mt-4 ml-4 inline-block text-blue-600 underline">
             マイページへ
           </Link>
         </div>
@@ -154,7 +209,7 @@ export default function CollectionPage() {
         style={collection.gradient ? undefined : { backgroundColor: collection.color }}
       >
         <Link
-          href={isOtherUsersCollection(id) ? "/search" : "/profile"}
+          href={isFromApi || isOtherUsersCollection(id) ? "/search" : "/profile"}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/90 text-gray-900"
           aria-label="戻る"
         >

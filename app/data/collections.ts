@@ -155,6 +155,32 @@ export function saveCollections(collections: Collection[]): void {
   save(getCurrentActivityUserId(), collections);
 }
 
+/** 公開・メンバー限定コレクションをAPIに同期（リンクで誰でも見れるように） */
+function syncCollectionToApi(col: Collection): void {
+  if (col.visibility === "private") return;
+  const userId = getCurrentActivityUserId();
+  fetch("/api/collection", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId,
+      collection: {
+        id: col.id,
+        name: col.name,
+        color: col.color,
+        gradient: col.gradient,
+        visibility: col.visibility,
+        cardIds: col.cardIds,
+      },
+    }),
+  }).catch(() => {});
+}
+
+/** コレクションをAPIから削除（非公開化・削除時） */
+function deleteCollectionFromApi(id: string): void {
+  fetch(`/api/collection/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+}
+
 /** カードが現在ユーザーのいずれかのコレクションに含まれているか */
 export function isCardInAnyCollection(cardId: string): boolean {
   const cols = load(getCurrentActivityUserId());
@@ -178,6 +204,7 @@ export function addCardToCollection(collectionId: string, cardId: string): void 
   col.cardIds.push(cardId);
   save(userId, cols);
   addBookmark(cardId);
+  if (col.visibility === "public" || col.visibility === "member") syncCollectionToApi(col);
 }
 
 /** カードをコレクションから削除 */
@@ -188,6 +215,7 @@ export function removeCardFromCollection(collectionId: string, cardId: string): 
   if (!col) return;
   col.cardIds = col.cardIds.filter((id) => id !== cardId);
   save(userId, cols);
+  if (col.visibility === "public" || col.visibility === "member") syncCollectionToApi(col);
 }
 
 /** コレクションに含まれるかトグル（追加時はBookmarkにも登録） */
@@ -203,6 +231,7 @@ export function toggleCardInCollection(collectionId: string, cardId: string): vo
     addBookmark(cardId);
   }
   save(userId, cols);
+  if (col.visibility === "public" || col.visibility === "member") syncCollectionToApi(col);
 }
 
 /** 新規コレクション作成（現在ユーザーが作る。名前必須） */
@@ -223,6 +252,7 @@ export function createCollection(
   };
   cols.push(newCol);
   save(userId, cols);
+  if (newCol.visibility === "public" || newCol.visibility === "member") syncCollectionToApi(newCol);
   return newCol;
 }
 
@@ -240,6 +270,8 @@ export function updateCollection(
   if (updates.gradient !== undefined) col.gradient = updates.gradient;
   if (updates.visibility !== undefined) col.visibility = updates.visibility;
   save(userId, cols);
+  if (col.visibility === "public" || col.visibility === "member") syncCollectionToApi(col);
+  else if (updates.visibility === "private") deleteCollectionFromApi(id);
 }
 
 /** コレクションを削除 */
@@ -249,6 +281,7 @@ export function deleteCollection(id: string): void {
   save(userId, cols);
   const pinned = getPinnedCollectionIds().filter((pid) => pid !== id);
   if (pinned.length < getPinnedCollectionIds().length) savePinnedIds(userId, pinned);
+  deleteCollectionFromApi(id);
 }
 
 function loadPinnedIds(userId: string): string[] {
