@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef, Suspense } from "react";
+import { useMemo, useState, useEffect, useRef, Suspense, useDeferredValue } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "./components/AppHeader";
 import VoteCard from "./components/VoteCard";
@@ -68,10 +68,15 @@ function sortByTrending(
   cards: VoteCardData[],
   activity: Record<string, CardActivity>
 ): VoteCardData[] {
+  const pointsMap = new Map<string, number>();
+  for (const c of cards) {
+    const id = c.id ?? c.question;
+    pointsMap.set(id, getTrendingPoints(c, activity));
+  }
   return [...cards].sort((a, b) => {
-    const pointsA = getTrendingPoints(a, activity);
-    const pointsB = getTrendingPoints(b, activity);
-    return pointsB - pointsA;
+    const pa = pointsMap.get(a.id ?? a.question) ?? 0;
+    const pb = pointsMap.get(b.id ?? b.question) ?? 0;
+    return pb - pa;
   });
 }
 
@@ -337,6 +342,7 @@ function HomeContent() {
     () => buildTimelineItems(cardsForTab, timelineCollectionPool),
     [cardsForTab, timelineCollectionPool]
   );
+  const deferredTimelineItems = useDeferredValue(timelineItems);
 
   return (
     <div className="min-h-screen bg-[#F1F1F1]">
@@ -360,7 +366,7 @@ function HomeContent() {
             </div>
           ) : null}
 
-          {timelineItems.map((item, idx) => {
+          {deferredTimelineItems.map((item, idx) => {
             if (item.type === "vote") {
               const card = item.card;
               const cardId = card.id ?? card.question;
@@ -487,8 +493,13 @@ function HomeFallback() {
     <div className="min-h-screen bg-[#F1F1F1]">
       <AppHeader type="logo" />
       <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
-        <div className="flex justify-center py-12">
-          <p className="text-sm text-gray-500">読み込み中...</p>
+        <div className="flex flex-col gap-[60px] animate-pulse">
+          <div className="h-10 w-32 rounded-full bg-gray-200" aria-hidden />
+          <div className="flex flex-col gap-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-[200px] rounded-[18px] bg-gray-200" aria-hidden />
+            ))}
+          </div>
         </div>
       </main>
       <BottomNav activeId="home" />
