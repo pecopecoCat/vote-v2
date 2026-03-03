@@ -162,6 +162,17 @@ export function clearLastLoggedInUserId(): void {
   }
 }
 
+/** ログイン選択画面用：保存済みプロフィールがあれば反映した表示名・アイコンを返す */
+export function getDisplayUserForDemo(userId: DemoUserId): { name: string; iconUrl: string } {
+  const defaultUser = DEMO_USERS[userId];
+  const saved = loadSavedProfile(userId);
+  if (!saved) return defaultUser;
+  return {
+    name: saved.name ?? defaultUser.name,
+    iconUrl: saved.iconUrl ?? defaultUser.iconUrl,
+  };
+}
+
 /** 簡易デモ：user1..user10 のいずれかでログイン（保存済みニックネーム・アイコンがあれば復元） */
 export function loginAsDemoUser(userId: DemoUserId): void {
   const defaultUser = DEMO_USERS[userId];

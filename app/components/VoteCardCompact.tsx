@@ -130,9 +130,9 @@ export default function VoteCardCompact({
           ) : (
             <>
               <div
-                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${onVote ? "cursor-pointer active:opacity-90" : ""}`}
-                onClick={onVote ? () => onVote("A") : undefined}
-                role={onVote ? "button" : undefined}
+                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${onVote && selectedSide == null ? "cursor-pointer active:opacity-90" : ""}`}
+                onClick={onVote && selectedSide == null ? () => onVote("A") : undefined}
+                role={onVote && selectedSide == null ? "button" : undefined}
               >
                 <span className="flex w-[14.25%] min-w-[36px] shrink-0 items-center justify-center rounded-l-lg bg-[#E63E48] py-2 text-sm font-bold text-white">
                   A
@@ -161,9 +161,9 @@ export default function VoteCardCompact({
                 </div>
               </div>
               <div
-                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${onVote ? "cursor-pointer active:opacity-90" : ""}`}
-                onClick={onVote ? () => onVote("B") : undefined}
-                role={onVote ? "button" : undefined}
+                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${onVote && selectedSide == null ? "cursor-pointer active:opacity-90" : ""}`}
+                onClick={onVote && selectedSide == null ? () => onVote("B") : undefined}
+                role={onVote && selectedSide == null ? "button" : undefined}
               >
                 <span className="flex w-[14.25%] min-w-[36px] shrink-0 items-center justify-center rounded-l-lg bg-[#3273E3] py-2 text-sm font-bold text-white">
                   B

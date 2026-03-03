@@ -33,6 +33,7 @@ import {
   PINNED_UPDATED_EVENT,
 } from "../data/collections";
 import { isCardBookmarked } from "../data/bookmarks";
+import { getShowVoted, setShowVoted } from "../data/showVotedPreference";
 import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../data/auth";
 import {
   getHiddenUserIds,
@@ -126,7 +127,11 @@ function SearchContent() {
   const tagFromUrl = searchParams.get("tag") ?? "";
   const [searchValue, setSearchValue] = useState(tagFromUrl);
   const [activeTab, setActiveTab] = useState<"trending" | "favorite">("trending");
-  const [showVoted, setShowVoted] = useState(true);
+  const [showVoted, setShowVotedState] = useState(() => getShowVoted());
+  const handleShowVotedChange = useCallback((value: boolean) => {
+    setShowVoted(value);
+    setShowVotedState(value);
+  }, []);
   const shared = useSharedData();
   const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
@@ -360,7 +365,7 @@ function SearchContent() {
             </div>
             <Checkbox
               checked={showVoted}
-              onChange={setShowVoted}
+              onChange={handleShowVotedChange}
               label="投票済みを表示"
             />
           </div>

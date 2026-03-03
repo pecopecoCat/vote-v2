@@ -4,7 +4,20 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import BottomNav from "../../components/BottomNav";
-import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, DEMO_USERS, DEMO_USER_IDS, type DemoUserId } from "../../data/auth";
+import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, getDisplayUserForDemo, DEMO_USER_IDS, type DemoUserId } from "../../data/auth";
+
+const USER_MEMOS: Record<DemoUserId, string> = {
+  user1: "普通",
+  user2: "ママ",
+  user3: "ドラマ好き",
+  user4: "パパ",
+  user5: "Kpop好き",
+  user6: "猫好き",
+  user7: "アート・クリエイティブ好き",
+  user8: "映画好き",
+  user9: "アイドル好き",
+  user10: "オーガニック女子",
+};
 
 function ProfileLoginContent() {
   const router = useRouter();
@@ -167,6 +180,8 @@ function ProfileLoginContent() {
                 <div className="grid grid-cols-5 gap-2">
                   {DEMO_USER_IDS.map((userId) => {
                     const lastId = getLastLoggedInUserId();
+                    const displayUser = getDisplayUserForDemo(userId);
+                    const memo = USER_MEMOS[userId];
                     // キャッシュクリア後は lastId が無いため「どれが別端末か」判定できない → すべて選択可にしてタップで取りこぼし解除
                     const isLoggedInElsewhere =
                       activeUserIds.includes(userId) &&
@@ -181,16 +196,19 @@ function ProfileLoginContent() {
                         disabled={disabled}
                         className="flex flex-col items-center gap-1 rounded-xl border-2 border-gray-300 bg-white py-3 hover:border-gray-900 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:bg-white touch-manipulation"
                         style={{ touchAction: "manipulation" }}
-                        aria-label={isLoggedInElsewhere ? `${DEMO_USERS[userId].name}は別の端末でログイン中` : `${DEMO_USERS[userId].name}でログイン`}
+                        aria-label={isLoggedInElsewhere ? `${displayUser.name}は別の端末でログイン中` : `${displayUser.name}でログイン`}
                       >
                         <img
-                          src={DEMO_USERS[userId].iconUrl}
+                          src={displayUser.iconUrl}
                           alt=""
                           className="h-10 w-10 rounded-full object-cover"
                           width={40}
                           height={40}
                         />
-                        <span className="text-xs font-bold text-gray-900">{DEMO_USERS[userId].name}</span>
+                        <span className="text-xs font-bold text-gray-900">{displayUser.name}</span>
+                        {memo && (
+                          <span className="text-[12px] text-gray-500">{memo}</span>
+                        )}
                         {isLoggedInElsewhere && (
                           <span className="text-[10px] text-gray-500">ログイン中</span>
                         )}

@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import VoteCard from "../../components/VoteCard";
 import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
@@ -24,6 +24,7 @@ import { getCollectionGradientClass } from "../../data/search";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
 import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../../data/auth";
 import { addHiddenUser } from "../../data/hiddenUsers";
+import { getShowVoted, setShowVoted } from "../../data/showVotedPreference";
 import { getMergedCounts, type CardActivity } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
 import type { VoteCardData } from "../../data/voteCards";
@@ -65,7 +66,11 @@ export default function CollectionPage() {
   const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [collections, setCollections] = useState<Collection[]>([]);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
-  const [showVoted, setShowVoted] = useState(true);
+  const [showVoted, setShowVotedState] = useState(() => getShowVoted());
+  const handleShowVotedChange = useCallback((value: boolean) => {
+    setShowVoted(value);
+    setShowVotedState(value);
+  }, []);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
@@ -120,7 +125,7 @@ export default function CollectionPage() {
 
   const cardsToShow = useMemo(() => {
     if (showVoted) return cardsInCollection;
-    return cardsInCollection.filter(({ cardId }) => activity[cardId]?.userSelectedOption);
+    return cardsInCollection.filter(({ cardId }) => !activity[cardId]?.userSelectedOption);
   }, [cardsInCollection, showVoted, activity]);
 
   const handleTogglePin = () => {
@@ -202,7 +207,7 @@ export default function CollectionPage() {
           </button>
           <Checkbox
             checked={showVoted}
-            onChange={setShowVoted}
+            onChange={handleShowVotedChange}
             label="投票済みを表示"
           />
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { memo } from "react";
 import Link from "next/link";
 
 export type VoteCardPattern =
@@ -86,7 +87,7 @@ function getPeriodEndLabel(periodEnd: string): string {
   return `投票終了まで${days}日`;
 }
 
-export default function VoteCard({
+function VoteCard({
   backgroundImageUrl,
   patternType,
   question,
@@ -117,6 +118,7 @@ export default function VoteCard({
   const useImage = Boolean(backgroundImageUrl);
 
   const [selectedOption, setSelectedOption] = useState<"A" | "B" | null>(initialSelectedOption);
+  const isSelectingRef = useRef(false);
   useEffect(() => {
     setSelectedOption(initialSelectedOption);
   }, [initialSelectedOption]);
@@ -154,13 +156,15 @@ export default function VoteCard({
   }, [selectedOption, percentA, percentB]);
 
   const handleSelectA = () => {
-    if (selectedOption) return;
+    if (isSelectingRef.current || selectedOption) return;
+    isSelectingRef.current = true;
     setSelectedOption("A");
     setLocalCountA((c) => c + 1);
     if (cardId != null && onVote) onVote(cardId, "A");
   };
   const handleSelectB = () => {
-    if (selectedOption) return;
+    if (isSelectingRef.current || selectedOption) return;
+    isSelectingRef.current = true;
     setSelectedOption("B");
     setLocalCountB((c) => c + 1);
     if (cardId != null && onVote) onVote(cardId, "B");
@@ -231,7 +235,7 @@ export default function VoteCard({
                   </span>
                   <div className="vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-xl bg-white py-3.5 pl-4 pr-[20px]">
                     <div
-                      className={`absolute inset-y-0 left-0 overflow-hidden bg-[#fce4ec] transition-[width] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${displayPercentA >= 100 ? "rounded-r-xl" : ""}`}
+                      className={`absolute inset-y-0 left-0 overflow-hidden bg-[#fce4ec] transition-[width] duration-300 ease-out ${displayPercentA >= 100 ? "rounded-r-xl" : ""}`}
                       style={{ width: `${displayPercentA}%` }}
                     />
                     <span className="relative z-10 min-w-0 truncate font-semibold text-[#CF0606]">
@@ -256,7 +260,7 @@ export default function VoteCard({
                   </span>
                   <div className="vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-xl bg-white py-3.5 pl-4 pr-[20px]">
                     <div
-                      className={`absolute inset-y-0 left-0 overflow-hidden bg-[#e3f2fd] transition-[width] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${displayPercentB >= 100 ? "rounded-r-xl" : ""}`}
+                      className={`absolute inset-y-0 left-0 overflow-hidden bg-[#e3f2fd] transition-[width] duration-300 ease-out ${displayPercentB >= 100 ? "rounded-r-xl" : ""}`}
                       style={{ width: `${displayPercentB}%` }}
                     />
                     <span className="relative z-10 min-w-0 truncate font-semibold text-[#1F77D4]">
@@ -438,6 +442,8 @@ export default function VoteCard({
     </article>
   );
 }
+
+export default memo(VoteCard);
 
 /** 丸マスク・白縁・ドロップシャドウ。非ログインは共通アイコン、SNSログイン時は iconUrl を表示 */
 const DEFAULT_AVATAR_URL = "/default-avatar.png";
