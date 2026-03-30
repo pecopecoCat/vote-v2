@@ -25,7 +25,11 @@ import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
 import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../../data/auth";
 import { addHiddenUser } from "../../data/hiddenUsers";
 import { getShowVoted, setShowVoted } from "../../data/showVotedPreference";
-import { getMergedCounts, type CardActivity } from "../../data/voteCardActivity";
+import {
+  getMergedCounts,
+  isCommentAuthoredByCurrentUser,
+  type CardActivity,
+} from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
 import type { VoteCardData } from "../../data/voteCards";
 import type { CurrentUser } from "../../components/VoteCard";
@@ -152,10 +156,17 @@ export default function CollectionPage() {
   const isPinned = pinnedIds.includes(id);
   const commentedCardIds = useMemo(
     () =>
-      Object.entries(activity).filter(([, a]) =>
-        (a.comments ?? []).some((c) => c.user?.name === "自分")
-      ).map(([cid]) => cid),
-    [activity]
+      Object.entries(activity)
+        .filter(([, a]) =>
+          (a.comments ?? []).some((c) =>
+            isCommentAuthoredByCurrentUser(c.user?.name, {
+              isLoggedIn: auth.isLoggedIn,
+              displayName: auth.user?.name,
+            })
+          )
+        )
+        .map(([cid]) => cid),
+    [activity, auth.isLoggedIn, auth.user?.name]
   );
 
   const cardsInCollection = useMemo(() => {
@@ -277,7 +288,7 @@ export default function CollectionPage() {
             </p>
           </div>
         ) : (
-          <div className="mt-4 flex flex-col gap-4">
+          <div className="mt-4 flex flex-col gap-[5.333vw]">
             {cardsToShow.map(({ card, cardId }) => {
               const act = activity[cardId];
               const merged = getMergedCounts(

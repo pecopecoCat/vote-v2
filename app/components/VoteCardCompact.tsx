@@ -1,6 +1,8 @@
 "use client";
 
 import type { VoteCardPattern } from "./VoteCard";
+import { removeBookmarkFully } from "../data/bookmarkRemove";
+import { showAppToast } from "../lib/appToast";
 
 const patternClasses: Record<VoteCardPattern, string> = {
   "geometric-stripes": "vote-pattern-geometric",
@@ -214,8 +216,16 @@ export default function VoteCardCompact({
         <button
           type="button"
           className="flex items-center justify-center text-gray-400"
-          aria-label="ブックマーク"
-          onClick={() => cardId != null && onBookmarkClick?.(cardId)}
+          aria-label={bookmarked ? "ブックマークを外す" : "ブックマーク"}
+          onClick={() => {
+            if (cardId == null) return;
+            if (bookmarked) {
+              removeBookmarkFully(cardId);
+              showAppToast("bookmarkを解除しました");
+              return;
+            }
+            onBookmarkClick?.(cardId);
+          }}
         >
           {bookmarked ? (
             <span className="bookmark-icon-bookmarked h-[18px] w-[15px]" aria-hidden />

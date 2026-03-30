@@ -16,7 +16,7 @@ import BottomNav from "../components/BottomNav";
 import type { CurrentUser } from "../components/VoteCard";
 import type { VoteCardData } from "../data/voteCards";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
-import { getMergedCounts, type CardActivity } from "../data/voteCardActivity";
+import { getMergedCounts, isCommentAuthoredByCurrentUser, type CardActivity } from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
 import {
   getFavoriteTags,
@@ -275,10 +275,17 @@ function SearchContent() {
 
   const commentedCardIds = useMemo(
     () =>
-      Object.entries(activity).filter(([, a]) =>
-        (a.comments ?? []).some((c) => c.user?.name === "自分")
-      ).map(([cid]) => cid),
-    [activity]
+      Object.entries(activity)
+        .filter(([, a]) =>
+          (a.comments ?? []).some((c) =>
+            isCommentAuthoredByCurrentUser(c.user?.name, {
+              isLoggedIn: auth.isLoggedIn,
+              displayName: auth.user?.name,
+            })
+          )
+        )
+        .map(([cid]) => cid),
+    [activity, auth.isLoggedIn, auth.user?.name]
   );
 
   /** 検索結果タイムライン用：実際にあるコレクションから1件ランダム */
@@ -370,7 +377,7 @@ function SearchContent() {
             />
           </div>
           <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-6">
-            <div className="flex flex-col gap-9">
+            <div className="flex flex-col gap-[5.333vw]">
               {cardsToShow.length === 0 ? (
                 <div className="rounded-[2rem] bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
                   <p className="text-sm text-gray-600">

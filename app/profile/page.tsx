@@ -7,7 +7,12 @@ import BottomNav from "../components/BottomNav";
 import VoteCard from "../components/VoteCard";
 import { getCreatedVotes, deleteCreatedVote, getCreatedVotesUpdatedEventName } from "../data/createdVotes";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
-import { getMergedCounts, type CardActivity, type VoteComment } from "../data/voteCardActivity";
+import {
+  getMergedCounts,
+  isCommentAuthoredByCurrentUser,
+  type CardActivity,
+  type VoteComment,
+} from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
 import { getCurrentActivityUserId } from "../data/auth";
 import { getFavoriteTags, getFavoriteTagsUpdatedEventName, removeFavoriteTag } from "../data/favoriteTags";
@@ -57,8 +62,6 @@ const MOCK_USER = {
 };
 
 type ProfileTabId = "myVOTE" | "vote" | "bookmark" | "comment";
-
-const MY_COMMENT_USER_NAME = "自分";
 
 function formatCommentDate(iso: string): string {
   try {
@@ -228,9 +231,6 @@ function ProfileContent() {
   const currentUser: CurrentUser = auth.isLoggedIn
     ? { type: "sns", name: profileUser.name, iconUrl: profileUser.iconUrl }
     : { type: "guest" };
-  /** 自分のコメント判定用：ログイン時は表示名、未ログイン時は「自分」 */
-  const myCommentUserName = auth.isLoggedIn ? (auth.user?.name ?? "") : MY_COMMENT_USER_NAME;
-
   const userId = typeof window !== "undefined" ? getCurrentActivityUserId() : "";
   /** myVOTEタブ用：API利用時はContextから、それ以外はlocalStorageから「自分が作ったVOTE」を表示 */
   const createdVotesRaw = useMemo(() => {
@@ -292,24 +292,32 @@ function ProfileContent() {
 
   const commentedCardIds = useMemo(
     () =>
-      Object.entries(activity).filter(([, a]) =>
-        (a.comments ?? []).some((c) => c.user?.name === myCommentUserName)
-      ).map(([cid]) => cid),
-    [activity, myCommentUserName]
+      Object.entries(activity)
+        .filter(([, a]) =>
+          (a.comments ?? []).some((c) =>
+            isCommentAuthoredByCurrentUser(c.user?.name, {
+              isLoggedIn: auth.isLoggedIn,
+              displayName: auth.user?.name,
+            })
+          )
+        )
+        .map(([cid]) => cid),
+    [activity, auth.isLoggedIn, auth.user?.name]
   );
 
   /** コメントタブ用：自分のコメントの最新日時でカードを最新順に並べる */
   const commentedCardIdsNewestFirst = useMemo(() => {
+    const opts = { isLoggedIn: auth.isLoggedIn, displayName: auth.user?.name };
     return [...commentedCardIds].sort((cardIdA, cardIdB) => {
       const actA = activity[cardIdA] ?? { comments: [] };
       const actB = activity[cardIdB] ?? { comments: [] };
-      const myA = (actA.comments ?? []).filter((c) => c.user?.name === myCommentUserName);
-      const myB = (actB.comments ?? []).filter((c) => c.user?.name === myCommentUserName);
+      const myA = (actA.comments ?? []).filter((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts));
+      const myB = (actB.comments ?? []).filter((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts));
       const latestA = myA.length ? Math.max(...myA.map((c) => new Date(c.date ?? 0).getTime())) : 0;
       const latestB = myB.length ? Math.max(...myB.map((c) => new Date(c.date ?? 0).getTime())) : 0;
       return latestB - latestA;
     });
-  }, [commentedCardIds, activity, myCommentUserName]);
+  }, [commentedCardIds, activity, auth.isLoggedIn, auth.user?.name]);
 
   const tabLabels: { id: ProfileTabId; label: string }[] = [
     { id: "myVOTE", label: "myVOTE" },
@@ -594,7 +602,7 @@ function ProfileContent() {
                 <p className="text-sm text-gray-500">作ったVOTEがまだありません。</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-[5.333vw]">
                 {createdVotes.map((card) => {
                   const cardId = card.id ?? card.question;
                   const act = activity[cardId];
@@ -723,7 +731,7 @@ function ProfileContent() {
                 <p className="text-sm text-gray-500">投票したVOTEがここに表示されます。</p>
               </div>
             ) : (
-              <div className="mt-4 flex flex-col gap-4">
+              <div className="mt-4 flex flex-col gap-[5.333vw]">
                 {votedCards.map((card) => {
                   const cardId = card.id ?? card.question;
                   const act = activity[cardId];
@@ -861,7 +869,7 @@ function ProfileContent() {
                     );
                   }
                   return (
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-[5.333vw]">
                       {cardsToShow.map((card) => {
                         const cardId = card.id ?? card.question;
                         const act = activity[cardId];
@@ -929,7 +937,12 @@ function ProfileContent() {
                     card.commentCount ?? 0,
                     act
                   );
-                  const myComments = (act.comments ?? []).filter((c) => c.user?.name === myCommentUserName);
+                  const myComments = (act.comments ?? []).filter((c) =>
+                    isCommentAuthoredByCurrentUser(c.user?.name, {
+                      isLoggedIn: auth.isLoggedIn,
+                      displayName: auth.user?.name,
+                    })
+                  );
                   return (
                     <Link key={cardId} href={`/comments/${cardId}`} className="block py-4 first:pt-0">
                       <div className="rounded-2xl bg-white shadow-sm">

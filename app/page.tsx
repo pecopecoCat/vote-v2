@@ -18,6 +18,7 @@ import type { VoteCardData } from "./data/voteCards";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "./data/voteCards";
 import {
   getMergedCounts,
+  isCommentAuthoredByCurrentUser,
   resetAllVoteCounts,
   type CardActivity,
 } from "./data/voteCardActivity";
@@ -241,10 +242,17 @@ function HomeContent() {
 
   const commentedCardIds = useMemo(
     () =>
-      Object.entries(activity).filter(([, a]) =>
-        (a.comments ?? []).some((c) => c.user?.name === "自分")
-      ).map(([id]) => id),
-    [activity]
+      Object.entries(activity)
+        .filter(([, a]) =>
+          (a.comments ?? []).some((c) =>
+            isCommentAuthoredByCurrentUser(c.user?.name, {
+              isLoggedIn: auth.isLoggedIn,
+              displayName: auth.user?.name,
+            })
+          )
+        )
+        .map(([id]) => id),
+    [activity, auth.isLoggedIn, auth.user?.name]
   );
 
   const allCards = useMemo(() => {
@@ -357,7 +365,7 @@ function HomeContent() {
 
       {/* メインコンテンツ（下ナビ分の余白を確保） */}
       <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
-        <div className="flex flex-col gap-[60px]">
+        <div className="flex flex-col gap-[5.333vw]">
           {activeTab === "myTimeline" && cardsForTab.length === 0 ? (
             <div className="rounded-[2rem] bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
               <p className="text-sm text-gray-600">
@@ -499,7 +507,7 @@ function HomeFallback() {
     <div className="min-h-screen bg-[#F1F1F1]">
       <AppHeader type="logo" />
       <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
-        <div className="flex flex-col gap-[60px] animate-pulse">
+        <div className="flex flex-col gap-[5.333vw] animate-pulse">
           <div className="h-10 w-32 rounded-full bg-gray-200" aria-hidden />
           <div className="flex flex-col gap-6">
             {[1, 2, 3].map((i) => (

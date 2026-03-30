@@ -8,7 +8,8 @@ export interface RecommendedTagsProps {
 
 export default function RecommendedTags({ tags }: RecommendedTagsProps) {
   return (
-    <section className="w-full py-4">
+    <section className="w-full my-[5.333vw] py-6">
+      <div className="mb-[5.333vw] border-b border-gray-300" aria-hidden />
       <h2 className="mb-3 text-base font-semibold text-gray-900">
         おすすめタグ
       </h2>
@@ -23,7 +24,7 @@ export default function RecommendedTags({ tags }: RecommendedTagsProps) {
           </Link>
         ))}
       </div>
-      <div className="mt-4 border-b border-gray-300" aria-hidden />
+      <div className="mt-[5.333vw] border-b border-gray-300" aria-hidden />
     </section>
   );
 }

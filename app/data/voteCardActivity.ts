@@ -6,7 +6,7 @@
  * - 現在ユーザーの投票選択 → vote_card_activity_${userId}（ログイン/ゲスト別）
  */
 
-import { getCurrentActivityUserId } from "./auth";
+import { getAuth, getCurrentActivityUserId } from "./auth";
 
 /** コメント1件：コメントしたユーザー・日付・テキスト・いいね数・返信先 */
 export interface VoteComment {
@@ -280,15 +280,35 @@ export function addCommentLike(
   }
 }
 
-/** 自分がコメントしたカードID一覧（総数側のコメントで user.name が「自分」のもの） */
+/** 未ログイン時のコメント表示名（CommentInput 既定） */
 const MY_COMMENT_USER_NAME = "自分";
 
+/**
+ * コメントが現在ユーザー本人のものか。
+ * ログイン時は表示名（例: user2）で保存されるため、ゲスト時の「自分」と併用する。
+ */
+export function isCommentAuthoredByCurrentUser(
+  commentUserName: string | undefined,
+  opts: { isLoggedIn: boolean; displayName?: string | null }
+): boolean {
+  if (opts.isLoggedIn && typeof opts.displayName === "string" && opts.displayName.length > 0) {
+    return commentUserName === opts.displayName;
+  }
+  return commentUserName === MY_COMMENT_USER_NAME;
+}
+
 export function getCardIdsUserCommentedOn(): string[] {
+  const auth = getAuth();
   const global = loadGlobal();
   const ids: string[] = [];
   for (const [cardId, a] of Object.entries(global)) {
     if (!Array.isArray(a.comments)) continue;
-    const hasMine = a.comments.some((c) => c.user?.name === MY_COMMENT_USER_NAME);
+    const hasMine = a.comments.some((c) =>
+      isCommentAuthoredByCurrentUser(c.user?.name, {
+        isLoggedIn: auth.isLoggedIn,
+        displayName: auth.user?.name,
+      })
+    );
     if (hasMine) ids.push(cardId);
   }
   return ids;

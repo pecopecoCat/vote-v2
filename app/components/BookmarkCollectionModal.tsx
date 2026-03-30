@@ -9,12 +9,9 @@ import {
   getCollectionsUpdatedEventName,
   type Collection,
 } from "../data/collections";
-import {
-  addBookmark,
-  removeBookmark,
-  isCardBookmarked,
-  getBookmarksUpdatedEventName,
-} from "../data/bookmarks";
+import { addBookmark, isCardBookmarked, getBookmarksUpdatedEventName } from "../data/bookmarks";
+import { removeBookmarkFully } from "../data/bookmarkRemove";
+import { showAppToast } from "../lib/appToast";
 import { getCollectionGradientStyle, type CollectionGradient } from "../data/search";
 import { useSharedData } from "../context/SharedDataContext";
 import { useEffect, useState } from "react";
@@ -135,12 +132,10 @@ export default function BookmarkCollectionModal({
   /** Bookmarkから外す（全コレクションからも削除） */
   const handleRemoveFromBookmark = () => {
     if (!cardId) return;
-    collections.forEach((col) => {
-      if (col.cardIds.includes(cardId)) removeCardFromCollection(col.id, cardId);
-    });
-    removeBookmark(cardId);
+    removeBookmarkFully(cardId);
     setCollections(getCollections());
     onCollectionsUpdated?.();
+    showAppToast("bookmarkを解除しました");
     onClose();
   };
 

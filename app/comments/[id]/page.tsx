@@ -26,6 +26,7 @@ import {
   getMergedCounts,
   addCommentLike,
   getCommentIdsLikedByCurrentUser,
+  isCommentAuthoredByCurrentUser,
   COMMENT_LIKES_BY_ME_UPDATED_EVENT,
   type VoteComment,
 } from "../../data/voteCardActivity";
@@ -163,9 +164,16 @@ export default function CommentsPage() {
   const commentedCardIds = useMemo(
     () =>
       Object.entries(sharedActivity)
-        .filter(([, a]) => (a.comments ?? []).some((c) => c.user?.name === "自分"))
+        .filter(([, a]) =>
+          (a.comments ?? []).some((c) =>
+            isCommentAuthoredByCurrentUser(c.user?.name, {
+              isLoggedIn,
+              displayName: auth.user?.name,
+            })
+          )
+        )
         .map(([cid]) => cid),
-    [sharedActivity]
+    [sharedActivity, isLoggedIn, auth.user?.name]
   );
 
   const backgroundUrl = card ? backgroundForCard(card, id) : CARD_BACKGROUND_IMAGES[0];
@@ -381,7 +389,7 @@ export default function CommentsPage() {
         {bottomCards.length > 0 && (
           <section className="-mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6">
             <h2 className="mb-3 text-base font-bold text-gray-900">{bottomSectionTitle}</h2>
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-[5.333vw]">
               {bottomCards.map((related) => {
                 const relatedId = related.id ?? related.question;
                 const relActivity = sharedActivity[relatedId] ?? emptyActivity;

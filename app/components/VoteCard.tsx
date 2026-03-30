@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { memo } from "react";
 import Link from "next/link";
+import { removeBookmarkFully } from "../data/bookmarkRemove";
+import { showAppToast } from "../lib/appToast";
 
 export type VoteCardPattern =
   | "geometric-stripes"
@@ -319,13 +321,20 @@ function VoteCard({
           className="flex items-center justify-center text-gray-400 hover:text-gray-600"
           aria-label={isBookmarked ? "ブックマークを外す" : "ブックマーク"}
           onClick={() => {
-            if (cardId != null && onBookmarkClick) {
+            if (cardId == null) return;
+            if (isBookmarked) {
+              removeBookmarkFully(cardId);
+              setIsBookmarked(false);
+              showAppToast("bookmarkを解除しました");
+              return;
+            }
+            if (onBookmarkClick) {
               onBookmarkClick(cardId);
               return;
             }
             const next = !isBookmarked;
             setIsBookmarked(next);
-            if (cardId != null && onBookmarkToggle) onBookmarkToggle(cardId, next);
+            if (onBookmarkToggle) onBookmarkToggle(cardId, next);
           }}
         >
           {isBookmarked ? (
