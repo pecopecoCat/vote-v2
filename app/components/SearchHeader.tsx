@@ -42,11 +42,17 @@ export default function SearchHeader({
         {value.length > 0 && (
           <button
             type="button"
-            className="shrink-0 text-gray-400 hover:text-gray-600"
+            className="shrink-0 opacity-90 hover:opacity-100"
             aria-label="クリア"
             onClick={() => onChange?.("")}
           >
-            <ClearIcon className="h-5 w-5" />
+            <img
+              src="/icons/icon_close.svg"
+              alt=""
+              className="icon-close-responsive"
+              width={14}
+              height={14}
+            />
           </button>
         )}
       </div>
@@ -75,10 +81,3 @@ function MagnifyIcon({ className }: { className?: string }) {
   );
 }
 
-function ClearIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" />
-    </svg>
-  );
-}

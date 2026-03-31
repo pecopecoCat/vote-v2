@@ -19,14 +19,13 @@ export interface ReportViolationModalProps {
 
 export default function ReportViolationModal({
   onClose,
-  cardId,
+  cardId: _cardId,
 }: ReportViolationModalProps) {
   const [selectedReason, setSelectedReason] = useState<string>("");
 
   const handleSubmit = () => {
-    // 未実装：ここでメール送信など。今は no-op でOK
     if (selectedReason) {
-      // console.log("違反報告", { cardId, reason: selectedReason });
+      // 未実装：ここでメール送信など
     }
     onClose();
   };
@@ -34,46 +33,63 @@ export default function ReportViolationModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/50"
+        className="fixed inset-0 z-[60] bg-black/50"
         aria-hidden
         onClick={onClose}
       />
-      <div className="fixed left-1/2 top-1/2 z-50 w-[90%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-lg">
-        <h2 className="text-lg font-bold text-gray-900">違反報告</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          この意見またはコメントが不適切または攻撃的である理由を選択ください。
+      <div
+        className="report-violation-modal fixed left-1/2 top-1/2 z-[70] w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-white px-5 pt-8 pb-7 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="report-violation-title"
+      >
+        <h2
+          id="report-violation-title"
+          className="text-lg font-bold leading-snug text-[#191919]"
+        >
+          違反報告
+        </h2>
+        <p className="mt-3 text-sm font-normal leading-relaxed text-[#333333]">
+          この意見またはコメントが不適切または攻撃的である理由を選択してください。
         </p>
-        <ul className="mt-4 space-y-2">
+
+        <ul className="mt-5 space-y-4">
           {REPORT_REASONS.map((reason) => (
             <li key={reason}>
-              <label className="flex cursor-pointer items-center gap-2">
+              <label className="flex cursor-pointer items-start gap-3">
                 <input
                   type="radio"
                   name="reportReason"
                   value={reason}
                   checked={selectedReason === reason}
                   onChange={() => setSelectedReason(reason)}
-                  className="h-4 w-4 border-gray-300 text-blue-600"
+                  className="report-violation-radio"
                 />
-                <span className="text-sm text-gray-900">{reason}</span>
+                <span className="min-w-0 flex-1 pt-0.5 text-sm font-normal leading-snug text-[#191919]">
+                  {reason}
+                </span>
               </label>
             </li>
           ))}
         </ul>
-        <div className="mt-6 flex flex-col gap-2">
+
+        <div className="mt-10 flex flex-col items-stretch">
           <button
             type="button"
             onClick={handleSubmit}
-            className="w-full rounded-lg bg-gray-900 py-3 text-sm font-medium text-white"
+            className="w-full rounded-xl bg-black py-3.5 text-center text-sm font-bold text-white transition-opacity hover:opacity-90 active:opacity-90"
           >
             違反報告
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="flex items-center justify-center gap-1 text-sm text-blue-600"
+            className="mt-5 flex items-center justify-center gap-1 text-sm font-normal text-[#0779F1] hover:underline"
           >
-            <span aria-hidden>×</span> 閉じる
+            <span className="text-base leading-none" aria-hidden>
+              ✕
+            </span>
+            閉じる
           </button>
         </div>
       </div>

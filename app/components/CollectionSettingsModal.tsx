@@ -49,13 +49,17 @@ export default function CollectionSettingsModal({ onClose, onSave, editingCollec
           <h2 className="text-lg font-bold text-gray-900">コレクションの設定</h2>
           <button
             type="button"
-            className="flex h-10 w-10 items-center justify-center text-blue-600"
+            className="flex h-10 w-10 items-center justify-center"
             aria-label="閉じる"
             onClick={onClose}
           >
-            <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-            </svg>
+            <img
+              src="/icons/icon_close.svg"
+              alt=""
+              className="icon-close-responsive"
+              width={14}
+              height={14}
+            />
           </button>
         </div>
 

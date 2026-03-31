@@ -191,7 +191,7 @@ function HomeContent() {
   }, [tabFromUrl]);
   const [collections, setCollections] = useState(() => getCollections());
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
+  const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
@@ -289,11 +289,20 @@ function HomeContent() {
     [collections, bookmarkRefreshKey, auth]
   );
 
-  /** ページ表示時点で投票済みのID。初回マウント時のみ activity からセットし、投票直後は更新しない */
+  /**
+   * 急上昇・新着用「この画面を開いた時点の投票済み」セット。
+   * 投票直後は activity は変わるがここは更新しないのでカードはそのまま。
+   * ブラウザのタブを切り替えて戻ったとき（visibility）に activity から再同期。
+   *
+   * 初回だけ SharedData の bootstrap 完了後にスナップショットする（ハイドレーション直後の
+   * 空 activity でロックしてしまう不具合の防止）。
+   */
   const [votedIdsAtLoad, setVotedIdsAtLoad] = useState<Set<string>>(() => new Set());
   const votedIdsInitializedRef = useRef(false);
   useEffect(() => {
     if (votedIdsInitializedRef.current) return;
+    if (!activityBootstrapDone) return;
+
     const ids = new Set(
       Object.entries(activity)
         .filter(([, a]) => a?.userSelectedOption)
@@ -301,9 +310,8 @@ function HomeContent() {
     );
     setVotedIdsAtLoad(ids);
     votedIdsInitializedRef.current = true;
-  }, [activity]);
+  }, [activity, activityBootstrapDone]);
 
-  /** 別タブに移動して戻ってきたときに最新の投票済み状態を反映 */
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState !== "visible") return;
@@ -318,9 +326,9 @@ function HomeContent() {
     return () => document.removeEventListener("visibilitychange", handler);
   }, [activity]);
 
-  /** 急上昇中・新着では投票済みカードを除外（表示時点の投票済みのみ。投票後はそのまま表示し、離脱して戻ったときに最新状態で反映） */
+  /** 急上昇中・新着では投票済みを除外（同期タイミングは上記コメント参照） */
   const cardsForFeed = useMemo(
-    () => publicCards.filter((c) => !votedIdsAtLoad.has(c.id ?? "")),
+    () => publicCards.filter((c) => !votedIdsAtLoad.has(c.id ?? c.question)),
     [publicCards, votedIdsAtLoad]
   );
 

@@ -177,13 +177,13 @@ function VoteCard({
   return (
     <article className="relative w-full overflow-visible rounded-[18px] bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
       {visibility === "private" && (
-        <span className="absolute right-3 top-3 z-10 rounded-full bg-gray-800/80 px-2.5 py-1 text-xs font-medium text-white">
+        <span className="absolute right-5 top-5 z-10 rounded-full bg-gray-800/80 px-2.5 py-1 text-xs font-medium text-white">
           非公開
         </span>
       )}
-      {/* 背景付きエリア（白エリア左右padding 80%=4.27vw） */}
+      {/* 背景付きエリア（カード左右内側 20px） */}
       <div
-        className={`relative min-h-[100px] rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat px-[4.27vw] pb-[5.333vw] pt-[13.333vw] ${!useImage ? patternClass : ""}`}
+        className={`relative min-h-[100px] rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat px-5 pb-[5.333vw] pt-[13.333vw] ${!useImage ? patternClass : ""}`}
         style={
           useImage
             ? { backgroundImage: `url(${backgroundImageUrl})` }
@@ -287,10 +287,10 @@ function VoteCard({
 
       {/* フッター（タグあり時は下0.36em、タグなし時は下2倍の0.72em） */}
       <div
-        className={`flex items-center gap-4 border-t border-gray-100 px-[4.27vw] pt-[2.73vw] ${tags.length > 0 ? "pb-[0.36em]" : "pb-[0.72em]"}`}
+        className={`flex items-center gap-4 border-t border-gray-100 px-5 pt-[2.73vw] ${tags.length > 0 ? "pb-[0.36em]" : "pb-[0.72em]"}`}
       >
         <span className="flex items-center gap-1" aria-label="2択回答数">
-          <img src="/icons/votemark.svg" alt="" className="h-4 w-4 scale-110" />
+          <img src="/icons/votemark.svg" alt="" className="vote-card-footer-icon-square" />
           <span className="vote-card-footer-count">{displayTotal}</span>
         </span>
         {cardId != null ? (
@@ -300,18 +300,18 @@ function VoteCard({
             aria-label={`コメント ${commentCount}件、コメントページへ`}
           >
             {hasCommented ? (
-              <span className="comment-icon-commented h-4 w-4 scale-110" aria-hidden />
+              <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
             ) : (
-              <img src="/icons/comment.svg" alt="" className="h-4 w-4 scale-110" />
+              <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
             )}
             <span className="vote-card-footer-count">{commentCount}</span>
           </Link>
         ) : (
           <span className="flex items-center gap-1" aria-label="コメント数">
             {hasCommented ? (
-              <span className="comment-icon-commented h-4 w-4 scale-110" aria-hidden />
+              <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
             ) : (
-              <img src="/icons/comment.svg" alt="" className="h-4 w-4 scale-110" />
+              <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
             )}
             <span className="vote-card-footer-count">{commentCount}</span>
           </span>
@@ -338,12 +338,12 @@ function VoteCard({
           }}
         >
           {isBookmarked ? (
-            <span className="bookmark-icon-bookmarked h-[18px] w-[15px]" aria-hidden />
+            <span className="bookmark-icon-bookmarked vote-card-footer-icon-bookmark" aria-hidden />
           ) : (
             <img
               src="/icons/bookmark.svg"
               alt=""
-              className="h-[18px] w-[15px] opacity-40"
+              className="vote-card-footer-icon-bookmark opacity-40"
             />
           )}
         </button>
@@ -362,7 +362,7 @@ function VoteCard({
 
       {/* A/B画像（指定時のみ：フッター下・タグ上に2枚並び・角にA/Bバッジ） */}
       {(optionAImageUrl != null || optionBImageUrl != null) && (
-        <div className="flex gap-2 px-[4.27vw] pt-3">
+        <div className="flex gap-2 px-5 pt-3">
           {optionAImageUrl != null && (
             <div className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -398,10 +398,10 @@ function VoteCard({
         </div>
       )}
 
-      {/* タグ（画像がある場合は上に10px間隔。タグブロックの下0.78em＝0.6em×1.3） */}
+      {/* タグ（アイコン行〜タグ上 10px@375 を相対指定。タグブロックの下0.78em＝0.6em×1.3） */}
       {tags.length > 0 && (
         <div
-          className={`flex flex-wrap gap-2 px-[4.27vw] ${(optionAImageUrl != null || optionBImageUrl != null) ? "pt-[10px]" : ""} ${!readMoreText && !periodEnd ? "pb-[0.78em]" : ""}`}
+          className={`vote-card-tags-margin-top flex flex-wrap gap-2 px-5 ${!readMoreText && !periodEnd ? "pb-[0.78em]" : ""}`}
         >
           {tags.map((tag) => (
             <Link
@@ -418,7 +418,7 @@ function VoteCard({
       {/* 投票期間（タグの下・薄いグレー15px。「追加したいコレクションを選択」と同じ色 #8A8A8A） */}
       {periodEnd && getPeriodEndLabel(periodEnd) && (
         <div
-          className={`px-[4.27vw] ${tags.length > 0 ? "pt-1" : "pt-2"} pb-[0.78em] text-[15px]`}
+          className={`px-5 ${tags.length > 0 ? "pt-1" : "pt-2"} pb-[0.78em] text-[15px]`}
           style={{ color: "#8A8A8A" }}
         >
           {getPeriodEndLabel(periodEnd)}
@@ -427,14 +427,14 @@ function VoteCard({
 
       {/* 続きを読む（テキスト下・続きを読む上下のマージンは15px） */}
       {readMoreText && (
-        <div className="px-[4.27vw] pt-[0.8em]">
+        <div className="px-5 pt-[0.8em]">
           <p
             className={`text-[14px] text-gray-600 ${!readMoreExpanded ? "line-clamp-2" : ""}`}
           >
             {readMoreExpanded ? readMoreText : readMoreText}
           </p>
-          <div className="mt-[15px] border-t border-[#E5E7EB] pt-[15px] pb-[15px] -mx-[4.27vw]">
-            <div className="px-[4.27vw] text-center">
+          <div className="mt-[15px] border-t border-[#E5E7EB] pt-[15px] pb-[15px] -mx-5">
+            <div className="px-5 text-center">
               <button
                 type="button"
                 className="text-[14px] font-medium text-gray-600 hover:underline"

@@ -88,7 +88,7 @@ export default function VoteCardCompact({
   return (
     <article className="w-full overflow-hidden rounded-[18px] bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
       <div
-        className={`relative min-h-[72px] rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat pb-3 pt-5 ${isMini ? "px-[5.333vw]" : "pl-3 pr-10"} ${!useImage ? patternClass : ""}`}
+        className={`relative min-h-[72px] rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat px-5 pb-3 pt-5 ${!useImage ? patternClass : ""}`}
         style={
           useImage ? { backgroundImage: `url(${backgroundImageUrl})` } : undefined
         }
@@ -199,17 +199,17 @@ export default function VoteCardCompact({
       </div>
 
       <div
-        className={`flex items-center gap-4 border-t border-gray-100 ${isMini ? "px-[5.333vw] pt-2 pb-[14.4px]" : "px-[5.333vw] py-2"}`}
+        className={`flex items-center gap-4 border-t border-gray-100 px-5 ${isMini ? "pt-2 pb-[14.4px]" : "py-2"}`}
       >
         <span className="flex items-center gap-1" aria-label="2択回答数">
-          <img src="/icons/votemark.svg" alt="" className="h-4 w-4 scale-110" />
+          <img src="/icons/votemark.svg" alt="" className="vote-card-footer-icon-square" />
           <span className="vote-card-footer-count">{displayTotal}</span>
         </span>
         <span className="flex items-center gap-1" aria-label="コメント数">
           {hasCommented ? (
-            <span className="comment-icon-commented h-4 w-4 scale-110" aria-hidden />
+            <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
           ) : (
-            <img src="/icons/comment.svg" alt="" className="h-4 w-4 scale-110" />
+            <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
           )}
           <span className="vote-card-footer-count">{commentCount}</span>
         </span>
@@ -228,9 +228,9 @@ export default function VoteCardCompact({
           }}
         >
           {bookmarked ? (
-            <span className="bookmark-icon-bookmarked h-[18px] w-[15px]" aria-hidden />
+            <span className="bookmark-icon-bookmarked vote-card-footer-icon-bookmark" aria-hidden />
           ) : (
-            <img src="/icons/bookmark.svg" alt="" className="h-[18px] w-[15px] opacity-40" />
+            <img src="/icons/bookmark.svg" alt="" className="vote-card-footer-icon-bookmark opacity-40" />
           )}
         </button>
         <button
@@ -244,7 +244,7 @@ export default function VoteCardCompact({
       </div>
 
       {!hideTags && tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-3 pb-2">
+        <div className="vote-card-tags-margin-top flex flex-wrap gap-1.5 px-5 pb-2">
           {tags.map((tag) => (
             <span
               key={tag}
@@ -258,7 +258,7 @@ export default function VoteCardCompact({
 
       {periodEnd && getPeriodEndLabel(periodEnd) && (
         <div
-          className="px-3 pb-2 text-[15px]"
+          className="px-5 pb-2 text-[15px]"
           style={{ color: "#8A8A8A" }}
         >
           {getPeriodEndLabel(periodEnd)}

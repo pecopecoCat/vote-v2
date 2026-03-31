@@ -34,7 +34,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  /* 欧文・数字 Lato → 日本語は Noto（--font-body-stack と同等の意図） */
+  --font-sans: var(--font-lato), var(--font-noto-sans-jp), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
@@ -48,7 +49,9 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* 欧文・数字は Lato、日本語は Noto（グリフが無い文字は次のフォントへ） */
+  font-family: var(--font-lato), var(--font-noto-sans-jp), "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Yu Gothic UI", YuGothic, Meiryo, sans-serif;
 }
 
 /* 下部ナビのセーフエリア（iPhoneホームインジケーター等） */
@@ -84,7 +87,7 @@ select {
 
 /* 黒ベタ内テキスト（375px基準の相対指定） */
 .vote-card-question-text {
-  font-family: var(--font-noto-sans-jp), sans-serif;
+  font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
   font-weight: 700;
   /* 20px @ 375px → 5.333vw */
   font-size: clamp(14px, 5.333vw, 28px);
@@ -97,7 +100,7 @@ select {
 
 /* A/B 回答テキスト */
 .vote-card-option-text {
-  font-family: var(--font-noto-sans-jp), sans-serif;
+  font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
 }
 
 /* パーセント表示：数字 Lato 14px Bold #191919、% は 12px */
@@ -117,9 +120,37 @@ select {
 /* カードフッター：2択回答数・コメント数（Lato Bold 15px #191919） */
 .vote-card-footer-count {
   font-family: var(--font-lato), sans-serif;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: #191919;
+}
+
+/* VOTEカードフッター：votemark・コメント画像（375px時 18×18px・相対） */
+.vote-card-footer-icon-square {
+  width: calc(100vw * 18 / 375);
+  height: calc(100vw * 18 / 375);
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* ブックマークSVG・ON時mask（高さ18px基準、幅は15:18） */
+.vote-card-footer-icon-bookmark {
+  width: calc(100vw * 15 / 375);
+  height: calc(100vw * 18 / 375);
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* .comment-icon-commented と併用（maskは親クラス） */
+.vote-card-footer-icon-commented {
+  width: calc(100vw * 18 / 375);
+  height: calc(100vw * 18 / 375);
+  flex-shrink: 0;
+}
+
+/* フッターアイコン行とハッシュタグの間（375px時 10px基準の約65%・相対） */
+.vote-card-tags-margin-top {
+  padding-top: calc(100vw * 10 / 375 * 0.65);
 }
 
 /* ブックマークON時：アイコンを #FFE100 に（mask で形状を切り抜き） */
@@ -138,10 +169,9 @@ select {
   mask: url("/icons/comment.svg") no-repeat center / contain;
 }
 
-/* タブ（急上昇・新着・myTimeline）：Noto Sans JP・bold・中央揃え */
+/* タブ（急上昇・新着・myTimeline）：Noto Sans JP・中央揃え（太さは選択状態で FeedTabs 側指定） */
 .feed-tab-label {
-  font-family: var(--font-noto-sans-jp), sans-serif;
-  font-weight: 700;
+  font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
   text-align: center;
 }
 
@@ -159,6 +189,54 @@ select {
   background-color: var(--color-brand-logo);
 }
 
+/* 閉じる（×）アイコン：375px時 14×14px・相対 */
+.icon-close-responsive {
+  width: calc(100vw * 14 / 375);
+  height: calc(100vw * 14 / 375);
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* 検索画面：人気コレクション見出し */
+.search-popular-collections-title {
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+/* 違反報告モーダル（日本語主体・Lato 併用） */
+.report-violation-modal {
+  font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
+}
+
+/* 違反報告モーダル：ラジオ（未選択 #D1D1D1、選択時 #191919＋内側白） */
+.report-violation-radio {
+  appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  border-radius: 9999px;
+  border: 2px solid #d1d1d1;
+  background-color: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.report-violation-radio:checked {
+  border-color: #191919;
+  background-color: #191919;
+  box-shadow: inset 0 0 0 3px #fff;
+}
+.report-violation-radio:focus-visible {
+  outline: 2px solid var(--color-select-b);
+  outline-offset: 2px;
+}
+
+/* VOTEカード3点メニュー：シェア／非表示／報告（Noto Sans JP Regular） */
+.card-options-modal-item-label {
+  font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
+  font-weight: 400;
+}
+
 /* 回答欄ドロップシャドウ：Y1 #000000 25%（既存のシャドウと併用） */
 .vote-card-answer-shadow {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -166,19 +244,19 @@ select {
 
 /* ボタン：Noto Sans JP Bold（日本語ラベル用） */
 .btn-font {
-  font-family: var(--font-noto-sans-jp), sans-serif;
+  font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
   font-weight: 700;
 }
 
 /* マイページお気に入りタグ：Noto Sans JP Regular 13px #191919 */
 .profile-favorite-tag {
-  font-family: var(--font-noto-sans-jp), sans-serif;
+  font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
   font-weight: 400;
 }
 
 /* コンパクトカード用の質問テキスト（1.5倍＝21px） */
 .vote-card-compact-question {
-  font-family: var(--font-noto-sans-jp), sans-serif;
+  font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
   font-weight: 700;
   font-size: 21px;
   line-height: 1.35;

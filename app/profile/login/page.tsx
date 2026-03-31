@@ -145,14 +145,14 @@ function ProfileLoginContent() {
           <div className="mt-[40px] w-full">
             <h2
               className="text-[16px] font-black text-gray-900"
-              style={{ fontFamily: "var(--font-noto-sans-jp), sans-serif" }}
+              style={{ fontFamily: "var(--font-lato), var(--font-noto-sans-jp), sans-serif" }}
             >
               ログインしよう。
             </h2>
             <p
               className="mt-4 text-[13px] font-bold text-gray-900"
               style={{
-                fontFamily: "var(--font-noto-sans-jp), sans-serif",
+                fontFamily: "var(--font-lato), var(--font-noto-sans-jp), sans-serif",
                 letterSpacing: "1px",
                 lineHeight: 1.66,
               }}

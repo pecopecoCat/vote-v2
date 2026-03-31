@@ -38,7 +38,15 @@ export default function CardOptionsModal({
     },
     {
       label: "非表示する",
-      icon: <img src="/icons/icon_alert.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={18} />,
+      icon: (
+        <img
+          src="/icons/icon_notshow.svg"
+          alt=""
+          className="h-5 w-auto shrink-0 object-contain"
+          width={22}
+          height={18}
+        />
+      ),
       onClick: () => {
         onHide?.(cardId);
         onClose();
@@ -46,7 +54,15 @@ export default function CardOptionsModal({
     },
     {
       label: "報告する",
-      icon: <img src="/icons/icon_notshow.svg" alt="" className="h-5 w-5 shrink-0" width={22} height={18} />,
+      icon: (
+        <img
+          src="/icons/icon_alert.svg"
+          alt=""
+          className="h-5 w-5 shrink-0 object-contain"
+          width={20}
+          height={18}
+        />
+      ),
       onClick: () => {
         onReport?.(cardId);
         onClose();
@@ -70,13 +86,17 @@ export default function CardOptionsModal({
           <div className="flex justify-end">
             <button
               type="button"
-              className="flex h-10 w-10 items-center justify-center text-blue-600"
+              className="flex h-10 w-10 items-center justify-center"
               aria-label="閉じる"
               onClick={onClose}
             >
-              <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-              </svg>
+              <img
+                src="/icons/icon_close.svg"
+                alt=""
+                className="icon-close-responsive"
+                width={14}
+                height={14}
+              />
             </button>
           </div>
         </div>
@@ -90,7 +110,7 @@ export default function CardOptionsModal({
                   onClick={item.onClick}
                 >
                   {item.icon}
-                  <span className="text-sm font-medium">{item.label}</span>
+                  <span className="card-options-modal-item-label text-sm text-gray-900">{item.label}</span>
                 </button>
               </li>
             ))}

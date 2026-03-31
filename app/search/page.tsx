@@ -596,7 +596,7 @@ function SearchContent() {
             {/* コレクション（他ユーザー登録分＋自分のコレクション・ピン留めを上に表示） */}
             <section>
               <div className="border-t border-gray-200 px-[5.333vw] pt-6">
-                <h2 className="text-left text-[18px] font-black text-gray-900">
+                <h2 className="search-popular-collections-title text-left font-black text-gray-900">
                   人気コレクション
                 </h2>
               </div>

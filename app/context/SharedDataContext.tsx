@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useState,
   type ReactNode,
 } from "react";
@@ -110,6 +111,8 @@ export interface SharedDataContextValue {
   recordBookmarkEvent: (cardId: string) => Promise<void>;
   /** 作成VOTEを一覧から除外（mypageの×削除でUI即時反映用） */
   removeCreatedVote: (cardId: string) => void;
+  /** 初回の作成VOTE/活動取得が完了したか（HOMEの投票済みスナップショット用） */
+  activityBootstrapDone: boolean;
 }
 
 const SharedDataContext = createContext<SharedDataContextValue | null>(null);
@@ -139,6 +142,7 @@ export function useSharedData(): SharedDataContextValue {
       ) => {},
       recordBookmarkEvent: async () => {},
       removeCreatedVote: () => {},
+      activityBootstrapDone: true,
     };
   }
   return ctx;
@@ -154,6 +158,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [voteEvents, setVoteEvents] = useState<VoteEvent[]>([]);
   const [bookmarkEvents, setBookmarkEvents] = useState<BookmarkEvent[]>([]);
   const [isRemote, setIsRemote] = useState(false);
+  const [activityBootstrapDone, setActivityBootstrapDone] = useState(false);
 
   const fetchCreatedVotes = useCallback(async (): Promise<boolean> => {
     try {
@@ -195,11 +200,21 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** ハイドレーション直後に React の activity が空のまま固まるのを防ぐ（localStorage を即同期） */
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    setActivity(getAllActivity());
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const [createdOk, activityOk] = await Promise.all([fetchCreatedVotes(), fetchActivity()]);
-      if (mounted && createdOk && activityOk) setIsRemote(true);
+      try {
+        const [createdOk, activityOk] = await Promise.all([fetchCreatedVotes(), fetchActivity()]);
+        if (mounted && createdOk && activityOk) setIsRemote(true);
+      } finally {
+        if (mounted) setActivityBootstrapDone(true);
+      }
     })();
     return () => {
       mounted = false;
@@ -345,6 +360,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     addComment,
     recordBookmarkEvent,
     removeCreatedVote,
+    activityBootstrapDone,
   };
 
   return (

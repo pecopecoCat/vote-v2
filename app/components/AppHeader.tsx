@@ -171,9 +171,9 @@ export default function AppHeader(props: AppHeaderProps) {
               <img
                 src="/icons/icon_close.svg"
                 alt=""
-                className="h-4 w-4"
-                width={15}
-                height={15}
+                className="icon-close-responsive"
+                width={14}
+                height={14}
               />
             </button>
           )

@@ -8,6 +8,17 @@ export interface FeedTabsProps {
   isLoggedIn?: boolean;
 }
 
+/** メニューテキスト〜黄色インジケーター上端まで 4px、線の太さ 3px → 下パディング 7px */
+const feedTabButtonPb = "pb-[7px]";
+
+/** 375px 基準の余白（30 / 20 / 15） */
+const feedTabNavStyle = {
+  paddingLeft: "calc(100vw * 30 / 375)",
+  paddingRight: "calc(100vw * 30 / 375)",
+  paddingTop: "calc(100vw * 20 / 375)",
+  paddingBottom: "calc(100vw * 15 / 375)",
+} as const;
+
 export default function FeedTabs({
   activeId,
   onSelect,
@@ -16,14 +27,17 @@ export default function FeedTabs({
   return (
     <div className="sticky top-[64px] z-30 w-full min-w-0">
       <nav
-        className="feed-tab-label flex w-full justify-center gap-6 border-b border-gray-200 bg-[#F1F1F1] px-[5.333vw] pt-[14.4px] pb-0"
+        className="feed-tab-label flex w-full justify-center gap-6 border-b border-gray-200 bg-[#F1F1F1]"
+        style={feedTabNavStyle}
         aria-label="フィード切り替え"
       >
       <button
         type="button"
         onClick={() => onSelect("trending")}
-        className={`relative flex items-center justify-center gap-1.5 pb-[14.4px] text-sm transition-colors ${
-          activeId === "trending" ? "text-[var(--color-brand-logo)]" : "text-[var(--color-text-gray)]"
+        className={`relative flex items-center justify-center gap-1.5 ${feedTabButtonPb} text-sm transition-colors ${
+          activeId === "trending"
+            ? "font-bold text-[var(--color-brand-logo)]"
+            : "font-normal text-[var(--color-text-gray)]"
         }`}
         aria-current={activeId === "trending" ? "page" : undefined}
       >
@@ -34,7 +48,7 @@ export default function FeedTabs({
         急上昇中
         {activeId === "trending" && (
           <span
-            className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FFE100]"
+            className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full bg-[#FFE100]"
             aria-hidden
           />
         )}
@@ -43,15 +57,17 @@ export default function FeedTabs({
       <button
         type="button"
         onClick={() => onSelect("new")}
-        className={`relative flex items-center justify-center pb-[14.4px] text-sm transition-colors ${
-          activeId === "new" ? "text-[var(--color-brand-logo)]" : "text-[var(--color-text-gray)]"
+        className={`relative flex items-center justify-center ${feedTabButtonPb} text-sm transition-colors ${
+          activeId === "new"
+            ? "font-bold text-[var(--color-brand-logo)]"
+            : "font-normal text-[var(--color-text-gray)]"
         }`}
         aria-current={activeId === "new" ? "page" : undefined}
       >
         新着
         {activeId === "new" && (
           <span
-            className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FFE100]"
+            className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full bg-[#FFE100]"
             aria-hidden
           />
         )}
@@ -61,15 +77,17 @@ export default function FeedTabs({
         <button
           type="button"
           onClick={() => onSelect("myTimeline")}
-          className={`relative flex items-center justify-center pb-[14.4px] text-sm transition-colors ${
-            activeId === "myTimeline" ? "text-[var(--color-brand-logo)]" : "text-[var(--color-text-gray)]"
+          className={`relative flex items-center justify-center ${feedTabButtonPb} text-sm transition-colors ${
+            activeId === "myTimeline"
+              ? "font-bold text-[var(--color-brand-logo)]"
+              : "font-normal text-[var(--color-text-gray)]"
           }`}
           aria-current={activeId === "myTimeline" ? "page" : undefined}
         >
           myTimeline
           {activeId === "myTimeline" && (
             <span
-              className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FFE100]"
+              className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full bg-[#FFE100]"
               aria-hidden
             />
           )}
