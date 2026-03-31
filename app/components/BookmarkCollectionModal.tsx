@@ -139,6 +139,11 @@ export default function BookmarkCollectionModal({
     onClose();
   };
 
+  const handleComplete = () => {
+    showAppToast("Bookmarkしました");
+    onClose();
+  };
+
   return (
     <>
       <div
@@ -155,7 +160,7 @@ export default function BookmarkCollectionModal({
               type="button"
               className="flex h-10 items-center justify-center px-2 text-blue-600 text-sm font-medium"
               aria-label="完了"
-              onClick={onClose}
+              onClick={handleComplete}
             >
               完了
             </button>

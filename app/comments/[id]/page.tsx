@@ -316,10 +316,7 @@ export default function CommentsPage() {
         {/* コメント一覧：トップレベル＋返信を表示。返信・いいね対応 */}
         <div className="-mx-[5.333vw] border-t border-gray-300 space-y-0 px-[5.333vw]">
           {activity.comments.length === 0 ? (
-            <>
-              <p className="py-4 text-sm text-gray-500">まだコメントはありません。</p>
-              <div className="-mx-[5.333vw] border-t border-gray-300" aria-hidden />
-            </>
+            <p className="py-4 text-sm text-gray-500">まだコメントはありません。</p>
           ) : (
             (() => {
               const topLevel = activity.comments.filter((c) => !c.parentId);
@@ -367,7 +364,7 @@ export default function CommentsPage() {
             })()
           )}
 
-          <RecommendedTags tags={commentsPageTagList} />
+          <RecommendedTags className="mt-6" tags={commentsPageTagList} />
         </div>
 
         {randomCollectionForComments && (

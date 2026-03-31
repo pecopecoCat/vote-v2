@@ -100,7 +100,7 @@ function TagRow({
       </div>
       <button
         type="button"
-        className="shrink-0 p-1 text-gray-400 hover:text-gray-600"
+        className="shrink-0 p-1 text-[#191919] hover:opacity-75"
         aria-label="メニュー"
         onClick={(e) => {
           e.preventDefault();
@@ -430,12 +430,7 @@ function SearchContent() {
                   );
                 })
               )}
-              <div className="-mx-[5.333vw]">
-                <div className="border-t border-gray-300" aria-hidden />
-                <div className="px-[5.333vw]">
-                  <RecommendedTags tags={trendingTags.map((t) => t.tag).slice(0, 10)} />
-                </div>
-              </div>
+              <RecommendedTags tags={trendingTags.map((t) => t.tag).slice(0, 10)} />
               {randomCollectionForTimeline && (
                 <CollectionCard
                   key={randomCollectionForTimeline.id}
