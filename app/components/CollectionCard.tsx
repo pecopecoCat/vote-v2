@@ -43,7 +43,7 @@ export default function CollectionCard({
         isBlackBlock && !timelineBanner
           ? "bg-gradient-to-br from-[#c2410c] via-orange-500 to-[#fde047] px-5 py-12"
           : isBlackBlock && timelineBanner
-            ? `bg-gradient-to-r ${gradientClass} flex flex-col justify-end`
+            ? `bg-gradient-to-r ${gradientClass} flex flex-col justify-center`
             : isBlackBlock
               ? "bg-gradient-to-br from-[#c2410c] via-orange-500 to-[#fde047] px-5 py-12"
               : `bg-gradient-to-r ${gradientClass} px-5 py-4`

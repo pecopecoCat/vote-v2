@@ -12,6 +12,7 @@ import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import RecommendedTags from "../../components/RecommendedTags";
+import EmptyStatePanel from "../../components/EmptyStatePanel";
 import CommentInput from "../../components/CommentInput";
 import {
   getVoteCardById,
@@ -316,7 +317,9 @@ export default function CommentsPage() {
         {/* コメント一覧：トップレベル＋返信を表示。返信・いいね対応 */}
         <div className="-mx-[5.333vw] border-t border-gray-300 space-y-0 px-[5.333vw]">
           {activity.comments.length === 0 ? (
-            <p className="py-4 text-sm text-gray-500">まだコメントはありません。</p>
+            <EmptyStatePanel className="mt-[20px]">
+              <p className="text-sm text-gray-600">まだコメントはありません。</p>
+            </EmptyStatePanel>
           ) : (
             (() => {
               const topLevel = activity.comments.filter((c) => !c.parentId);

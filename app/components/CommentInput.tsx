@@ -1,7 +1,36 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, type RefObject } from "react";
 import Link from "next/link";
+
+/** iOS Safari 等：fixed bottom がキーボードでずれるため、ビジュアルビューポートに合わせて bottom を補正 */
+function useCommentBarVisualViewportOffset(
+  barRef: RefObject<HTMLDivElement | null>,
+  /** ログイン／入力の切り替えで DOM が差し替わるたびに再同期 */
+  layoutKey?: boolean
+) {
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const sync = () => {
+      const el = barRef.current;
+      if (!el) return;
+      const overlap = window.innerHeight - vv.height - vv.offsetTop;
+      el.style.bottom = `${Math.max(0, overlap)}px`;
+    };
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    window.addEventListener("resize", sync);
+    sync();
+    return () => {
+      vv.removeEventListener("resize", sync);
+      vv.removeEventListener("scroll", sync);
+      window.removeEventListener("resize", sync);
+      const el = barRef.current;
+      if (el) el.style.removeProperty("bottom");
+    };
+  }, [barRef, layoutKey]);
+}
 
 export interface CommentSubmitPayload {
   user: { name: string; iconUrl?: string };
@@ -39,6 +68,8 @@ export default function CommentInput({
 }: CommentInputProps) {
   const [value, setValue] = useState("");
   const submittingRef = useRef(false);
+  const barRef = useRef<HTMLDivElement>(null);
+  useCommentBarVisualViewportOffset(barRef, showLoginButton);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -64,7 +95,10 @@ export default function CommentInput({
   if (showLoginButton) {
     const href = loginReturnTo ? `/profile/login?returnTo=${encodeURIComponent(loginReturnTo)}` : "/profile/login";
     return (
-      <div className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 py-3">
+      <div
+        ref={barRef}
+        className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 py-3"
+      >
         <div className="mx-auto max-w-lg">
           <Link
             href={href}
@@ -78,7 +112,10 @@ export default function CommentInput({
   }
 
   return (
-    <div className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 pt-3">
+    <div
+      ref={barRef}
+      className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 pt-3"
+    >
       <form
         onSubmit={handleSubmit}
         className="mx-auto flex max-w-lg overflow-hidden rounded-[9999px]"

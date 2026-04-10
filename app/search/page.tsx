@@ -12,6 +12,8 @@ import ReportViolationModal from "../components/ReportViolationModal";
 import BookmarkCollectionModal from "../components/BookmarkCollectionModal";
 import TagMenuModal, { type TagMenuVariant } from "../components/TagMenuModal";
 import Checkbox from "../components/Checkbox";
+import NewestOldestSortDropdown from "../components/NewestOldestSortDropdown";
+import EmptyStatePanel from "../components/EmptyStatePanel";
 import BottomNav from "../components/BottomNav";
 import type { CurrentUser } from "../components/VoteCard";
 import type { VoteCardData } from "../data/voteCards";
@@ -58,14 +60,19 @@ const PINNED_GRADIENTS: CollectionGradient[] = [
   "cyan-aqua",
 ];
 
-/** タグでフィルター（tag 指定時）、新着順でソート */
-function filterCardsByTag(cards: VoteCardData[], tag: string | null): VoteCardData[] {
+/** タグでフィルター（tag 指定時）、新着順／古い順でソート */
+function filterCardsByTag(
+  cards: VoteCardData[],
+  tag: string | null,
+  sortOrder: "newest" | "oldest"
+): VoteCardData[] {
   if (!tag) return [];
-  return [...cards]
-    .filter((c) => c.tags?.includes(tag))
-    .sort((a, b) =>
-      (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0")
-    );
+  const filtered = cards.filter((c) => c.tags?.includes(tag));
+  return [...filtered].sort((a, b) =>
+    sortOrder === "newest"
+      ? (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0")
+      : (a.createdAt ?? "0").localeCompare(b.createdAt ?? "0")
+  );
 }
 
 /** セクション見出し（グレーの横バー・中央テキスト） */
@@ -128,6 +135,8 @@ function SearchContent() {
   const [searchValue, setSearchValue] = useState(tagFromUrl);
   const [activeTab, setActiveTab] = useState<"trending" | "favorite">("trending");
   const [showVoted, setShowVotedState] = useState(() => getShowVoted());
+  /** ハッシュタグ一覧の並び（マイページ等と同じプルダウン） */
+  const [tagListSortOrder, setTagListSortOrder] = useState<"newest" | "oldest">("newest");
   const handleShowVotedChange = useCallback((value: boolean) => {
     setShowVoted(value);
     setShowVotedState(value);
@@ -179,6 +188,10 @@ function SearchContent() {
 
   useEffect(() => {
     setSearchValue(tagFromUrl);
+  }, [tagFromUrl]);
+
+  useEffect(() => {
+    setTagListSortOrder("newest");
   }, [tagFromUrl]);
 
   const query = searchValue.trim();
@@ -269,8 +282,13 @@ function SearchContent() {
   );
 
   const filteredCards = useMemo(
-    () => filterCardsByTag(allCardsForTagFilterFiltered, isTagFilterView ? tagFromUrl : null),
-    [allCardsForTagFilterFiltered, isTagFilterView, tagFromUrl]
+    () =>
+      filterCardsByTag(
+        allCardsForTagFilterFiltered,
+        isTagFilterView ? tagFromUrl : null,
+        tagListSortOrder
+      ),
+    [allCardsForTagFilterFiltered, isTagFilterView, tagFromUrl, tagListSortOrder]
   );
 
   const commentedCardIds = useMemo(
@@ -366,10 +384,7 @@ function SearchContent() {
       {isTagFilterView && (
         <>
           <div className="sticky top-[64px] z-10 flex items-center justify-between border-b border-gray-200 bg-[#F1F1F1] px-[5.333vw] py-3">
-            <div className="flex items-center gap-1 text-sm text-gray-600">
-              <span>新着順</span>
-              <ChevronDownIcon className="h-4 w-4" />
-            </div>
+            <NewestOldestSortDropdown value={tagListSortOrder} onChange={setTagListSortOrder} />
             <Checkbox
               checked={showVoted}
               onChange={handleShowVotedChange}
@@ -379,11 +394,11 @@ function SearchContent() {
           <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-6">
             <div className="flex flex-col gap-[5.333vw]">
               {cardsToShow.length === 0 ? (
-                <div className="rounded-[2rem] bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
+                <EmptyStatePanel>
                   <p className="text-sm text-gray-600">
                     {tagFromUrl ? `#${tagFromUrl} の投稿はありません` : "タグを選ぶか検索してください"}
                   </p>
-                </div>
+                </EmptyStatePanel>
               ) : (
                 cardsToShow.map((card) => {
                   const index = voteCardsData.indexOf(card);
@@ -722,12 +737,3 @@ export default function SearchPage() {
     </Suspense>
   );
 }
-
-function ChevronDownIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path d="M7 10l5 5 5-5H7z" />
-    </svg>
-  );
-}
-
