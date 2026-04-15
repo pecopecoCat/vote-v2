@@ -101,7 +101,7 @@ export default function CreateQuestionPage() {
       <AppHeader type="title" title="質問を入力" backHref="/" />
 
       <main className="mx-auto max-w-lg px-[5.333vw] pt-[10px]">
-        <div className="rounded-2xl bg-white p-4 shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
+        <div className="rounded-2xl bg-white p-4">
           <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value.slice(0, QUESTION_MAX + 10))}
@@ -129,7 +129,7 @@ export default function CreateQuestionPage() {
 
         <div className="mt-4 border-t border-gray-200 pt-4">
           <h2 className="bg-[#E5E7EB] py-2.5 pl-4 text-sm font-bold text-gray-900">関連トピック</h2>
-          <ul className="overflow-hidden rounded-b-xl bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
+          <ul className="overflow-hidden rounded-b-xl bg-white">
             {relatedTopics.length > 0 ? (
               relatedTopics.map((topic, i) => (
                 <li key={`${topic.text}-${i}`} className="border-b border-gray-100 last:border-b-0">
