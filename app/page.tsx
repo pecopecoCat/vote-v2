@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef, Suspense, useDeferredValue } from "react";
+import { useMemo, useState, useEffect, useRef, Suspense, useDeferredValue, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "./components/AppHeader";
 import VoteCard from "./components/VoteCard";
@@ -222,9 +222,13 @@ function HomeContent() {
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
-  const currentUser: CurrentUser = auth.isLoggedIn && auth.user
-    ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
-    : { type: "guest" };
+  const currentUser = useMemo<CurrentUser>(
+    () =>
+      auth.isLoggedIn && auth.user
+        ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
+        : { type: "guest" },
+    [auth.isLoggedIn, auth.user]
+  );
 
   /** 未ログイン時は myTimeline タブを出さないので、選択中なら急上昇中に切り替え */
   useEffect(() => {
@@ -240,19 +244,25 @@ function HomeContent() {
     return () => window.removeEventListener(eventName, handler);
   }, []);
 
-  const commentedCardIds = useMemo(
-    () =>
-      Object.entries(activity)
-        .filter(([, a]) =>
-          (a.comments ?? []).some((c) =>
-            isCommentAuthoredByCurrentUser(c.user?.name, {
-              isLoggedIn: auth.isLoggedIn,
-              displayName: auth.user?.name,
-            })
-          )
-        )
-        .map(([id]) => id),
-    [activity, auth.isLoggedIn, auth.user?.name]
+  const commentedCardIdSet = useMemo(() => {
+    const set = new Set<string>();
+    const opts = {
+      isLoggedIn: auth.isLoggedIn,
+      displayName: auth.user?.name,
+    };
+    for (const [id, a] of Object.entries(activity)) {
+      if ((a.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
+        set.add(id);
+      }
+    }
+    return set;
+  }, [activity, auth.isLoggedIn, auth.user?.name]);
+
+  const handleVote = useCallback(
+    (id: string, option: "A" | "B") => {
+      void sharedAddVote(id, option);
+    },
+    [sharedAddVote]
   );
 
   const allCards = useMemo(() => {
@@ -271,6 +281,12 @@ function HomeContent() {
       }),
     [allCards, hiddenUserIds, hiddenCardIds]
   );
+
+  const handleCardMoreClick = useCallback((cardId: string) => {
+    setCardOptionsCardId(cardId);
+    const card = allCardsFiltered.find((c) => (c.id ?? c.question) === cardId);
+    setCardOptionsIsOwnCard(card?.createdByUserId === getCurrentActivityUserId());
+  }, [allCardsFiltered]);
 
   /** 公開カードのみ（private はリンクを知ってる人だけ＝一覧には出さない） */
   const publicCards = useMemo(
@@ -416,16 +432,11 @@ function HomeContent() {
                   currentUser={currentUser}
                   cardId={cardId}
                   bookmarked={bookmarkedIds.has(cardId)}
-                  hasCommented={commentedCardIds.includes(cardId)}
+                  hasCommented={commentedCardIdSet.has(cardId)}
                   initialSelectedOption={act?.userSelectedOption ?? null}
-                  onVote={(id, option) => {
-                    void sharedAddVote(id, option);
-                  }}
+                  onVote={handleVote}
                   onBookmarkClick={setModalCardId}
-                  onMoreClick={() => {
-                    setCardOptionsCardId(cardId);
-                    setCardOptionsIsOwnCard(card.createdByUserId === getCurrentActivityUserId());
-                  }}
+                  onMoreClick={handleCardMoreClick}
                   visibility={card.visibility}
                   optionAImageUrl={card.optionAImageUrl}
                   optionBImageUrl={card.optionBImageUrl}

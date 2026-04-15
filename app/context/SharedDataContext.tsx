@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -349,19 +350,34 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const value: SharedDataContextValue = {
-    createdVotesForTimeline,
-    activity,
-    voteEvents,
-    bookmarkEvents,
-    isRemote,
-    addCreatedVote,
-    addVote,
-    addComment,
-    recordBookmarkEvent,
-    removeCreatedVote,
-    activityBootstrapDone,
-  };
+  const value = useMemo<SharedDataContextValue>(
+    () => ({
+      createdVotesForTimeline,
+      activity,
+      voteEvents,
+      bookmarkEvents,
+      isRemote,
+      addCreatedVote,
+      addVote,
+      addComment,
+      recordBookmarkEvent,
+      removeCreatedVote,
+      activityBootstrapDone,
+    }),
+    [
+      createdVotesForTimeline,
+      activity,
+      voteEvents,
+      bookmarkEvents,
+      isRemote,
+      addCreatedVote,
+      addVote,
+      addComment,
+      recordBookmarkEvent,
+      removeCreatedVote,
+      activityBootstrapDone,
+    ]
+  );
 
   return (
     <SharedDataContext.Provider value={value}>

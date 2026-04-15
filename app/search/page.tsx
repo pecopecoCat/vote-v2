@@ -157,9 +157,13 @@ function SearchContent() {
   const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
   const [auth, setAuth] = useState(() => getAuth());
   const isLoggedIn = auth.isLoggedIn;
-  const currentUser: CurrentUser = auth.isLoggedIn && auth.user
-    ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
-    : { type: "guest" };
+  const currentUser = useMemo<CurrentUser>(
+    () =>
+      auth.isLoggedIn && auth.user
+        ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
+        : { type: "guest" },
+    [auth.isLoggedIn, auth.user]
+  );
   useEffect(() => {
     setAuth(getAuth());
     setFavoriteTags(getFavoriteTags());
@@ -291,20 +295,19 @@ function SearchContent() {
     [allCardsForTagFilterFiltered, isTagFilterView, tagFromUrl, tagListSortOrder]
   );
 
-  const commentedCardIds = useMemo(
-    () =>
-      Object.entries(activity)
-        .filter(([, a]) =>
-          (a.comments ?? []).some((c) =>
-            isCommentAuthoredByCurrentUser(c.user?.name, {
-              isLoggedIn: auth.isLoggedIn,
-              displayName: auth.user?.name,
-            })
-          )
-        )
-        .map(([cid]) => cid),
-    [activity, auth.isLoggedIn, auth.user?.name]
-  );
+  const commentedCardIdSet = useMemo(() => {
+    const set = new Set<string>();
+    const opts = {
+      isLoggedIn: auth.isLoggedIn,
+      displayName: auth.user?.name,
+    };
+    for (const [cid, a] of Object.entries(activity)) {
+      if ((a.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
+        set.add(cid);
+      }
+    }
+    return set;
+  }, [activity, auth.isLoggedIn, auth.user?.name]);
 
   /** 検索結果タイムライン用：実際にあるコレクションから1件ランダム */
   const randomCollectionForTimeline = useMemo(() => {
@@ -360,6 +363,15 @@ function SearchContent() {
   const handleVote = useCallback((cardId: string, option: "A" | "B") => {
     void sharedAddVote(cardId, option);
   }, [sharedAddVote]);
+
+  const handleTagFilterCardMoreClick = useCallback(
+    (cardId: string) => {
+      setCardOptionsCardId(cardId);
+      const card = allCardsForTagFilterFiltered.find((c) => (c.id ?? c.question) === cardId);
+      setCardOptionsIsOwnCard(card?.createdByUserId === getCurrentActivityUserId());
+    },
+    [allCardsForTagFilterFiltered]
+  );
 
   return (
     <div
@@ -429,14 +441,11 @@ function SearchContent() {
                       currentUser={currentUser}
                       cardId={cardId}
                       bookmarked={isCardBookmarked(cardId)}
-                      hasCommented={commentedCardIds.includes(cardId)}
+                      hasCommented={commentedCardIdSet.has(cardId)}
                       initialSelectedOption={act?.userSelectedOption ?? null}
                       onVote={handleVote}
                       onBookmarkClick={setModalCardId}
-                      onMoreClick={() => {
-                        setCardOptionsCardId(cardId);
-                        setCardOptionsIsOwnCard(card.createdByUserId === getCurrentActivityUserId());
-                      }}
+                      onMoreClick={handleTagFilterCardMoreClick}
                       visibility={card.visibility}
                       optionAImageUrl={card.optionAImageUrl}
                       optionBImageUrl={card.optionBImageUrl}

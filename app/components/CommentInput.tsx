@@ -99,7 +99,12 @@ export default function CommentInput({
         ref={barRef}
         className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 py-3"
       >
-        <div className="mx-auto max-w-lg">
+        {/* iOS 等：キーボード直上〜画面下端の隙間に背面 UI が透けるのを防ぐ白の延長 */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-full z-0 bg-white [height:max(12rem,min(85dvh,36rem))]"
+        />
+        <div className="relative z-10 mx-auto max-w-lg">
           <Link
             href={href}
             className="block w-full rounded-xl bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 hover:opacity-90"
@@ -116,9 +121,13 @@ export default function CommentInput({
       ref={barRef}
       className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 pt-3"
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-full z-0 bg-white [height:max(12rem,min(85dvh,36rem))]"
+      />
       <form
         onSubmit={handleSubmit}
-        className="mx-auto flex max-w-lg overflow-hidden rounded-[9999px]"
+        className="relative z-10 mx-auto flex max-w-lg overflow-hidden rounded-[9999px]"
       >
         <input
           type="text"

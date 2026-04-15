@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import BottomNav from "../components/BottomNav";
@@ -228,9 +228,11 @@ function ProfileContent() {
   }, []);
 
   const profileUser = auth.user ?? MOCK_USER;
-  const currentUser: CurrentUser = auth.isLoggedIn
-    ? { type: "sns", name: profileUser.name, iconUrl: profileUser.iconUrl }
-    : { type: "guest" };
+  const currentUser = useMemo<CurrentUser>(() => {
+    if (!auth.isLoggedIn) return { type: "guest" };
+    const u = auth.user ?? MOCK_USER;
+    return { type: "sns", name: u.name, iconUrl: u.iconUrl };
+  }, [auth.isLoggedIn, auth.user]);
   const userId = typeof window !== "undefined" ? getCurrentActivityUserId() : "";
   /** myVOTEタブ用：API利用時はContextから、それ以外はlocalStorageから「自分が作ったVOTE」を表示 */
   const createdVotesRaw = useMemo(() => {
@@ -303,6 +305,29 @@ function ProfileContent() {
         )
         .map(([cid]) => cid),
     [activity, auth.isLoggedIn, auth.user?.name]
+  );
+
+  const commentedCardIdSet = useMemo(() => new Set(commentedCardIds), [commentedCardIds]);
+
+  const handleMyCreatedVoteMoreClick = useCallback((cardId: string) => {
+    setCardOptionsCardId(cardId);
+    setCardOptionsIsOwnCard(true);
+  }, []);
+
+  const handleProfileCardMoreClick = useCallback(
+    (cardId: string) => {
+      setCardOptionsCardId(cardId);
+      const card = allCardsFiltered.find((c) => (c.id ?? c.question) === cardId);
+      setCardOptionsIsOwnCard(card?.createdByUserId === userId);
+    },
+    [allCardsFiltered, userId]
+  );
+
+  const handleBookmarkListVote = useCallback(
+    (id: string, option: "A" | "B") => {
+      void sharedAddVote(id, option);
+    },
+    [sharedAddVote]
   );
 
   /** コメントタブ用：自分のコメントの最新日時でカードを最新順に並べる */
@@ -645,12 +670,9 @@ function ProfileContent() {
                         currentUser={currentUser}
                         cardId={cardId}
                         bookmarked={isCardBookmarked(cardId)}
-                        hasCommented={commentedCardIds.includes(cardId)}
+                        hasCommented={commentedCardIdSet.has(cardId)}
                         onBookmarkClick={setModalCardId}
-                        onMoreClick={() => {
-                          setCardOptionsCardId(cardId);
-                          setCardOptionsIsOwnCard(true);
-                        }}
+                        onMoreClick={handleMyCreatedVoteMoreClick}
                         visibility={card.visibility}
                         optionAImageUrl={card.optionAImageUrl}
                         optionBImageUrl={card.optionBImageUrl}
@@ -757,12 +779,9 @@ function ProfileContent() {
                       cardId={cardId}
                       initialSelectedOption={act?.userSelectedOption ?? null}
                       bookmarked={isCardBookmarked(cardId)}
-                      hasCommented={commentedCardIds.includes(cardId)}
+                      hasCommented={commentedCardIdSet.has(cardId)}
                       onBookmarkClick={setModalCardId}
-                      onMoreClick={() => {
-                        setCardOptionsCardId(cardId);
-                        setCardOptionsIsOwnCard(card.createdByUserId === userId);
-                      }}
+                      onMoreClick={handleProfileCardMoreClick}
                       visibility={card.visibility}
                       optionAImageUrl={card.optionAImageUrl}
                       optionBImageUrl={card.optionBImageUrl}
@@ -896,14 +915,11 @@ function ProfileContent() {
                             currentUser={currentUser}
                             cardId={cardId}
                             bookmarked={isCardBookmarked(cardId)}
-                            hasCommented={commentedCardIds.includes(cardId)}
+                            hasCommented={commentedCardIdSet.has(cardId)}
                             initialSelectedOption={act?.userSelectedOption ?? null}
-                            onVote={(id, option) => void sharedAddVote(id, option)}
+                            onVote={handleBookmarkListVote}
                             onBookmarkClick={setModalCardId}
-                            onMoreClick={() => {
-                              setCardOptionsCardId(cardId);
-                              setCardOptionsIsOwnCard(card.createdByUserId === userId);
-                            }}
+                            onMoreClick={handleProfileCardMoreClick}
                             visibility={card.visibility}
                             optionAImageUrl={card.optionAImageUrl}
                             optionBImageUrl={card.optionBImageUrl}

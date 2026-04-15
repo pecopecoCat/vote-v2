@@ -81,9 +81,13 @@ export default function CollectionPage() {
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [auth, setAuth] = useState(() => getAuth());
-  const currentUser: CurrentUser = auth.isLoggedIn && auth.user
-    ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
-    : { type: "guest" };
+  const currentUser = useMemo<CurrentUser>(
+    () =>
+      auth.isLoggedIn && auth.user
+        ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
+        : { type: "guest" },
+    [auth.isLoggedIn, auth.user]
+  );
 
   useEffect(() => {
     setAuth(getAuth());
@@ -154,20 +158,19 @@ export default function CollectionPage() {
   const collection = localCollection ?? collectionFromApi;
   const isFromApi = !!collectionFromApi && !localCollection;
   const isPinned = pinnedIds.includes(id);
-  const commentedCardIds = useMemo(
-    () =>
-      Object.entries(activity)
-        .filter(([, a]) =>
-          (a.comments ?? []).some((c) =>
-            isCommentAuthoredByCurrentUser(c.user?.name, {
-              isLoggedIn: auth.isLoggedIn,
-              displayName: auth.user?.name,
-            })
-          )
-        )
-        .map(([cid]) => cid),
-    [activity, auth.isLoggedIn, auth.user?.name]
-  );
+  const commentedCardIdSet = useMemo(() => {
+    const set = new Set<string>();
+    const opts = {
+      isLoggedIn: auth.isLoggedIn,
+      displayName: auth.user?.name,
+    };
+    for (const [cid, a] of Object.entries(activity)) {
+      if ((a.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
+        set.add(cid);
+      }
+    }
+    return set;
+  }, [activity, auth.isLoggedIn, auth.user?.name]);
 
   const cardsInCollection = useMemo(() => {
     if (!collection) return [];
@@ -183,6 +186,19 @@ export default function CollectionPage() {
     if (showVoted) return cardsInCollection;
     return cardsInCollection.filter(({ cardId }) => !activity[cardId]?.userSelectedOption);
   }, [cardsInCollection, showVoted, activity]);
+
+  const handleCollectionVote = useCallback(
+    (cid: string, option: "A" | "B") => {
+      void sharedAddVote(cid, option);
+    },
+    [sharedAddVote]
+  );
+
+  const handleCollectionCardMoreClick = useCallback((cardId: string) => {
+    setCardOptionsCardId(cardId);
+    const found = cardsInCollection.find((x) => x.cardId === cardId);
+    setCardOptionsIsOwnCard(found?.card.createdByUserId === getCurrentActivityUserId());
+  }, [cardsInCollection]);
 
   const handleTogglePin = () => {
     togglePinnedCollection(id);
@@ -314,14 +330,11 @@ export default function CollectionPage() {
                   currentUser={currentUser}
                   cardId={cardId}
                   bookmarked={isCardBookmarked(cardId)}
-                  hasCommented={commentedCardIds.includes(cardId)}
+                  hasCommented={commentedCardIdSet.has(cardId)}
                   initialSelectedOption={act?.userSelectedOption ?? null}
-                  onVote={(cid, option) => void sharedAddVote(cid, option)}
+                  onVote={handleCollectionVote}
                   onBookmarkClick={setModalCardId}
-                  onMoreClick={() => {
-                    setCardOptionsCardId(cardId);
-                    setCardOptionsIsOwnCard(card.createdByUserId === getCurrentActivityUserId());
-                  }}
+                  onMoreClick={handleCollectionCardMoreClick}
                   visibility={card.visibility}
                   optionAImageUrl={card.optionAImageUrl}
                   optionBImageUrl={card.optionBImageUrl}
