@@ -231,7 +231,20 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   // いいねなどで global だけ更新されたとき、既存の activity を上書きせずマージする（API取得分が消えないように）
   useEffect(() => {
     const handler = () => {
-      setActivity((prev) => ({ ...prev, ...getAllActivity() }));
+      const next = getAllActivity();
+      setActivity((prev) => {
+        const merged: Record<string, CardActivity> = { ...prev };
+        for (const [cardId, a] of Object.entries(next)) {
+          const p = prev[cardId];
+          merged[cardId] = {
+            ...(p ?? a),
+            ...a,
+            // remote(KV) の userSelectedOption を localStorage(=undefined) で上書きしない
+            userSelectedOption: p?.userSelectedOption ?? a.userSelectedOption,
+          };
+        }
+        return merged;
+      });
     };
     window.addEventListener(ACTIVITY_GLOBAL_UPDATED_EVENT, handler);
     return () => window.removeEventListener(ACTIVITY_GLOBAL_UPDATED_EVENT, handler);
