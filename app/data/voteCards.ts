@@ -295,6 +295,44 @@ export function getRelatedVoteCards(
     .slice(0, limit);
 }
 
+/**
+ * コメントページ下部の関連VOTE用。
+ * 現在カードのタグを **先頭から順** に試し、同じタグ文字列を持つ他カードを新着順で最大 `limit` 件まで集める。
+ * 1番目のタグで取り切ったあと足りなければ2番目のタグで未採用分を埋める（重複なし）。
+ */
+export function getRelatedVoteCardsByTagPriority(
+  currentCard: VoteCardData,
+  allCards: VoteCardData[],
+  currentId: string,
+  limit = 10
+): VoteCardData[] {
+  const cardId = (c: VoteCardData) => c.id ?? c.question;
+  const tags = currentCard.tags ?? [];
+  if (tags.length === 0 || limit <= 0) return [];
+
+  const others = allCards
+    .filter((c) => cardId(c) !== currentId)
+    .sort((a, b) => (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0"));
+
+  const seen = new Set<string>();
+  const out: VoteCardData[] = [];
+
+  for (const tag of tags) {
+    if (out.length >= limit) break;
+    for (const c of others) {
+      if (out.length >= limit) break;
+      const cid = cardId(c);
+      if (seen.has(cid)) continue;
+      if ((c.tags ?? []).includes(tag)) {
+        out.push(c);
+        seen.add(cid);
+      }
+    }
+  }
+
+  return out;
+}
+
 /** 新着順でカードを返す（関連VOTEが0件のときのフォールバック用）。currentId を除く。 */
 export function getNewestVoteCards(
   allCards: VoteCardData[],

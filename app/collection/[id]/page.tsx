@@ -270,14 +270,14 @@ export default function CollectionPage() {
           {collection.visibility !== "public" && ` · ${VISIBILITY_LABEL[collection.visibility]}`}
         </p>
 
-        {/* 新着順・投票済みを表示（mypageのmyVOTEタブと同じ見た目） */}
+        {/* 新着順・投票済みを表示（並び替え UI と同じピル見た目） */}
         <div className="mt-3 flex items-center justify-between">
           <button
             type="button"
-            className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-gray-900 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+            className="flex min-h-[36px] min-w-[7.75rem] items-center justify-between gap-2 rounded-full border border-[#DADADA] bg-white py-1.5 pl-3.5 pr-1.5 text-left text-[12px] font-normal leading-none text-[#787878] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
           >
-            新着順
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
+            <span className="min-w-0 flex-1 text-left tracking-tight">新着順</span>
+            <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[var(--color-brand-base)]">
               <img
                 src="/icons/icon_b_arrow.svg"
                 alt=""

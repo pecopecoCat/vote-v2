@@ -5,20 +5,20 @@ import { useParams } from "next/navigation";
 import { useMemo, useState, useEffect } from "react";
 import AppHeader from "../../components/AppHeader";
 import VoteCard from "../../components/VoteCard";
-import VoteCardCompact from "../../components/VoteCardCompact";
 import VoteCardMini from "../../components/VoteCardMini";
 import CollectionCard from "../../components/CollectionCard";
 import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import RecommendedTags from "../../components/RecommendedTags";
-import EmptyStatePanel from "../../components/EmptyStatePanel";
+import NewestOldestSortDropdown from "../../components/NewestOldestSortDropdown";
+import CommentThreadGroup from "../../components/CommentThreadGroup";
 import CommentInput from "../../components/CommentInput";
 import {
   getVoteCardById,
   voteCardsData,
   CARD_BACKGROUND_IMAGES,
-  getRelatedVoteCards,
+  getRelatedVoteCardsByTagPriority,
   getNewestVoteCards,
 } from "../../data/voteCards";
 import { getTagsSimilarTo, popularCollections, trendingTags, type CollectionGradient } from "../../data/search";
@@ -60,24 +60,6 @@ function backgroundForCard(card: VoteCardData, cardId: string): string {
   return CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
 }
 
-function MoreIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-    </svg>
-  );
-}
-
-/** コメント日付を表示用にフォーマット */
-function formatCommentDate(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString("ja-JP", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return iso;
-  }
-}
-
 const emptyActivity = { countA: 0, countB: 0, comments: [] as VoteComment[], userSelectedOption: undefined as "A" | "B" | undefined };
 
 export default function CommentsPage() {
@@ -98,7 +80,6 @@ export default function CommentsPage() {
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [auth, setAuth] = useState(() => getAuth());
   const [commentSortOrder, setCommentSortOrder] = useState<"newest" | "oldest">("newest");
-  const [commentSortDropdownOpen, setCommentSortDropdownOpen] = useState(false);
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
   const isLoggedIn = auth.isLoggedIn;
@@ -127,17 +108,23 @@ export default function CommentsPage() {
     return [...createdVotesForTimeline, ...seedWithId];
   }, [createdVotesForTimeline]);
 
-  const relatedCards = useMemo(() => {
-    if (!card) return [];
-    return getRelatedVoteCards(card, allCards, id, 5);
+  /**
+   * 下部一覧: タグ優先で関連最大10件。0件なら新着10件。
+   * bottomSectionTitle: 表示見出し用
+   */
+  const { bottomCards, bottomSectionTitle } = useMemo(() => {
+    if (!card) {
+      return { bottomCards: [] as VoteCardData[], bottomSectionTitle: "関連VOTE" };
+    }
+    const related = getRelatedVoteCardsByTagPriority(card, allCards, id, 10);
+    if (related.length > 0) {
+      return { bottomCards: related, bottomSectionTitle: "関連VOTE" };
+    }
+    return {
+      bottomCards: getNewestVoteCards(allCards, id, 10),
+      bottomSectionTitle: "新着VOTE",
+    };
   }, [card, allCards, id]);
-
-  const fallbackCards = useMemo(() => {
-    return getNewestVoteCards(allCards, id, 5);
-  }, [allCards, id]);
-
-  const bottomCards = relatedCards.length > 0 ? relatedCards : fallbackCards;
-  const bottomSectionTitle = relatedCards.length > 0 ? "関連VOTE" : "新着";
 
   /** みんなのコメントページ：カードにタグあり→1個目に似たタグ10件、なし→注目のタグ10件 */
   const commentsPageTagList = useMemo(() => {
@@ -145,7 +132,7 @@ export default function CommentsPage() {
     return getTagsSimilarTo(card.tags[0], allCards, 10);
   }, [card?.tags, allCards]);
 
-  /** みんなのコメントページ：実際にあるコレクションから1件ランダム表示 */
+  /** みんなのコメントページ：実際にあるコレクションから1件表示（カードIDで安定選択） */
   const randomCollectionForComments = useMemo(() => {
     const other = getOtherUsersCollections().map((c) => ({
       id: c.id,
@@ -159,8 +146,10 @@ export default function CommentsPage() {
     }));
     const pool = [...popularCollections, ...other, ...mine];
     if (pool.length === 0) return null;
-    return pool[Math.floor(Math.random() * pool.length)];
-  }, []);
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+    return pool[Math.abs(h) % pool.length];
+  }, [id]);
 
   const commentedCardIds = useMemo(
     () =>
@@ -251,75 +240,21 @@ export default function CommentsPage() {
           />
         </div>
 
-        {/* コメント見出し + 新着順（mypageと同じプルダウン） */}
-        <div className="-mx-[5.333vw] mb-3 flex items-center justify-between border-t border-gray-300 px-[5.333vw] pt-4">
-          <h2 className="text-base font-bold text-gray-900">コメント</h2>
-          <div className="relative">
-            <button
-              type="button"
-              className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-gray-900 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-              aria-haspopup="listbox"
-              aria-expanded={commentSortDropdownOpen}
-              onClick={() => setCommentSortDropdownOpen((o) => !o)}
-            >
-              {commentSortOrder === "newest" ? "新着順" : "古い順"}
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
-                <img
-                  src="/icons/icon_b_arrow.svg"
-                  alt=""
-                  className="h-2.5 w-2.5 shrink-0"
-                  width={10}
-                  height={8}
-                />
-              </span>
-            </button>
-            {commentSortDropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  aria-hidden
-                  onClick={() => setCommentSortDropdownOpen(false)}
-                />
-                <ul
-                  className="absolute right-0 top-full z-20 mt-1 min-w-[120px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
-                  role="listbox"
-                >
-                  <li role="option" aria-selected={commentSortOrder === "newest"}>
-                    <button
-                      type="button"
-                      className="w-full px-4 py-2 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"
-                      onClick={() => {
-                        setCommentSortOrder("newest");
-                        setCommentSortDropdownOpen(false);
-                      }}
-                    >
-                      新着順
-                    </button>
-                  </li>
-                  <li role="option" aria-selected={commentSortOrder === "oldest"}>
-                    <button
-                      type="button"
-                      className="w-full px-4 py-2 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"
-                      onClick={() => {
-                        setCommentSortOrder("oldest");
-                        setCommentSortDropdownOpen(false);
-                      }}
-                    >
-                      古い順
-                    </button>
-                  </li>
-                </ul>
-              </>
-            )}
+        {/* コメント：グレー帯の見出し + 白背景の一覧（デザイン参照） */}
+        <div className="-mx-[5.333vw] overflow-hidden border-t border-[#DADADA]">
+          <div className="flex items-center justify-between bg-[var(--color-bg)] px-[5.333vw] py-3">
+            <h2 className="text-base font-bold text-[#191919]">コメント</h2>
+            <NewestOldestSortDropdown
+              value={commentSortOrder}
+              onChange={setCommentSortOrder}
+              menuAlign="right"
+            />
           </div>
-        </div>
-
-        {/* コメント一覧：トップレベル＋返信を表示。返信・いいね対応 */}
-        <div className="-mx-[5.333vw] border-t border-gray-300 space-y-0 px-[5.333vw]">
+          <div className="bg-white">
           {activity.comments.length === 0 ? (
-            <EmptyStatePanel className="mt-[20px]">
-              <p className="text-sm text-gray-600">まだコメントはありません。</p>
-            </EmptyStatePanel>
+            <div className="px-[5.333vw] py-10 text-center">
+              <p className="text-sm text-[#787878]">まだコメントはありません。</p>
+            </div>
           ) : (
             (() => {
               const topLevel = activity.comments.filter((c) => !c.parentId);
@@ -338,37 +273,26 @@ export default function CommentsPage() {
                   comments: activity.comments ?? [],
                 };
                 return (
-                  <div key={c.id}>
-                    <CommentRow
-                      cardId={id}
-                      comment={c}
-                      onLike={() => {
-                        addCommentLike(id, c.id, currentCard);
-                      }}
-                      onReply={() => setReplyingToCommentId(c.id)}
-                      showReplyButton
-                      isLikedByMe={likedCommentIds.includes(c.id)}
-                    />
-                    {replies.map((r) => (
-                      <CommentRow
-                        key={r.id}
-                        cardId={id}
-                        comment={r}
-                        onLike={() => addCommentLike(id, r.id, currentCard)}
-                        onReply={() => setReplyingToCommentId(r.id)}
-                        showReplyButton
-                        isReply
-                        isLikedByMe={likedCommentIds.includes(r.id)}
-                      />
-                    ))}
-                  </div>
+                  <CommentThreadGroup
+                    key={c.id}
+                    parent={c}
+                    replies={replies}
+                    likedCommentIds={likedCommentIds}
+                    onParentLike={() => addCommentLike(id, c.id, currentCard)}
+                    onParentReply={() => setReplyingToCommentId(c.id)}
+                    onReplyLike={(r) => addCommentLike(id, r.id, currentCard)}
+                    maxRepliesVisible={1}
+                    replyListMoreHref={replies.length > 1 ? `/comments/${id}/reply/${c.id}` : undefined}
+                    replyToReplyHref={replies.length > 0 ? `/comments/${id}/reply/${c.id}` : undefined}
+                  />
                 );
               });
             })()
           )}
-
-          <RecommendedTags className="mt-6" tags={commentsPageTagList} />
+          </div>
         </div>
+
+        <RecommendedTags className="mt-6" tags={commentsPageTagList} />
 
         {randomCollectionForComments && (
           <div className="mt-6">
@@ -385,7 +309,7 @@ export default function CommentsPage() {
           </div>
         )}
 
-        {/* 一番下：関連VOTE（同じタグ+アクションあり）、なければ新着 — HOMEと同じNORMALサイズ */}
+        {/* 一番下：関連VOTE（タグ優先・最大10件）／0件時は新着10件 — HOMEと同じNORMALサイズ */}
         {bottomCards.length > 0 && (
           <section className="-mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6">
             <h2 className="mb-3 text-base font-bold text-gray-900">{bottomSectionTitle}</h2>
@@ -488,78 +412,6 @@ export default function CommentsPage() {
           isLoggedIn={isLoggedIn}
         />
       )}
-    </div>
-  );
-}
-
-function CommentRow({
-  cardId,
-  comment,
-  onLike,
-  onReply,
-  showReplyButton = false,
-  isReply = false,
-  isLikedByMe = false,
-}: {
-  cardId: string;
-  comment: VoteComment;
-  onLike?: () => void;
-  onReply?: () => void;
-  showReplyButton?: boolean;
-  isReply?: boolean;
-  isLikedByMe?: boolean;
-}) {
-  const replyCount = comment.replyCount ?? 0;
-  const likeCount = comment.likeCount ?? 0;
-  return (
-    <div
-      className={`-mx-[5.333vw] flex gap-3 border-b border-gray-300 px-[5.333vw] py-3 last:border-b-0 ${isReply ? "pl-[5.333vw]" : ""}`}
-      style={isReply ? { paddingLeft: "calc(5.333vw + 2rem)" } : undefined}
-    >
-      <div className="shrink-0">
-        <span className="flex h-10 w-10 overflow-hidden rounded-full bg-gray-200">
-          <img src={comment.user.iconUrl ?? "/default-avatar.png"} alt="" className="h-full w-full object-cover" />
-        </span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-gray-800">{comment.user.name}</p>
-        <p className="mt-0.5 text-sm text-[#191919]">{comment.text}</p>
-        <p className="mt-1 flex items-center gap-4 text-xs text-gray-500">
-          {showReplyButton && (
-            <button
-              type="button"
-              className="flex items-center gap-1 hover:underline"
-              onClick={onReply}
-            >
-              <img src="/icons/comment.svg" alt="" className="h-4 w-4" />
-              {replyCount}
-            </button>
-          )}
-          {!showReplyButton && replyCount > 0 && (
-            <span className="flex items-center gap-1">
-              <img src="/icons/comment.svg" alt="" className="h-4 w-4" />
-              {replyCount}
-            </span>
-          )}
-          <button
-            type="button"
-            className="flex items-center gap-1 hover:underline"
-            onClick={onLike}
-            aria-label="いいね"
-          >
-            <img
-              src="/icons/good.svg"
-              alt=""
-              className="h-4 w-4"
-              style={isLikedByMe ? { filter: "brightness(0) saturate(100%) invert(18%) sepia(98%) saturate(7000%) hue-rotate(348deg)" } : undefined}
-            />
-            <span style={isLikedByMe ? { color: "#F2063C" } : undefined}>{likeCount}</span>
-          </button>
-        </p>
-      </div>
-      <button type="button" className="shrink-0 text-[var(--color-brand-logo)] hover:opacity-80" aria-label="その他">
-        <MoreIcon className="h-5 w-5" />
-      </button>
     </div>
   );
 }

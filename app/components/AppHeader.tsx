@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export type AppHeaderType = "logo" | "search" | "hashtag" | "title";
 
 export interface AppHeaderLogoProps {
@@ -29,6 +31,7 @@ export interface AppHeaderHashtagProps {
 export interface AppHeaderTitleProps {
   type: "title";
   title: string;
+  /** 指定時は戻るでこのURLへ遷移（未指定は history.back） */
   backHref?: string;
   /** 右側のボタン（例: 下書きリンク） */
   right?: React.ReactNode;
@@ -69,14 +72,10 @@ export default function AppHeader(props: AppHeaderProps) {
   }
 
   if (props.type === "title") {
-    const { title, right } = props;
-    const BackButton = () => (
-      <button
-        type="button"
-        className="flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]"
-        aria-label="1つ前のページに戻る"
-        onClick={() => window.history.back()}
-      >
+    const { title, right, backHref } = props;
+    const BackButton = () => {
+      const className = "flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]";
+      const img = (
         <img
           src="/icons/icon_back.svg"
           alt=""
@@ -84,12 +83,29 @@ export default function AppHeader(props: AppHeaderProps) {
           width={8}
           height={18}
         />
-      </button>
-    );
+      );
+      if (backHref) {
+        return (
+          <Link href={backHref} className={className} aria-label="戻る">
+            {img}
+          </Link>
+        );
+      }
+      return (
+        <button
+          type="button"
+          className={className}
+          aria-label="1つ前のページに戻る"
+          onClick={() => window.history.back()}
+        >
+          {img}
+        </button>
+      );
+    };
     return (
       <header className={`sticky top-0 z-40 relative flex ${HEADER_HEIGHT} items-center bg-[#FFE100] pl-2.5 pr-[5.333vw] shadow-sm`} aria-label={title}>
         <BackButton />
-        <h1 className="absolute left-1/2 top-1/2 min-w-0 -translate-x-1/2 -translate-y-1/2 px-2 text-center text-base font-bold text-gray-900">
+        <h1 className="absolute left-1/2 top-1/2 min-w-0 max-w-[calc(100%-5.5rem)] -translate-x-1/2 -translate-y-1/2 truncate px-2 text-center text-base font-bold text-gray-900">
           {title}
         </h1>
         <div className="ml-auto flex shrink-0 items-center">
