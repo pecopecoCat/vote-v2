@@ -188,8 +188,8 @@ export default function CommentInputModal({
         {/* body (tap-to-focus, input not visible) */}
         <button
           type="button"
-          className={`block w-full flex-1 px-5 py-6 text-left rounded-2xl transition-colors ${
-            isInputFocused ? "bg-white/80 ring-2 ring-[#FFE100] ring-offset-2 ring-offset-[#F1F1F1]" : ""
+          className={`block w-full flex-1 rounded-2xl border-2 px-5 py-6 text-left transition-colors ${
+            isInputFocused ? "border-[#FFE100] bg-[#FFFDF0]" : "border-transparent"
           }`}
           onClick={focusInput}
           disabled={effectiveDisabled}
