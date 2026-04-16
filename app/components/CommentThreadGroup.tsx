@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -65,6 +66,7 @@ export function CommentBody({
   className = "",
   replyNavigateHref,
   replyCountOverride,
+  navigateHref,
 }: {
   comment: VoteComment;
   onLike?: () => void;
@@ -76,11 +78,35 @@ export function CommentBody({
   replyNavigateHref?: string;
   /** 指定時は返信数表示を上書き（保存値が古い場合の補正） */
   replyCountOverride?: number;
+  /** 指定時は吹き出し全体タップで画面遷移 */
+  navigateHref?: string;
 }) {
+  const router = useRouter();
   const replyCount = replyCountOverride ?? comment.replyCount ?? 0;
   const likeCount = comment.likeCount ?? 0;
+  const navigable = Boolean(navigateHref);
+  const handleNavigate = useCallback(() => {
+    if (!navigateHref) return;
+    router.push(navigateHref);
+  }, [navigateHref, router]);
   return (
-    <div className={`min-w-0 flex-1 ${className}`.trim()}>
+    <div
+      className={`min-w-0 flex-1 ${className} ${navigable ? "cursor-pointer" : ""}`.trim()}
+      onClick={navigable ? handleNavigate : undefined}
+      role={navigable ? "link" : undefined}
+      tabIndex={navigable ? 0 : undefined}
+      onKeyDown={
+        navigable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleNavigate();
+              }
+            }
+          : undefined
+      }
+      aria-label={navigable ? "リプライ画面へ" : undefined}
+    >
       <p className="text-[14px] font-bold text-[#191919]">{comment.user.name}</p>
       <p className="mt-[0.2625rem] text-[15px] font-normal leading-relaxed text-[#191919]">{comment.text}</p>
       <div className="mt-[0.525rem] flex items-center justify-between gap-2">
@@ -91,12 +117,20 @@ export function CommentBody({
                 href={replyNavigateHref}
                 className="flex items-center gap-1.5 opacity-90 hover:opacity-100"
                 aria-label="リプライ画面へ"
+                onClick={(e) => e.stopPropagation()}
               >
                 <img src="/icons/comment.svg" alt="" className="h-[18px] w-[18px]" />
                 {replyCount}
               </Link>
             ) : (
-              <button type="button" className="flex items-center gap-1.5 opacity-90 hover:opacity-100" onClick={onReply}>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 opacity-90 hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReply?.();
+                }}
+              >
                 <img src="/icons/comment.svg" alt="" className="h-[18px] w-[18px]" />
                 {replyCount}
               </button>
@@ -107,7 +141,15 @@ export function CommentBody({
               {replyCount}
             </span>
           )}
-          <button type="button" className="flex items-center gap-1.5 opacity-90 hover:opacity-100" onClick={onLike} aria-label="いいね">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 opacity-90 hover:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              onLike?.();
+            }}
+            aria-label="いいね"
+          >
             <img
               src="/icons/good.svg"
               alt=""
@@ -117,7 +159,12 @@ export function CommentBody({
             <span className={isLikedByMe ? "text-[var(--color-select-a)]" : undefined}>{likeCount}</span>
           </button>
         </div>
-        <button type="button" className="shrink-0 p-0.5 text-[#191919] hover:opacity-70" aria-label="その他">
+        <button
+          type="button"
+          className="shrink-0 p-0.5 text-[#191919] hover:opacity-70"
+          aria-label="その他"
+          onClick={(e) => e.stopPropagation()}
+        >
           <MoreIcon className="h-5 w-5" />
         </button>
       </div>
@@ -134,6 +181,8 @@ export interface CommentThreadGroupProps {
   onReplyLike: (reply: VoteComment) => void;
   /** リプライ行のコメントアイコン用（replyToReplyHref 未指定時） */
   onReplyReply?: (reply: VoteComment) => void;
+  /** 指定時、親コメントの吹き出しタップでこのURLへ遷移 */
+  parentReplyThreadHref?: string;
   /** 先頭からこの件数だけ表示。超える分は replyListMoreHref で案内 */
   maxRepliesVisible?: number;
   replyListMoreHref?: string;
@@ -149,6 +198,7 @@ export default function CommentThreadGroup({
   onParentReply,
   onReplyLike,
   onReplyReply,
+  parentReplyThreadHref,
   maxRepliesVisible,
   replyListMoreHref,
   replyToReplyHref,
@@ -242,6 +292,8 @@ export default function CommentThreadGroup({
               showReplyButton
               isLikedByMe={likedCommentIds.includes(parent.id)}
               replyCountOverride={parentReplyCount}
+              replyNavigateHref={parentReplyThreadHref}
+              navigateHref={parentReplyThreadHref}
             />
           </div>
           {showConnector &&
@@ -260,6 +312,7 @@ export default function CommentThreadGroup({
                     onLike={() => onReplyLike(r)}
                     onReply={replyToReplyHref ? undefined : () => onReplyReply?.(r)}
                     replyNavigateHref={replyToReplyHref}
+                    navigateHref={replyToReplyHref}
                     showReplyButton
                     isLikedByMe={likedCommentIds.includes(r.id)}
                   />

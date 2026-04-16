@@ -54,6 +54,10 @@ interface CommentInputProps {
   loginReturnTo?: string;
   /** 返信先のユーザー名（指定時はプレースホルダーを「○○へリプライ」に） */
   replyToUserName?: string;
+  /** 返信モード解除（指定時は「返信先: ○○」と解除ボタンを表示） */
+  onCancelReply?: () => void;
+  /** 表示モード。bottomBar は画面下固定、inline は通常レイアウト内 */
+  variant?: "bottomBar" | "inline";
 }
 
 export default function CommentInput({
@@ -65,11 +69,34 @@ export default function CommentInput({
   showLoginButton = false,
   loginReturnTo = "/profile",
   replyToUserName,
+  onCancelReply,
+  variant = "bottomBar",
 }: CommentInputProps) {
   const [value, setValue] = useState("");
   const submittingRef = useRef(false);
   const barRef = useRef<HTMLDivElement>(null);
-  useCommentBarVisualViewportOffset(barRef, showLoginButton);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useCommentBarVisualViewportOffset(barRef, variant === "bottomBar" ? showLoginButton : undefined);
+
+  // 返信先を選んだら、すぐ入力できるようにフォーカス（モバイルの体感改善）
+  useEffect(() => {
+    if (disabled || showLoginButton) return;
+    if (variant === "bottomBar" && !replyToUserName) return;
+    // iOS Safari などで安定させるために、描画後へ回す
+    const t = window.setTimeout(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      // 既に入力済みでも末尾にカーソルを寄せる
+      try {
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      } catch {
+        // setSelectionRange が使えない環境は無視
+      }
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [replyToUserName, disabled, showLoginButton, variant]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -97,13 +124,18 @@ export default function CommentInput({
     return (
       <div
         ref={barRef}
-        className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-[#F1F1F1] px-4 py-3"
+        className={
+          variant === "bottomBar"
+            ? "comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-[#F1F1F1] px-4 py-3"
+            : "w-full px-4 py-3"
+        }
       >
-        {/* iOS 等：キーボード直上〜画面下端の隙間に背面 UI が透けるのを防ぐ白の延長 */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-full z-0 bg-[#F1F1F1] [height:max(12rem,min(85dvh,36rem))]"
-        />
+        {variant === "bottomBar" ? (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-full z-0 bg-[#F1F1F1] [height:max(12rem,min(85dvh,36rem))]"
+          />
+        ) : null}
         <div className="relative z-10 mx-auto max-w-lg">
           <Link
             href={href}
@@ -119,48 +151,69 @@ export default function CommentInput({
   return (
     <div
       ref={barRef}
-      className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-[#F1F1F1] px-4 pt-3"
+      className={
+        variant === "bottomBar"
+          ? "comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-[#F1F1F1] px-4 pt-3"
+          : "w-full px-4 pt-3"
+      }
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-full z-0 bg-[#F1F1F1] [height:max(12rem,min(85dvh,36rem))]"
-      />
-      <form
-        onSubmit={handleSubmit}
-        className="relative z-10 mx-auto flex max-w-lg overflow-hidden rounded-[9999px]"
-      >
-        <input
-          type="text"
-          placeholder={
-            disabled
-              ? (disabledPlaceholder ?? "投票してコメントしよう!")
-              : replyToUserName
-                ? `${replyToUserName}へリプライ`
-                : "選んだ理由は？"
-          }
-          value={value}
-          onChange={(e) => !disabled && setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          className={`min-w-0 flex-1 rounded-l-[9999px] border-y border-l border-r-0 px-4 py-3 text-sm focus:outline-none focus:ring-0 ${
-            disabled
-              ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 placeholder:text-gray-400"
-              : "border-gray-200 bg-gray-50 text-gray-900 placeholder:text-gray-400 focus:border-[#FFE100]"
-          }`}
-          aria-label={disabled ? "投票後にコメントできます" : "コメント入力"}
+      {variant === "bottomBar" ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-full z-0 bg-[#F1F1F1] [height:max(12rem,min(85dvh,36rem))]"
         />
-        <button
-          type="submit"
-          disabled={disabled}
-          className={`shrink-0 rounded-r-[9999px] border border-l-0 border-gray-200 px-5 py-3 text-sm font-bold transition-opacity ${
-            disabled
-              ? "cursor-not-allowed bg-gray-200 text-gray-400"
-              : "bg-[#FFE100] text-gray-900 active:opacity-90"
-          }`}
+      ) : null}
+      <div className="relative z-10 mx-auto max-w-lg">
+        {replyToUserName && onCancelReply && !disabled && (
+          <div className="mb-2 flex items-center justify-between gap-2 px-1 text-[12px] text-[#191919]">
+            <span className="min-w-0 truncate opacity-80">返信先: {replyToUserName}</span>
+            <button
+              type="button"
+              className="shrink-0 font-medium opacity-70 hover:opacity-100"
+              onClick={onCancelReply}
+            >
+              解除
+            </button>
+          </div>
+        )}
+        <form
+          onSubmit={handleSubmit}
+          className="flex overflow-hidden rounded-[9999px]"
         >
-          送信
-        </button>
-      </form>
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={
+              disabled
+                ? (disabledPlaceholder ?? "投票してコメントしよう!")
+                : replyToUserName
+                  ? `${replyToUserName}へリプライ`
+                  : "選んだ理由は？"
+            }
+            value={value}
+            onChange={(e) => !disabled && setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={disabled}
+            className={`min-w-0 flex-1 rounded-l-[9999px] border-y border-l border-r-0 px-4 py-3 text-sm focus:outline-none focus:ring-0 ${
+              disabled
+                ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 placeholder:text-gray-400"
+                : "border-gray-200 bg-gray-50 text-gray-900 placeholder:text-gray-400 focus:border-[#FFE100]"
+            }`}
+            aria-label={disabled ? "投票後にコメントできます" : "コメント入力"}
+          />
+          <button
+            type="submit"
+            disabled={disabled}
+            className={`shrink-0 rounded-r-[9999px] border border-l-0 border-gray-200 px-5 py-3 text-sm font-bold transition-opacity ${
+              disabled
+                ? "cursor-not-allowed bg-gray-200 text-gray-400"
+                : "bg-[#FFE100] text-gray-900 active:opacity-90"
+            }`}
+          >
+            送信
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

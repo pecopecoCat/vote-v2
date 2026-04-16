@@ -13,7 +13,7 @@ import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import RecommendedTags from "../../components/RecommendedTags";
 import NewestOldestSortDropdown from "../../components/NewestOldestSortDropdown";
 import CommentThreadGroup from "../../components/CommentThreadGroup";
-import CommentInput from "../../components/CommentInput";
+import CommentInputModal from "../../components/CommentInputModal";
 import {
   getVoteCardById,
   voteCardsData,
@@ -82,6 +82,7 @@ export default function CommentsPage() {
   const [commentSortOrder, setCommentSortOrder] = useState<"newest" | "oldest">("newest");
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const isLoggedIn = auth.isLoggedIn;
 
   useEffect(() => {
@@ -210,7 +211,7 @@ export default function CommentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-[100px]">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[120px]">
       <AppHeader type="title" title="みんなのコメント" backHref="/" />
 
       <main className="mx-auto max-w-lg px-[5.333vw] py-4">
@@ -281,9 +282,10 @@ export default function CommentsPage() {
                     onParentLike={() => addCommentLike(id, c.id, currentCard)}
                     onParentReply={() => setReplyingToCommentId(c.id)}
                     onReplyLike={(r) => addCommentLike(id, r.id, currentCard)}
+                    parentReplyThreadHref={`/comments/${id}/reply/${c.id}`}
                     maxRepliesVisible={1}
                     replyListMoreHref={replies.length > 1 ? `/comments/${id}/reply/${c.id}` : undefined}
-                    replyToReplyHref={replies.length > 0 ? `/comments/${id}/reply/${c.id}` : undefined}
+                    replyToReplyHref={`/comments/${id}/reply/${c.id}`}
                   />
                 );
               });
@@ -362,23 +364,38 @@ export default function CommentsPage() {
         )}
       </main>
 
-      {/* ページ下：未ログイン時は「ログインしてコメントしよう!」ボタン、ログイン時は入力欄 */}
-      <CommentInput
+      {/* 入力はモーダルで表示 */}
+      <CommentInputModal
+        open={isCommentModalOpen}
+        onClose={() => {
+          setIsCommentModalOpen(false);
+          setReplyingToCommentId(null);
+        }}
         cardId={id}
-        onCommentSubmit={(cardId, payload) =>
-          handleCommentSubmit(cardId, payload, replyingToCommentId ?? undefined)
-        }
+        onCommentSubmit={(cardId, payload) => handleCommentSubmit(cardId, payload, replyingToCommentId ?? undefined)}
         disabled={!isLoggedIn || activity.userSelectedOption == null}
         disabledPlaceholder={!isLoggedIn ? "ログインするとコメントできます" : undefined}
         currentUser={currentUser.type === "sns" ? { name: currentUser.name ?? "自分", iconUrl: currentUser.iconUrl } : undefined}
         showLoginButton={!isLoggedIn}
         loginReturnTo={`/comments/${id}`}
         replyToUserName={
-          replyingToCommentId
-            ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.name
-            : undefined
+          replyingToCommentId ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.name : undefined
         }
+        onCancelReply={() => setReplyingToCommentId(null)}
       />
+
+      {/* 画面下固定：入力を開くボタン */}
+      <div className="fixed inset-x-0 bottom-0 z-30 bg-transparent px-4 pb-4">
+        <div className="mx-auto max-w-lg">
+          <button
+            type="button"
+            className="w-full rounded-[9999px] bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 shadow-lg hover:opacity-95 active:opacity-90"
+            onClick={() => setIsCommentModalOpen(true)}
+          >
+            {replyingToCommentId ? "リプライする" : "コメントする"}
+          </button>
+        </div>
+      </div>
 
       {cardOptionsCardId != null && (
         <CardOptionsModal

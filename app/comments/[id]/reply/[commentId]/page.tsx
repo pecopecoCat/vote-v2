@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "../../../../components/AppHeader";
-import CommentInput from "../../../../components/CommentInput";
+import CommentInputModal from "../../../../components/CommentInputModal";
 import { CommentAvatar, CommentBody } from "../../../../components/CommentThreadGroup";
 import { getVoteCardById, voteCardsData } from "../../../../data/voteCards";
 import {
@@ -49,6 +49,7 @@ export default function CommentReplyThreadPage() {
   const [auth, setAuth] = useState(() => getAuth());
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
+  const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
   const isLoggedIn = auth.isLoggedIn;
 
   useEffect(() => {
@@ -129,7 +130,7 @@ export default function CommentReplyThreadPage() {
     : parent.user.name;
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-[100px]">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[120px]">
       <AppHeader type="title" title={headerTitle} backHref={`/comments/${id}`} />
 
       <main>
@@ -178,18 +179,34 @@ export default function CommentReplyThreadPage() {
         </div>
       </main>
 
-      <CommentInput
+      <CommentInputModal
+        open={isReplyModalOpen}
+        onClose={() => {
+          setIsReplyModalOpen(false);
+          setReplyingToCommentId(null);
+        }}
         cardId={id}
-        onCommentSubmit={(cardId, payload) =>
-          handleCommentSubmit(cardId, payload, replyingToCommentId ?? parent.id)
-        }
+        onCommentSubmit={(cardId, payload) => handleCommentSubmit(cardId, payload, replyingToCommentId ?? parent.id)}
         disabled={!isLoggedIn || activity.userSelectedOption == null}
         disabledPlaceholder={!isLoggedIn ? "ログインするとコメントできます" : undefined}
         currentUser={currentUser.type === "sns" ? { name: currentUser.name ?? "自分", iconUrl: currentUser.iconUrl } : undefined}
         showLoginButton={!isLoggedIn}
         loginReturnTo={`/comments/${id}/reply/${commentId}`}
         replyToUserName={replyTargetName}
+        onCancelReply={() => setReplyingToCommentId(null)}
       />
+
+      <div className="fixed inset-x-0 bottom-0 z-30 bg-transparent px-4 pb-4">
+        <div className="mx-auto max-w-lg">
+          <button
+            type="button"
+            className="w-full rounded-[9999px] bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 shadow-lg hover:opacity-95 active:opacity-90"
+            onClick={() => setIsReplyModalOpen(true)}
+          >
+            リプライする
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
