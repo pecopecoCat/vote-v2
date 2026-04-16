@@ -102,7 +102,7 @@ export default function CommentInput({
         {/* iOS 等：キーボード直上〜画面下端の隙間に背面 UI が透けるのを防ぐ白の延長 */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-full z-0 bg-white [height:max(12rem,min(85dvh,36rem))]"
+          className="pointer-events-none absolute inset-x-0 top-full z-0 bg-[#F1F1F1] [height:max(12rem,min(85dvh,36rem))]"
         />
         <div className="relative z-10 mx-auto max-w-lg">
           <Link
@@ -123,7 +123,7 @@ export default function CommentInput({
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-full z-0 bg-white [height:max(12rem,min(85dvh,36rem))]"
+        className="pointer-events-none absolute inset-x-0 top-full z-0 bg-[#F1F1F1] [height:max(12rem,min(85dvh,36rem))]"
       />
       <form
         onSubmit={handleSubmit}
