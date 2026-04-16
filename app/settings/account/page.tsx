@@ -6,12 +6,6 @@ import Link from "next/link";
 import AppHeader from "../../components/AppHeader";
 import { getAuth, updateCurrentUserProfile, getAuthUpdatedEventName } from "../../data/auth";
 
-const ICON_OPTIONS = [
-  { value: "/user1.png", label: "女性" },
-  { value: "/user2.png", label: "男性" },
-  { value: "/default-avatar.png", label: "デフォルト" },
-] as const;
-
 export default function AccountSettingsPage() {
   const router = useRouter();
   const auth = getAuth();
@@ -113,21 +107,6 @@ export default function AccountSettingsPage() {
                 }}
               />
             </button>
-          </div>
-          <p className="mt-2 text-xs text-gray-500">プリセットから選ぶ</p>
-          <div className="mt-1.5 flex gap-3">
-            {ICON_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setIconUrl(opt.value)}
-                className={`h-12 w-12 overflow-hidden rounded-full border-2 ${
-                  iconUrl === opt.value ? "border-[#FFE100]" : "border-gray-200"
-                }`}
-              >
-                <img src={opt.value} alt={opt.label} className="h-full w-full object-cover" />
-              </button>
-            ))}
           </div>
         </div>
 

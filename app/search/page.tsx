@@ -632,6 +632,7 @@ function SearchContent() {
                       title={col.name}
                       gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
                       showPin={pinnedCollectionIds.includes(col.id)}
+                      popularBanner
                       href={`/collection/${col.id}`}
                     />
                   ))

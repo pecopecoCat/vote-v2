@@ -41,7 +41,7 @@ export default function NewestOldestSortDropdown({
     <div className="relative inline-flex">
       <button
         type="button"
-        className="flex min-h-[36px] min-w-[7.75rem] items-center justify-between gap-2 rounded-full border border-[#DADADA] bg-white py-1.5 pl-3.5 pr-1.5 text-left text-[12px] font-normal leading-none text-[#787878] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-base)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+        className="flex min-h-[36px] min-w-[7.75rem] items-center justify-between gap-2 rounded-full border border-[#DADADA] bg-white py-1.5 pl-3.5 pr-1.5 text-left text-[12px] font-normal leading-none text-[#787878] transition-shadow duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-base)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
@@ -70,7 +70,7 @@ export default function NewestOldestSortDropdown({
           />
           <ul
             id={listboxId}
-            className={`absolute top-full z-20 mt-2 min-w-[148px] overflow-hidden rounded-xl border border-[#DADADA] bg-white py-1 shadow-[0_8px_30px_rgba(0,0,0,0.12)] ${menuPosition}`}
+            className={`absolute top-full z-20 mt-2 min-w-[148px] overflow-hidden rounded-xl border border-[#DADADA] bg-white py-1 shadow-none ${menuPosition}`}
             role="listbox"
           >
             {OPTIONS.map((opt) => {

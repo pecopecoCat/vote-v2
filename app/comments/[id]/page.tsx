@@ -8,6 +8,7 @@ import AppHeader from "../../components/AppHeader";
 import VoteCard from "../../components/VoteCard";
 import VoteCardMini from "../../components/VoteCardMini";
 import CollectionCard from "../../components/CollectionCard";
+import BottomNav from "../../components/BottomNav";
 import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
@@ -394,7 +395,7 @@ export default function CommentsPage() {
       />
 
       {/* 画面下固定：入力を開くボタン */}
-      <div className="fixed inset-x-0 bottom-0 z-30 bg-transparent px-4 pb-4">
+      <div className="fixed inset-x-0 bottom-14 z-30 bg-transparent px-4 pb-4">
         <div className="mx-auto max-w-lg">
           <button
             type="button"
@@ -423,6 +424,8 @@ export default function CommentsPage() {
           </button>
         </div>
       </div>
+
+      <BottomNav activeId="home" />
 
       {cardOptionsCardId != null && (
         <CardOptionsModal

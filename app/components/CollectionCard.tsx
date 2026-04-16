@@ -15,6 +15,8 @@ export interface CollectionCardProps {
   href?: string;
   /** タイトルを白文字・黒ブロックで表示（マリオカード用）。title に \n で改行可能 */
   titleVariant?: "default" | "blackBlock";
+  /** 人気コレクション枠でのみ、タイトルフォントを大きくする */
+  popularBanner?: boolean;
   /** 右上のラベル（例: コレクション）。角丸・薄い背景付き */
   label?: string;
   /** タイムライン用バナー：W335px相当・H260px・タイトルは黒ベタ・#ffffff・26px */
@@ -29,6 +31,7 @@ export default function CollectionCard({
   showPin = false,
   href,
   titleVariant = "default",
+  popularBanner = false,
   label,
   timelineBanner = false,
 }: CollectionCardProps) {
@@ -79,7 +82,13 @@ export default function CollectionCard({
           </p>
         </div>
       ) : (
-        <p className={`text-sm font-bold text-[#191919] ${showPin ? "pr-12" : ""}`}>{title}</p>
+        <p
+          className={`${
+            popularBanner ? "text-[21px] leading-none" : "text-sm"
+          } font-bold text-[#191919] ${showPin ? "pr-12" : ""}`.trim()}
+        >
+          {title}
+        </p>
       )}
     </article>
   );

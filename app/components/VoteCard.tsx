@@ -235,12 +235,12 @@ function VoteCard({
                   <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#E63E48] py-3.5 text-base font-bold text-white">
                     A
                   </span>
-                  <div className="vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-xl bg-white py-3.5 pl-4 pr-[20px]">
+                  <div className="vote-card-option-text relative flex flex-1 min-w-0 items-start overflow-visible rounded-r-xl bg-white py-3.5 pl-4 pr-[20px]">
                     <div
                       className={`absolute inset-y-0 left-0 overflow-hidden bg-[#fce4ec] transition-[width] duration-300 ease-out ${displayPercentA >= 100 ? "rounded-r-xl" : ""}`}
                       style={{ width: `${displayPercentA}%` }}
                     />
-                    <span className="relative z-10 min-w-0 truncate font-semibold text-[#CF0606]">
+                    <span className="relative z-10 min-w-0 whitespace-normal break-words font-semibold text-[#CF0606] leading-snug text-[clamp(12px,4.8vw,16px)]">
                       {optionA}
                     </span>
                     <span className="relative z-10 ml-auto flex min-w-[3rem] shrink-0 items-baseline justify-end">
@@ -260,12 +260,12 @@ function VoteCard({
                   <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#3273E3] py-3.5 text-base font-bold text-white">
                     B
                   </span>
-                  <div className="vote-card-option-text relative flex flex-1 min-w-0 items-center overflow-visible rounded-r-xl bg-white py-3.5 pl-4 pr-[20px]">
+                  <div className="vote-card-option-text relative flex flex-1 min-w-0 items-start overflow-visible rounded-r-xl bg-white py-3.5 pl-4 pr-[20px]">
                     <div
                       className={`absolute inset-y-0 left-0 overflow-hidden bg-[#e3f2fd] transition-[width] duration-300 ease-out ${displayPercentB >= 100 ? "rounded-r-xl" : ""}`}
                       style={{ width: `${displayPercentB}%` }}
                     />
-                    <span className="relative z-10 min-w-0 truncate font-semibold text-[#1F77D4]">
+                    <span className="relative z-10 min-w-0 whitespace-normal break-words font-semibold text-[#1F77D4] leading-snug text-[clamp(12px,4.8vw,16px)]">
                       {optionB}
                     </span>
                     <span className="relative z-10 ml-auto flex min-w-[3rem] shrink-0 items-baseline justify-end">
@@ -364,7 +364,13 @@ function VoteCard({
       {(optionAImageUrl != null || optionBImageUrl != null) && (
         <div className="flex gap-2 px-5 pt-3">
           {optionAImageUrl != null && (
-            <div className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100">
+            <button
+              type="button"
+              className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFE100] disabled:cursor-not-allowed"
+              onClick={handleSelectA}
+              disabled={selectedOption !== null}
+              aria-label="Aを投票"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={optionAImageUrl}
@@ -377,10 +383,16 @@ function VoteCard({
               >
                 A
               </span>
-            </div>
+            </button>
           )}
           {optionBImageUrl != null && (
-            <div className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100">
+            <button
+              type="button"
+              className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFE100] disabled:cursor-not-allowed"
+              onClick={handleSelectB}
+              disabled={selectedOption !== null}
+              aria-label="Bを投票"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={optionBImageUrl}
@@ -393,7 +405,7 @@ function VoteCard({
               >
                 B
               </span>
-            </div>
+            </button>
           )}
         </div>
       )}
