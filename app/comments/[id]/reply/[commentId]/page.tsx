@@ -128,6 +128,9 @@ export default function CommentReplyThreadPage() {
   const replyTargetName = replyingToCommentId
     ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.name
     : parent.user.name;
+  const replyTargetIconUrl = replyingToCommentId
+    ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.iconUrl
+    : parent.user.iconUrl;
 
   return (
     <div className="min-h-screen bg-[#F1F1F1] pb-[120px]">
@@ -193,6 +196,7 @@ export default function CommentReplyThreadPage() {
         showLoginButton={!isLoggedIn}
         loginReturnTo={`/comments/${id}/reply/${commentId}`}
         replyToUserName={replyTargetName}
+        replyToUserIconUrl={replyTargetIconUrl}
         onCancelReply={() => setReplyingToCommentId(null)}
       />
 

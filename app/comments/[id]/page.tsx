@@ -381,6 +381,9 @@ export default function CommentsPage() {
         replyToUserName={
           replyingToCommentId ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.name : undefined
         }
+        replyToUserIconUrl={
+          replyingToCommentId ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.iconUrl : undefined
+        }
         onCancelReply={() => setReplyingToCommentId(null)}
       />
 
