@@ -36,6 +36,7 @@ export default function CommentInputModal({
 }: CommentInputModalProps) {
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [keyboardInsetPx, setKeyboardInsetPx] = useState(0);
 
   useEffect(() => {
     if (!open) return;
@@ -52,6 +53,33 @@ export default function CommentInputModal({
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    let raf = 0;
+    const update = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const inset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+        setKeyboardInsetPx(inset);
+      });
+    };
+
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      cancelAnimationFrame(raf);
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      window.removeEventListener("orientationchange", update);
+      setKeyboardInsetPx(0);
     };
   }, [open]);
 
@@ -89,6 +117,7 @@ export default function CommentInputModal({
         <div className="fixed inset-0 z-[60] bg-black/50" aria-hidden onClick={onClose} />
         <div
           className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white shadow-lg"
+          style={{ bottom: keyboardInsetPx, transition: "bottom 160ms ease-out" }}
           role="dialog"
           aria-modal="true"
           aria-label={modalTitle}
@@ -125,6 +154,7 @@ export default function CommentInputModal({
       <div className="fixed inset-0 z-[60] bg-black/50" aria-hidden onClick={onClose} />
       <div
         className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white shadow-lg"
+        style={{ bottom: keyboardInsetPx, transition: "bottom 160ms ease-out" }}
         role="dialog"
         aria-modal="true"
         aria-label={modalTitle}

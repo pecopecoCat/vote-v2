@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useEffect } from "react";
 import AppHeader from "../../components/AppHeader";
 import VoteCard from "../../components/VoteCard";
@@ -64,6 +65,7 @@ const emptyActivity = { countA: 0, countB: 0, comments: [] as VoteComment[], use
 
 export default function CommentsPage() {
   const params = useParams();
+  const router = useRouter();
   const id = typeof params.id === "string" ? params.id : "0";
   const shared = useSharedData();
   const { createdVotesForTimeline, activity: sharedActivity, addVote: sharedAddVote, addComment: sharedAddComment } = shared;
@@ -84,6 +86,9 @@ export default function CommentsPage() {
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const isLoggedIn = auth.isLoggedIn;
+  const canPostByVote = activity.userSelectedOption != null;
+  const canOpenPostModal = !isLoggedIn || canPostByVote;
+  const canUseReplyAction = isLoggedIn && canPostByVote;
 
   useEffect(() => {
     const handler = () => setLikedCommentIds(getCommentIdsLikedByCurrentUser(id));
@@ -282,6 +287,7 @@ export default function CommentsPage() {
                     onParentLike={() => addCommentLike(id, c.id, currentCard)}
                     onParentReply={() => setReplyingToCommentId(c.id)}
                     onReplyLike={(r) => addCommentLike(id, r.id, currentCard)}
+                    canReply={canUseReplyAction}
                     parentReplyThreadHref={`/comments/${id}/reply/${c.id}`}
                     maxRepliesVisible={1}
                     replyListMoreHref={replies.length > 1 ? `/comments/${id}/reply/${c.id}` : undefined}
@@ -392,10 +398,28 @@ export default function CommentsPage() {
         <div className="mx-auto max-w-lg">
           <button
             type="button"
-            className="w-full rounded-[9999px] bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 shadow-lg hover:opacity-95 active:opacity-90"
-            onClick={() => setIsCommentModalOpen(true)}
+            className={`w-full rounded-[9999px] py-3.5 text-center text-sm font-bold shadow-lg ${
+              canOpenPostModal
+                ? "bg-[#FFE100] text-gray-900 hover:opacity-95 active:opacity-90"
+                : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
+            }`}
+            onClick={() => {
+              if (!isLoggedIn) {
+                router.push(`/profile/login?returnTo=${encodeURIComponent(`/comments/${id}`)}`);
+                return;
+              }
+              if (!canPostByVote) return;
+              setIsCommentModalOpen(true);
+            }}
+            disabled={!canOpenPostModal}
           >
-            {replyingToCommentId ? "リプライする" : "コメントする"}
+            {!isLoggedIn
+              ? "ログインするとコメントできるよ！"
+              : canPostByVote
+                ? replyingToCommentId
+                  ? "リプライする"
+                  : "コメントする"
+                : "投票するとコメントできます"}
           </button>
         </div>
       </div>

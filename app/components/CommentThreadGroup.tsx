@@ -62,6 +62,7 @@ export function CommentBody({
   onLike,
   onReply,
   showReplyButton,
+  replyDisabled,
   isLikedByMe,
   className = "",
   replyNavigateHref,
@@ -72,6 +73,7 @@ export function CommentBody({
   onLike?: () => void;
   onReply?: () => void;
   showReplyButton?: boolean;
+  replyDisabled?: boolean;
   isLikedByMe?: boolean;
   className?: string;
   /** 指定時はリプライアイコンが画面遷移（ボタンの代わりに Link） */
@@ -125,9 +127,13 @@ export function CommentBody({
             ) : (
               <button
                 type="button"
-                className="flex items-center gap-1.5 opacity-90 hover:opacity-100"
+                className={`flex items-center gap-1.5 opacity-90 hover:opacity-100 ${
+                  replyDisabled ? "cursor-not-allowed opacity-40 hover:opacity-40" : ""
+                }`}
+                disabled={replyDisabled}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (replyDisabled) return;
                   onReply?.();
                 }}
               >
@@ -179,6 +185,8 @@ export interface CommentThreadGroupProps {
   onParentLike: () => void;
   onParentReply: () => void;
   onReplyLike: (reply: VoteComment) => void;
+  /** true のときリプライ操作を有効化。false のときリプライボタンを非活性（投票前など） */
+  canReply?: boolean;
   /** リプライ行のコメントアイコン用（replyToReplyHref 未指定時） */
   onReplyReply?: (reply: VoteComment) => void;
   /** 指定時、親コメントの吹き出しタップでこのURLへ遷移 */
@@ -197,6 +205,7 @@ export default function CommentThreadGroup({
   onParentLike,
   onParentReply,
   onReplyLike,
+  canReply = true,
   onReplyReply,
   parentReplyThreadHref,
   maxRepliesVisible,
@@ -290,6 +299,7 @@ export default function CommentThreadGroup({
               onLike={onParentLike}
               onReply={onParentReply}
               showReplyButton
+              replyDisabled={!canReply}
               isLikedByMe={likedCommentIds.includes(parent.id)}
               replyCountOverride={parentReplyCount}
               replyNavigateHref={parentReplyThreadHref}
@@ -314,6 +324,7 @@ export default function CommentThreadGroup({
                     replyNavigateHref={replyToReplyHref}
                     navigateHref={replyToReplyHref}
                     showReplyButton
+                    replyDisabled={!canReply && !replyToReplyHref}
                     isLikedByMe={likedCommentIds.includes(r.id)}
                   />
                 </div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "../../../../components/AppHeader";
 import CommentInputModal from "../../../../components/CommentInputModal";
@@ -35,6 +36,7 @@ const emptyActivity = { countA: 0, countB: 0, comments: [] as VoteComment[], use
 
 export default function CommentReplyThreadPage() {
   const params = useParams();
+  const router = useRouter();
   const id = typeof params.id === "string" ? params.id : "0";
   const commentId = typeof params.commentId === "string" ? params.commentId : "";
   const shared = useSharedData();
@@ -51,6 +53,8 @@ export default function CommentReplyThreadPage() {
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
   const isLoggedIn = auth.isLoggedIn;
+  const canPostByVote = activity.userSelectedOption != null;
+  const canOpenPostModal = !isLoggedIn || canPostByVote;
 
   useEffect(() => {
     const handler = () => setLikedCommentIds(getCommentIdsLikedByCurrentUser(id));
@@ -149,6 +153,7 @@ export default function CommentReplyThreadPage() {
                 onLike={() => addCommentLike(id, parent.id, currentCard)}
                 onReply={() => setReplyingToCommentId(parent.id)}
                 showReplyButton
+                replyDisabled={!canOpenPostModal}
                 isLikedByMe={likedCommentIds.includes(parent.id)}
                 replyCountOverride={replies.length}
               />
@@ -174,6 +179,7 @@ export default function CommentReplyThreadPage() {
                   onLike={() => addCommentLike(id, r.id, currentCard)}
                   onReply={() => setReplyingToCommentId(r.id)}
                   showReplyButton
+                  replyDisabled={!canOpenPostModal}
                   isLikedByMe={likedCommentIds.includes(r.id)}
                 />
               </div>
@@ -204,10 +210,28 @@ export default function CommentReplyThreadPage() {
         <div className="mx-auto max-w-lg">
           <button
             type="button"
-            className="w-full rounded-[9999px] bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 shadow-lg hover:opacity-95 active:opacity-90"
-            onClick={() => setIsReplyModalOpen(true)}
+            className={`w-full rounded-[9999px] py-3.5 text-center text-sm font-bold shadow-lg ${
+              canOpenPostModal
+                ? "bg-[#FFE100] text-gray-900 hover:opacity-95 active:opacity-90"
+                : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
+            }`}
+            onClick={() => {
+              if (!isLoggedIn) {
+                router.push(
+                  `/profile/login?returnTo=${encodeURIComponent(`/comments/${id}/reply/${commentId}`)}`
+                );
+                return;
+              }
+              if (!canPostByVote) return;
+              setIsReplyModalOpen(true);
+            }}
+            disabled={!canOpenPostModal}
           >
-            リプライする
+            {!isLoggedIn
+              ? "ログインするとリプライできるよ！"
+              : canPostByVote
+                ? "リプライする"
+                : "投票するとリプライできます"}
           </button>
         </div>
       </div>
