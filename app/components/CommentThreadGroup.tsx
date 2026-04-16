@@ -323,7 +323,9 @@ export default function CommentThreadGroup({
                     onReply={replyToReplyHref ? undefined : () => onReplyReply?.(r)}
                     replyNavigateHref={replyToReplyHref}
                     navigateHref={replyToReplyHref}
-                    showReplyButton
+                    // リプライにリプライはしない想定なので、この画面では吹き出し（リプライ数/ボタン）を出さない
+                    showReplyButton={false}
+                    replyCountOverride={0}
                     replyDisabled={!canReply && !replyToReplyHref}
                     isLikedByMe={likedCommentIds.includes(r.id)}
                   />
