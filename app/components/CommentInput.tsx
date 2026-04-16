@@ -97,7 +97,7 @@ export default function CommentInput({
     return (
       <div
         ref={barRef}
-        className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 py-3"
+        className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-[#F1F1F1] px-4 py-3"
       >
         {/* iOS 等：キーボード直上〜画面下端の隙間に背面 UI が透けるのを防ぐ白の延長 */}
         <div
@@ -119,7 +119,7 @@ export default function CommentInput({
   return (
     <div
       ref={barRef}
-      className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 pt-3"
+      className="comment-input-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-[#F1F1F1] px-4 pt-3"
     >
       <div
         aria-hidden
