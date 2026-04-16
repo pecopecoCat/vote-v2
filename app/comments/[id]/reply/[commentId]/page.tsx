@@ -151,11 +151,8 @@ export default function CommentReplyThreadPage() {
               <CommentBody
                 comment={parent}
                 onLike={() => addCommentLike(id, parent.id, currentCard)}
-                onReply={() => setReplyingToCommentId(parent.id)}
-                showReplyButton
-                replyDisabled={!canOpenPostModal}
                 isLikedByMe={likedCommentIds.includes(parent.id)}
-                replyCountOverride={replies.length}
+                replyCountOverride={0}
               />
             </div>
           </div>
@@ -177,10 +174,8 @@ export default function CommentReplyThreadPage() {
                 <CommentBody
                   comment={r}
                   onLike={() => addCommentLike(id, r.id, currentCard)}
-                  onReply={() => setReplyingToCommentId(r.id)}
-                  showReplyButton
-                  replyDisabled={!canOpenPostModal}
                   isLikedByMe={likedCommentIds.includes(r.id)}
+                  replyCountOverride={0}
                 />
               </div>
             ))
@@ -203,7 +198,7 @@ export default function CommentReplyThreadPage() {
         loginReturnTo={`/comments/${id}/reply/${commentId}`}
         replyToUserName={replyTargetName}
         replyToUserIconUrl={replyTargetIconUrl}
-        onCancelReply={() => setReplyingToCommentId(null)}
+        onCancelReply={replyingToCommentId ? () => setReplyingToCommentId(null) : undefined}
       />
 
       <div className="fixed inset-x-0 bottom-0 z-30 bg-transparent px-4 pb-4">
