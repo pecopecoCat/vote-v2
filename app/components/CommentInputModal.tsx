@@ -37,7 +37,6 @@ export default function CommentInputModal({
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [keyboardInsetPx, setKeyboardInsetPx] = useState(0);
-  const [isInputFocused, setIsInputFocused] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -55,10 +54,6 @@ export default function CommentInputModal({
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) setIsInputFocused(false);
   }, [open]);
 
   useEffect(() => {
@@ -97,7 +92,6 @@ export default function CommentInputModal({
   const focusInput = () => {
     if (effectiveDisabled) return;
     inputRef.current?.focus();
-    setIsInputFocused(true);
   };
 
   const handleSubmit = () => {
@@ -188,9 +182,7 @@ export default function CommentInputModal({
         {/* body (tap-to-focus, input not visible) */}
         <button
           type="button"
-          className={`block w-full flex-1 rounded-2xl border-2 px-5 py-6 text-left transition-colors ${
-            isInputFocused ? "border-[#FFE100] bg-[#FFFDF0]" : "border-transparent"
-          }`}
+          className="block w-full flex-1 px-5 py-6 text-left"
           onClick={focusInput}
           disabled={effectiveDisabled}
         >
@@ -233,7 +225,6 @@ export default function CommentInputModal({
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onBlur={() => setIsInputFocused(false)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.preventDefault();
