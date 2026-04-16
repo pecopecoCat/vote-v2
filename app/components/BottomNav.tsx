@@ -46,12 +46,13 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
         const showUserIcon = id === "profile" && userIconUrl;
         const icon = showUserIcon ? (
           <span
-            className={`block h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full ${isActive ? "ring-2 ring-[#191919]" : ""}`}
+            className="block h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full"
+            style={isActive ? { boxShadow: "inset 0 0 0 2px #191919" } : undefined}
           >
             <img
               src={userIconUrl}
               alt=""
-              className="h-full w-full object-cover"
+              className="h-full w-full scale-[1.12] object-cover"
               width={22}
               height={22}
               aria-hidden
