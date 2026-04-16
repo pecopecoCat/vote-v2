@@ -123,15 +123,21 @@ export default function CommentsPage() {
     if (!card) {
       return { bottomCards: [] as VoteCardData[], bottomSectionTitle: "関連VOTE" };
     }
-    const related = getRelatedVoteCardsByTagPriority(card, allCards, id, 10);
+    const onlyUnvoted = (cards: VoteCardData[]) =>
+      cards.filter((c) => {
+        const cid = c.id ?? c.question;
+        return sharedActivity[cid]?.userSelectedOption == null;
+      });
+
+    const related = onlyUnvoted(getRelatedVoteCardsByTagPriority(card, allCards, id, 10));
     if (related.length > 0) {
-      return { bottomCards: related, bottomSectionTitle: "関連VOTE" };
+      return { bottomCards: related.slice(0, 10), bottomSectionTitle: "関連VOTE" };
     }
     return {
-      bottomCards: getNewestVoteCards(allCards, id, 10),
+      bottomCards: onlyUnvoted(getNewestVoteCards(allCards, id, 30)).slice(0, 10),
       bottomSectionTitle: "新着VOTE",
     };
-  }, [card, allCards, id]);
+  }, [card, allCards, id, sharedActivity]);
 
   /** みんなのコメントページ：カードにタグあり→1個目に似たタグ10件、なし→注目のタグ10件 */
   const commentsPageTagList = useMemo(() => {
