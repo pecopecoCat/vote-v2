@@ -198,6 +198,15 @@ function SearchContent() {
     setTagListSortOrder("newest");
   }, [tagFromUrl]);
 
+  /**
+   * 「投票済みを表示」OFF のとき、投票直後はカードをタイムラインに残す（結果表示のまま）。
+   * タグ切替・別ページ遷移・リロードで state が消えたら通常フィルタに戻る。
+   */
+  const [keepVotedCardVisible, setKeepVotedCardVisible] = useState<Record<string, true>>({});
+  useEffect(() => {
+    setKeepVotedCardVisible({});
+  }, [tagFromUrl]);
+
   const query = searchValue.trim();
   const isSearching = query.length > 0;
   const matchedCollectionsRaw = useMemo(() => searchCollections(query), [query]);
@@ -347,9 +356,10 @@ function SearchContent() {
     if (showVoted) return filteredCards;
     return filteredCards.filter((card) => {
       const cardId = card.id ?? `seed-${voteCardsData.indexOf(card)}`;
+      if (keepVotedCardVisible[cardId]) return true;
       return !activity[cardId]?.userSelectedOption;
     });
-  }, [filteredCards, showVoted, activity]);
+  }, [filteredCards, showVoted, activity, keepVotedCardVisible]);
   const backgroundPerCard = useMemo(
     () =>
       voteCardsData.map(
@@ -360,9 +370,15 @@ function SearchContent() {
       ),
     []
   );
-  const handleVote = useCallback((cardId: string, option: "A" | "B") => {
-    void sharedAddVote(cardId, option);
-  }, [sharedAddVote]);
+  const handleVote = useCallback(
+    (cardId: string, option: "A" | "B") => {
+      if (!showVoted) {
+        setKeepVotedCardVisible((prev) => ({ ...prev, [cardId]: true }));
+      }
+      void sharedAddVote(cardId, option);
+    },
+    [sharedAddVote, showVoted]
+  );
 
   const handleTagFilterCardMoreClick = useCallback(
     (cardId: string) => {
