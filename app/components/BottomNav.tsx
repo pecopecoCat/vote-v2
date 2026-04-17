@@ -44,33 +44,66 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
         const className =
           "flex flex-col items-center justify-center gap-0.5 py-2 transition-colors active:opacity-80 min-w-[56px]";
         const showUserIcon = id === "profile" && userIconUrl;
-        const icon = showUserIcon ? (
-          <span
-            className="block h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full"
-            style={isActive ? { boxShadow: "inset 0 0 0 2px #191919" } : undefined}
-          >
+        /** プロフィールは円形クリップで実寸より小さく見えるため、他タブより一回り大きくして視覚的に揃える */
+        const profilePx = 26;
+        const iconPx = id === "profile" ? profilePx : 22;
+        /** マイページ選択時: #191919 の 2px 縁（ring は内側クリップと分離して描画） */
+        const profileActiveRing = "ring-2 ring-[#191919] ring-offset-0";
+
+        const icon = (() => {
+          if (showUserIcon) {
+            const avatar = (
+              <span
+                className="block shrink-0 overflow-hidden rounded-full"
+                style={{ width: profilePx, height: profilePx }}
+              >
+                <img
+                  src={userIconUrl}
+                  alt=""
+                  className="h-full w-full scale-[1.08] object-cover"
+                  width={profilePx}
+                  height={profilePx}
+                  aria-hidden
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                  }}
+                />
+              </span>
+            );
+            return isActive ? (
+              <span className={`inline-flex shrink-0 rounded-full ${profileActiveRing}`}>{avatar}</span>
+            ) : (
+              avatar
+            );
+          }
+          if (id === "profile") {
+            const mypageImg = (
+              <img
+                src={isActive ? srcOn : src}
+                alt=""
+                className="h-[26px] w-[26px] shrink-0"
+                width={iconPx}
+                height={iconPx}
+                aria-hidden
+              />
+            );
+            return isActive ? (
+              <span className={`inline-flex shrink-0 rounded-full ${profileActiveRing}`}>{mypageImg}</span>
+            ) : (
+              mypageImg
+            );
+          }
+          return (
             <img
-              src={userIconUrl}
+              src={isActive ? srcOn : src}
               alt=""
-              className="h-full w-full scale-[1.12] object-cover"
-              width={22}
-              height={22}
+              className="h-[22px] w-[22px] shrink-0"
+              width={iconPx}
+              height={iconPx}
               aria-hidden
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
-              }}
             />
-          </span>
-        ) : (
-          <img
-            src={isActive ? srcOn : src}
-            alt=""
-            className="h-[22px] w-[22px] shrink-0"
-            width={22}
-            height={22}
-            aria-hidden
-          />
-        );
+          );
+        })();
         if (href) {
           return (
             <Link

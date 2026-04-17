@@ -31,7 +31,7 @@ export default function NotificationTabs({
 
   return (
     <div className="bg-[#F1F1F1]">
-      <AppHeader type="title" title="お知らせ" backHref="/" />
+      <AppHeader type="logo" />
 
       {/* タブバー：上マージン120%(12px→14.4px)、下マージン95%(12px→11.4px)。黄ラインは境界に */}
       {isLoggedIn && (
@@ -73,8 +73,8 @@ export default function NotificationTabs({
         </div>
       )}
 
-      {/* コンテンツ（グレー上のpadding 150%: 16px→24px） */}
-      <main className="mx-auto max-w-lg px-[5.333vw] pb-4 pt-6">
+      {/* コンテンツ（グレー背景・デザイン画像に合わせた余白） */}
+      <main className="mx-auto max-w-lg px-[5.333vw] pb-6 pt-4">
         {effectiveTab === "activity" ? activityContent : announcementsContent}
       </main>
     </div>

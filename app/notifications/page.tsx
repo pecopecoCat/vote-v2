@@ -40,7 +40,11 @@ function formatDate(iso: string): string {
   if (!iso) return "";
   try {
     const d = new Date(iso);
-    return d.toLocaleDateString("ja-JP", { year: "numeric", month: "numeric", day: "numeric" });
+    if (Number.isNaN(d.getTime())) return iso;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}.${m}.${day}`;
   } catch {
     return iso;
   }
@@ -246,7 +250,6 @@ export default function NotificationsPage() {
         isLoggedIn={isLoggedIn}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        headerLabel="news-VOTEからのお知らせ"
         activityContent={<ActivityList items={activityItems} />}
         announcementsContent={<AnnouncementsList items={MOCK_ANNOUNCEMENTS} />}
       />
@@ -263,17 +266,13 @@ function getActivityLabel(item: ActivityItem): string {
   return item.label;
 }
 
-/** アイコン左上に表示するA or Bバッジ（選択した回答）12px・白枠1px */
+/** アイコン左上に表示するA or Bバッジ（デザイン画像に合わせたサイズ） */
 function ABBadge({ option }: { option: "A" | "B" }) {
   const isA = option === "A";
   return (
     <span
-      className="absolute left-0 top-0 z-10 box-border flex items-center justify-center rounded-full border border-white text-[8px] font-bold leading-none text-white shadow-sm"
+      className="absolute -left-0.5 -top-0.5 z-10 flex h-[16px] w-[16px] items-center justify-center rounded-full border-[2.5px] border-white text-[9px] font-bold leading-none text-white shadow-[0_0_0_1px_rgba(0,0,0,0.06)]"
       style={{
-        width: 12,
-        height: 12,
-        minWidth: 12,
-        minHeight: 12,
         backgroundColor: isA ? "#E63E48" : "#3273E3",
       }}
       aria-hidden
@@ -293,8 +292,19 @@ function ActivityIcon({ item }: { item: ActivityItem }) {
     case "voted_on_mine":
       return (
         <span className="relative h-10 w-10 shrink-0 overflow-visible">
-          <span className={iconClass} style={{ backgroundColor: "#FFE100" }}>
-            <img src="/icons/vote_icon_dark.svg" alt="" className="h-5 w-5" width={20} height={20} />
+          <span className={`${iconClass} bg-[#FFE100]`}>
+            <svg
+              className="h-[17px] w-[18px] shrink-0"
+              viewBox="0 0 18 17"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden
+            >
+              <path
+                d="M17.355 0.131212L7.69051 11.3242C7.56003 11.4795 7.32083 11.4795 7.18724 11.3242L3.03066 6.41268L2.93747 6.30084C2.75418 6.08338 2.41867 6.06785 2.21364 6.27289L0.144668 8.33875C-0.0355127 8.51893 -0.047939 8.80473 0.110496 8.99734L5.92598 16.0741C6.29566 16.5649 6.86727 16.8507 7.47926 16.8507H7.50411C8.12543 16.8445 8.70325 16.537 9.0605 16.0306L17.9484 0.547491C18.1658 0.165384 17.6439 -0.204297 17.355 0.131212Z"
+                fill="#191919"
+              />
+            </svg>
           </span>
           {actorVote === "A" || actorVote === "B" ? <ABBadge option={actorVote} /> : null}
         </span>
@@ -343,30 +353,35 @@ function ActivityIcon({ item }: { item: ActivityItem }) {
 function ActivityList({ items }: { items: ActivityItem[] }) {
   if (items.length === 0) {
     return (
-      <div className="rounded-xl bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.08)]">
-        <p className="text-sm text-gray-500">アクティビティはまだありません</p>
+      <div className="rounded-[12px] bg-white px-6 py-12 text-center">
+        <p className="text-sm text-[#787878]">アクティビティはまだありません</p>
       </div>
     );
   }
   return (
-    <ul className="divide-y divide-gray-200 rounded-xl bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.08)]">
+    <ul className="border-t border-[#DADADA]">
       {items.map((item, i) => {
         const preview = item.commentPreview ?? item.questionPreview;
         return (
-          <li key={`${item.cardId}-${item.type}-${i}`}>
+          <li
+            key={`${item.cardId}-${item.type}-${i}`}
+            className="border-b border-[#DADADA] bg-[#F1F1F1] last:border-b-0"
+          >
             <Link
               href={`/comments/${item.cardId}`}
-              className="flex gap-3 px-4 py-4 transition-colors hover:bg-gray-50"
+              className="block py-4 transition-colors active:bg-black/[0.03]"
             >
-              <ActivityIcon item={item} />
-              <div className="min-w-0 flex-1 text-left">
-                <p className="text-sm font-medium text-gray-900">{getActivityLabel(item)}</p>
-                {item.date && <p className="mt-0.5 text-xs text-gray-500">{item.date}</p>}
-                {preview && (
-                  <div className="mt-2 rounded-lg bg-gray-100 px-3 py-2">
-                    <p className="text-xs text-gray-700 line-clamp-2">{preview}</p>
-                  </div>
-                )}
+              <div className="flex gap-3">
+                <ActivityIcon item={item} />
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="text-sm font-bold leading-snug text-[#191919]">{getActivityLabel(item)}</p>
+                  {item.date ? <p className="mt-1 text-xs font-normal text-[#787878]">{item.date}</p> : null}
+                  {preview ? (
+                    <div className="mt-3 rounded-[10px] bg-white px-3 py-2.5">
+                      <p className="text-xs leading-relaxed text-[#191919] line-clamp-3">{preview}</p>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </Link>
           </li>
@@ -382,15 +397,15 @@ function AnnouncementsList({
   items: { title: string; body: string; date: string }[];
 }) {
   return (
-    <ul className="space-y-3">
+    <ul className="flex flex-col gap-3">
       {items.map((item, i) => (
         <li
           key={i}
-          className="rounded-xl bg-white p-4 shadow-[0_2px_1px_0_rgba(51,51,51,0.08)]"
+          className="rounded-[12px] bg-white p-4"
         >
-          <h3 className="text-sm font-bold text-gray-900">{item.title}</h3>
-          <p className="mt-2 text-xs leading-relaxed text-gray-700">{item.body}</p>
-          <p className="mt-2 text-xs text-gray-500">{item.date}</p>
+          <h3 className="text-sm font-bold text-[#191919]">{item.title}</h3>
+          <p className="mt-2 text-xs leading-relaxed text-[#191919]/80">{item.body}</p>
+          <p className="mt-2 text-xs text-[#787878]">{item.date}</p>
         </li>
       ))}
     </ul>
