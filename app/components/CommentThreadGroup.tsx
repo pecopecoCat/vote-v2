@@ -110,7 +110,7 @@ export function CommentBody({
       aria-label={navigable ? "リプライ画面へ" : undefined}
     >
       <p className="text-[14px] font-bold text-[#191919]">{comment.user.name}</p>
-      <p className="mt-[0.2625rem] text-[15px] font-normal leading-relaxed text-[#191919]">{comment.text}</p>
+      <p className="mt-[0.2625rem] text-[15px] font-medium leading-relaxed text-[#191919]">{comment.text}</p>
       <div className="mt-[0.525rem] flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-5 text-xs font-medium text-[#191919]">
           {showReplyButton &&
@@ -196,6 +196,13 @@ export interface CommentThreadGroupProps {
   replyListMoreHref?: string;
   /** 指定時、各リプライのコメントアイコンはこのURLへ遷移 */
   replyToReplyHref?: string;
+  /** 親が max 幅ラッパー内で横パディングを持つとき true（マイページの 335/375 帯など） */
+  threadInnerFlush?: boolean;
+  /**
+   * スレッド矢印の見え方。`darkOnGray` は元 SVG（#DADADA）を img のまま黒寄りにしてグレー背景でも判読しやすくする。
+   * インライン SVG で縦横に引き伸ばすと曲線が歪むため、常に img + filter を使う。
+   */
+  threadConnectorTone?: "default" | "darkOnGray";
 }
 
 export default function CommentThreadGroup({
@@ -211,6 +218,8 @@ export default function CommentThreadGroup({
   maxRepliesVisible,
   replyListMoreHref,
   replyToReplyHref,
+  threadInnerFlush = false,
+  threadConnectorTone = "default",
 }: CommentThreadGroupProps) {
   const parentReplyCount = replies.length;
   const visibleReplies = useMemo(
@@ -260,7 +269,7 @@ export default function CommentThreadGroup({
     <div className="w-full border-b border-[#DADADA]">
       <div
         ref={threadFlexRef}
-        className={`flex items-stretch gap-3 px-[5.333vw] ${showConnector ? "pt-4 pb-4" : "py-4"}`}
+        className={`flex items-stretch gap-3 ${threadInnerFlush ? "px-0" : "px-[5.333vw]"} ${showConnector ? "pt-4 pb-4" : "py-4"}`}
       >
         <div
           className={`flex shrink-0 flex-col items-center ${showConnector ? "min-h-0" : "w-10"}`}
@@ -287,6 +296,13 @@ export default function CommentThreadGroup({
                 style={{
                   transform: `translateX(calc(-50% + ${THREAD_CONNECTOR_OFFSET_X_PX}px)) scale(${THREAD_CONNECTOR_SCALE})`,
                   transformOrigin: "50% 100%",
+                  ...(threadConnectorTone === "darkOnGray"
+                    ? {
+                        /** #DADADA 形状のまま #191919 相当（純黒に近いグレー）に */
+                        filter: "brightness(0) saturate(100%)",
+                        opacity: 0.92,
+                      }
+                    : {}),
                 }}
               />
             </div>
@@ -337,7 +353,7 @@ export default function CommentThreadGroup({
               <div className="h-10 w-10 shrink-0" aria-hidden />
               <Link
                 href={replyListMoreHref}
-                className="self-center text-[12px] font-normal leading-normal text-[#c3c3c3]"
+                className="self-center text-[12px] font-medium leading-normal text-[#787878] underline-offset-2 hover:text-[#191919] hover:underline"
               >
                 もっと表示する
               </Link>

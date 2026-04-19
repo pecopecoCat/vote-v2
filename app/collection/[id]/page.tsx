@@ -296,7 +296,7 @@ export default function CollectionPage() {
 
         {/* カード一覧 */}
         {cardsToShow.length === 0 ? (
-          <div className="mt-4 rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
+          <div className="mt-4 rounded-2xl bg-white px-6 py-12 text-center">
             <p className="text-sm text-gray-500">
               {showVoted
                 ? "このコレクションにはまだ投稿がありません。"

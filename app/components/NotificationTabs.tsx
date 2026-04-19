@@ -73,9 +73,13 @@ export default function NotificationTabs({
         </div>
       )}
 
-      {/* コンテンツ（グレー背景・デザイン画像に合わせた余白） */}
-      <main className="mx-auto max-w-lg px-[5.333vw] pb-6 pt-4">
-        {effectiveTab === "activity" ? activityContent : announcementsContent}
+      {/* アクティビティは区切り線フル幅のため横パディングなし。お知らせは 335/375 相当のコンテンツ幅 */}
+      <main className="mx-auto max-w-lg pb-6 pt-4">
+        {effectiveTab === "activity" ? (
+          activityContent
+        ) : (
+          <div className="mx-auto w-[min(100%,calc(100vw*335/375))]">{announcementsContent}</div>
+        )}
       </main>
     </div>
   );

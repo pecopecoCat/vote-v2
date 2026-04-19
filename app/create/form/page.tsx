@@ -11,7 +11,7 @@ import { getAuth, getCurrentActivityUserId } from "../../data/auth";
 import { CARD_BACKGROUND_IMAGES, recommendedTagList } from "../../data/voteCards";
 import { useSharedData } from "../../context/SharedDataContext";
 import { addDraft } from "../../data/drafts";
-import SuccessModal from "../../components/SuccessModal";
+import { PENDING_VOTE_CREATED_TOAST_KEY } from "../../lib/appToast";
 
 const QUESTION_MAX = 80;
 const OPTION_MAX = 30; // A/Bの回答の文字数上限（画像の「00文字以内」はここで表示）
@@ -38,7 +38,6 @@ function CreateFormContent() {
   const [noComments, setNoComments] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-  const [showVoteCreatedModal, setShowVoteCreatedModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedBackgroundUrl, setSelectedBackgroundUrl] = useState<string>(
     CARD_BACKGROUND_IMAGES[0]
@@ -115,7 +114,12 @@ function CreateFormContent() {
         if (selectedCollectionId.trim()) {
           addCardToCollection(selectedCollectionId.trim(), card.id);
         }
-        setShowVoteCreatedModal(true);
+        try {
+          sessionStorage.setItem(PENDING_VOTE_CREATED_TOAST_KEY, "1");
+        } catch {
+          /* ignore quota / private mode */
+        }
+        router.push("/?tab=new");
       })
       .catch(() => {
         // 楽観的 UI は Context 側で巻き戻し。失敗時はモーダルを出さない
@@ -140,11 +144,6 @@ function CreateFormContent() {
     endDay,
     selectedCollectionId,
   ]);
-
-  const handleVoteCreatedModalClose = useCallback(() => {
-    setShowVoteCreatedModal(false);
-    router.push("/?tab=new");
-  }, [router]);
 
   const handleSaveDraftAndGoToDrafts = useCallback(() => {
     const text = question.trim() || "（未入力）";
@@ -594,13 +593,6 @@ function CreateFormContent() {
           {isSubmitting ? "作成中..." : "VOTEを作成"}
         </Button>
       </div>
-
-      <SuccessModal
-        open={showVoteCreatedModal}
-        message="VOTEを作成しました"
-        onClose={handleVoteCreatedModalClose}
-        autoCloseSeconds={1.5}
-      />
 
       <BottomNav activeId="add" />
     </div>

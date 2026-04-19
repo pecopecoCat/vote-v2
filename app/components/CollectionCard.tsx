@@ -15,11 +15,11 @@ export interface CollectionCardProps {
   href?: string;
   /** タイトルを白文字・黒ブロックで表示（マリオカード用）。title に \n で改行可能 */
   titleVariant?: "default" | "blackBlock";
-  /** 人気コレクション枠でのみ、タイトルフォントを大きくする */
+  /** 人気コレクション枠：タイムラインのコレバナーに寄せた黒地＋白字（21px 基準の 81% = 0.9×0.9） */
   popularBanner?: boolean;
   /** 右上のラベル（例: コレクション）。角丸・薄い背景付き */
   label?: string;
-  /** タイムライン用バナー：W335px相当・H260px・タイトルは黒ベタ・#ffffff・26px */
+  /** タイムライン用バナー：W335px相当・H260px・タイトルは黒地＋白字・26px */
   timelineBanner?: boolean;
 }
 
@@ -37,6 +37,8 @@ export default function CollectionCard({
 }: CollectionCardProps) {
   const gradientClass = getCollectionGradientClass(gradient);
   const isBlackBlock = titleVariant === "blackBlock" || timelineBanner;
+  /** 検索の人気コレのみ：タイムラインと同系の黒ブロック＋白タイトル（タイムライン260pxカードとは別レイヤー） */
+  const popularBlackBlock = popularBanner && !timelineBanner;
 
   const content = (
     <article
@@ -60,9 +62,9 @@ export default function CollectionCard({
           {label}
         </span>
       )}
-      {showPin && !label && (
+      {showPin && (
         <span
-          className="absolute right-6 top-1/2 h-5 w-5 -translate-y-1/2"
+          className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 ${label ? "right-[5.75rem]" : "right-6"}`}
           style={{
             backgroundColor: "#191919",
             mask: "url(/icons/icon_pin.svg) no-repeat center/contain",
@@ -81,14 +83,16 @@ export default function CollectionCard({
             {title}
           </p>
         </div>
-      ) : (
-        <p
-          className={`${
-            popularBanner ? "text-[21px] leading-none" : "text-sm"
-          } font-bold text-[#191919] ${showPin ? "pr-12" : ""}`.trim()}
+      ) : popularBlackBlock ? (
+        <div
+          className={`w-full rounded-none bg-black px-4 py-3 text-left ${showPin ? "pr-12" : ""}`}
         >
-          {title}
-        </p>
+          <p className="whitespace-pre-line text-[calc(21px*0.9*0.9)] font-bold leading-snug text-white">
+            {title}
+          </p>
+        </div>
+      ) : (
+        <p className={`text-sm font-bold text-[#191919] ${showPin ? "pr-12" : ""}`.trim()}>{title}</p>
       )}
     </article>
   );

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * 並び替えはカスタムドロップダウン（button + listbox）。
+ * ネイティブ <select> / OS のピッカーでは、黄丸矢印・ピル型・行ごとの薄黄ハイライトなど
+ * このデザインは再現できない（モバイルでは多くのブラウザが独自 UI を出す）ため、
+ * モバイル Web でも見た目を揃えるにはこの方式が適切。
+ */
 import { useState, useEffect, useId } from "react";
 
 export type NewestOldestSortOrder = "newest" | "oldest";
@@ -16,7 +22,7 @@ const OPTIONS: { value: NewestOldestSortOrder; label: string }[] = [
   { value: "oldest", label: "古い順" },
 ];
 
-/** 白ピル・12px/#787878 ラベル・枠 #DADADA・黄丸に下向き矢印の並び替え UI */
+/** 白ピル・枠 #DADADA・黄丸に矢印（開閉で回転）・リストは選択行を薄黄ハイライト */
 export default function NewestOldestSortDropdown({
   value,
   onChange,
@@ -41,7 +47,7 @@ export default function NewestOldestSortDropdown({
     <div className="relative inline-flex">
       <button
         type="button"
-        className="flex min-h-[36px] min-w-[7.75rem] items-center justify-between gap-2 rounded-full border border-[#DADADA] bg-white py-1.5 pl-3.5 pr-1.5 text-left text-[12px] font-normal leading-none text-[#787878] transition-shadow duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-base)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+        className="flex min-h-[40px] min-w-[8.5rem] items-center justify-between gap-2 rounded-full border border-[#DADADA] bg-white py-2 pl-4 pr-2 text-left text-[13px] font-medium leading-none text-[#191919] transition-shadow duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-base)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
@@ -51,7 +57,7 @@ export default function NewestOldestSortDropdown({
         <span className="min-w-0 flex-1 text-left tracking-tight">
           {value === "newest" ? "新着順" : "古い順"}
         </span>
-        <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[var(--color-brand-base)]">
+        <span className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-[#FFE100] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
           <img
             src="/icons/icon_b_arrow.svg"
             alt=""
@@ -70,7 +76,7 @@ export default function NewestOldestSortDropdown({
           />
           <ul
             id={listboxId}
-            className={`absolute top-full z-20 mt-2 min-w-[148px] overflow-hidden rounded-xl border border-[#DADADA] bg-white py-1 shadow-none ${menuPosition}`}
+            className={`absolute top-full z-20 mt-1.5 min-w-full overflow-hidden rounded-[14px] border border-[#DADADA] bg-white py-1 shadow-[0_2px_10px_rgba(0,0,0,0.06)] ${menuPosition}`}
             role="listbox"
           >
             {OPTIONS.map((opt) => {
@@ -79,10 +85,10 @@ export default function NewestOldestSortDropdown({
                 <li key={opt.value} role="option" aria-selected={selected}>
                   <button
                     type="button"
-                    className={`w-full px-3.5 py-2.5 text-left text-sm transition-colors duration-150 ${
+                    className={`w-full px-4 py-3 text-left text-[13px] transition-colors duration-150 ${
                       selected
-                        ? "bg-[color-mix(in_srgb,var(--color-brand-base)_28%,white)] font-bold text-[var(--color-text-default)]"
-                        : "font-medium text-[var(--color-text-soft-black)] hover:bg-[var(--color-bg)]"
+                        ? "bg-[#FFF9E0] font-bold text-[#191919]"
+                        : "bg-white font-normal text-[#191919] hover:bg-[#F8F8F8]"
                     }`}
                     onClick={() => {
                       onChange(opt.value);

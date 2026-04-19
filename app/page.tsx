@@ -23,6 +23,7 @@ import {
   type CardActivity,
 } from "./data/voteCardActivity";
 import { useSharedData } from "./context/SharedDataContext";
+import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "./lib/appToast";
 import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, resetUser1AndUser2Collections } from "./data/collections";
 import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
 import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "./data/auth";
@@ -214,6 +215,19 @@ function HomeContent() {
     if (tabFromUrl === "new") setActiveTab("new");
     else if (tabFromUrl === "myTimeline") setActiveTab("myTimeline");
   }, [tabFromUrl]);
+
+  /** VOTE作成完了後、HOME の新着タブ表示時に一度だけトースト */
+  useEffect(() => {
+    if (activeTab !== "new") return;
+    if (typeof window === "undefined") return;
+    try {
+      if (sessionStorage.getItem(PENDING_VOTE_CREATED_TOAST_KEY) !== "1") return;
+      sessionStorage.removeItem(PENDING_VOTE_CREATED_TOAST_KEY);
+    } catch {
+      return;
+    }
+    showAppToast("VOTEを作成しました");
+  }, [activeTab]);
   const [collections, setCollections] = useState(() => getCollections());
   const shared = useSharedData();
   const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
@@ -482,7 +496,6 @@ function HomeContent() {
                   title={title}
                   gradient={gradient}
                   titleVariant="blackBlock"
-                  label="コレクション"
                   href={`/collection/${id}`}
                   timelineBanner
                 />

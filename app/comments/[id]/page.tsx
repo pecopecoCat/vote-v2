@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import AppHeader from "../../components/AppHeader";
 import VoteCard from "../../components/VoteCard";
 import VoteCardMini from "../../components/VoteCardMini";
@@ -86,6 +86,8 @@ export default function CommentsPage() {
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  /** 遷移直後はコメント帯が画面上部に来るようスクロール（固定ヘッダ分は scroll-mt で確保） */
+  const commentsSectionRef = useRef<HTMLDivElement>(null);
   const isLoggedIn = auth.isLoggedIn;
   const canPostByVote = activity.userSelectedOption != null;
   const canOpenPostModal = !isLoggedIn || canPostByVote;
@@ -109,6 +111,17 @@ export default function CommentsPage() {
     setCard(c);
     setResolved(true);
   }, [id, createdVotesForTimeline]);
+
+  useLayoutEffect(() => {
+    if (!resolved || !card) return;
+    const el = commentsSectionRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: "auto", block: "start" });
+      });
+    });
+  }, [id, resolved, card?.id]);
 
   const allCards = useMemo(() => {
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
@@ -250,11 +263,15 @@ export default function CommentsPage() {
               setCardOptionsIsOwnCard((card?.createdByUserId ?? "") === getCurrentActivityUserId());
             }}
             periodEnd={card?.periodEnd}
+            expandMiniForCommentsPage
           />
         </div>
 
         {/* コメント：グレー帯の見出し + 白背景の一覧（デザイン参照） */}
-        <div className="-mx-[5.333vw] overflow-hidden border-t border-[#DADADA]">
+        <div
+          ref={commentsSectionRef}
+          className="-mx-[5.333vw] scroll-mt-16 overflow-hidden border-t border-[#DADADA]"
+        >
           <div className="flex items-center justify-between bg-[var(--color-bg)] px-[5.333vw] py-3">
             <h2 className="text-base font-bold text-[#191919]">コメント</h2>
             <NewestOldestSortDropdown
@@ -317,7 +334,6 @@ export default function CommentsPage() {
               title={randomCollectionForComments.title}
               gradient={randomCollectionForComments.gradient}
               titleVariant="blackBlock"
-              label="コレクション"
               href={`/collection/${randomCollectionForComments.id}`}
               timelineBanner
             />

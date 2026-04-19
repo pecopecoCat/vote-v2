@@ -8,6 +8,9 @@ import VoteCard from "../components/VoteCard";
 import { getCreatedVotes, deleteCreatedVote, getCreatedVotesUpdatedEventName } from "../data/createdVotes";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
 import {
+  addCommentLike,
+  COMMENT_LIKES_BY_ME_UPDATED_EVENT,
+  getCommentIdsLikedByCurrentUser,
   getMergedCounts,
   isCommentAuthoredByCurrentUser,
   type CardActivity,
@@ -48,6 +51,7 @@ import CollectionOptionsModal from "../components/CollectionOptionsModal";
 import CardOptionsModal from "../components/CardOptionsModal";
 import ReportViolationModal from "../components/ReportViolationModal";
 import NewestOldestSortDropdown from "../components/NewestOldestSortDropdown";
+import CommentThreadGroup from "../components/CommentThreadGroup";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   public: "公開",
@@ -62,47 +66,99 @@ const MOCK_USER = {
   collectionCount: 4,
 };
 
+/** 375px 幅時にコンテンツ 335px 相当（335/375） */
+const PROFILE_COMMENT_CONTENT_WIDTH_CLASS =
+  "mx-auto w-[min(100%,calc(100vw*335/375))]";
+
 type ProfileTabId = "myVOTE" | "vote" | "bookmark" | "comment";
 
-function formatCommentDate(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return iso;
+type ProfileCommentDisplayRow = {
+  key: string;
+  comment: VoteComment;
+  rowVariant: "default" | "dimmed";
+  threadIndex: number;
+};
+
+/** 自分のコメント・返信を並べ、他人の親コメントは必要時のみグレーで前置 */
+function buildProfileCommentDisplayRows(
+  allComments: VoteComment[],
+  myCommentsSorted: VoteComment[],
+  opts: { isLoggedIn: boolean; displayName?: string | undefined }
+): ProfileCommentDisplayRow[] {
+  const shownParentIds = new Set<string>();
+  const rows: ProfileCommentDisplayRow[] = [];
+  let i = 0;
+
+  for (const mc of myCommentsSorted) {
+    if (mc.parentId) {
+      const parent = allComments.find((c) => c.id === mc.parentId);
+      const parentIsOther =
+        Boolean(parent) && !isCommentAuthoredByCurrentUser(parent!.user?.name, opts);
+
+      if (parentIsOther && parent && !shownParentIds.has(parent.id)) {
+        shownParentIds.add(parent.id);
+        rows.push({
+          key: `parent-${parent.id}-${i++}`,
+          comment: parent,
+          rowVariant: "dimmed",
+          threadIndex: 0,
+        });
+        rows.push({
+          key: `mine-${mc.id}-${i++}`,
+          comment: mc,
+          rowVariant: "default",
+          threadIndex: 1,
+        });
+      } else if (parentIsOther && parent && shownParentIds.has(parent.id)) {
+        rows.push({
+          key: `mine-${mc.id}-${i++}`,
+          comment: mc,
+          rowVariant: "default",
+          threadIndex: 1,
+        });
+      } else {
+        rows.push({
+          key: `mine-${mc.id}-${i++}`,
+          comment: mc,
+          rowVariant: "default",
+          threadIndex: 0,
+        });
+      }
+    } else {
+      rows.push({
+        key: `mine-${mc.id}-${i++}`,
+        comment: mc,
+        rowVariant: "default",
+        threadIndex: 0,
+      });
+    }
   }
+  return rows;
 }
 
-function ProfileCommentRow({ comment }: { comment: VoteComment }) {
-  return (
-    <div className="flex gap-3 border-b border-gray-100 py-3 last:border-b-0">
-      <div className="shrink-0 overflow-hidden rounded-full">
-        <span className="flex h-10 w-10 overflow-hidden rounded-full bg-gray-200">
-          <img src={comment.user.iconUrl ?? "/default-avatar.png"} alt="" className="h-full w-full object-cover" />
-        </span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-gray-800">{comment.user.name}</p>
-        <p className="mt-0.5 text-sm text-[#191919]">{comment.text}</p>
-        <p className="mt-1 text-xs text-gray-500">{formatCommentDate(comment.date)}</p>
-        <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <img src="/icons/comment.svg" alt="" className="h-4 w-4" />
-            {comment.replyCount ?? 0}
-          </span>
-          <span className="flex items-center gap-1">
-            <img src="/icons/good.svg" alt="" className="h-4 w-4" />
-            {comment.likeCount ?? 0}
-          </span>
-        </div>
-      </div>
-      <button type="button" className="shrink-0 text-[var(--color-brand-logo)] hover:opacity-80" aria-label="その他" onClick={(e) => e.stopPropagation()}>
-        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-        </svg>
-      </button>
-    </div>
-  );
+/** 表示行を親＋返信の塊にまとめる（みんなのコメントの CommentThreadGroup 用） */
+function groupProfileCommentDisplayRows(
+  rows: ProfileCommentDisplayRow[]
+): { parent: VoteComment; replies: VoteComment[] }[] {
+  const groups: { parent: VoteComment; replies: VoteComment[] }[] = [];
+  let i = 0;
+  while (i < rows.length) {
+    const r = rows[i];
+    if (r.rowVariant === "dimmed") {
+      const parent = r.comment;
+      i++;
+      const replies: VoteComment[] = [];
+      while (i < rows.length && rows[i].comment.parentId === parent.id) {
+        replies.push(rows[i].comment);
+        i++;
+      }
+      groups.push({ parent, replies });
+    } else {
+      groups.push({ parent: r.comment, replies: [] });
+      i++;
+    }
+  }
+  return groups;
 }
 
 function HeartIcon({ className }: { className?: string }) {
@@ -204,6 +260,13 @@ function ProfileContent() {
     const handler = () => setBookmarkRefreshKey((k) => k + 1);
     window.addEventListener(eventName, handler);
     return () => window.removeEventListener(eventName, handler);
+  }, []);
+
+  const [, setCommentLikesRefreshKey] = useState(0);
+  useEffect(() => {
+    const handler = () => setCommentLikesRefreshKey((k) => k + 1);
+    window.addEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
   }, []);
 
   useEffect(() => {
@@ -821,11 +884,13 @@ function ProfileContent() {
         {activeTab === "comment" && (
           <>
             {commentedCardIds.length === 0 ? (
-              <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
-                <p className="text-sm text-gray-500">コメントしたVOTEがここに表示されます。</p>
+              <div className={PROFILE_COMMENT_CONTENT_WIDTH_CLASS}>
+                <div className="rounded-2xl bg-white px-6 py-12 text-center ring-1 ring-black/[0.06]">
+                  <p className="text-sm text-[#787878]">コメントしたVOTEがここに表示されます。</p>
+                </div>
               </div>
             ) : (
-              <div className="flex flex-col divide-y divide-gray-300">
+              <div className="flex flex-col gap-5">
                 {commentedCardIdsNewestFirst.map((cardId) => {
                   const card = allCardsFiltered.find((c) => (c.id ?? c.question) === cardId);
                   if (!card) return null;
@@ -836,36 +901,73 @@ function ProfileContent() {
                     card.commentCount ?? 0,
                     act
                   );
-                  const myComments = (act.comments ?? []).filter((c) =>
-                    isCommentAuthoredByCurrentUser(c.user?.name, {
-                      isLoggedIn: auth.isLoggedIn,
-                      displayName: auth.user?.name,
-                    })
-                  );
+                  const myCommentsSorted = (act.comments ?? [])
+                    .filter((c) =>
+                      isCommentAuthoredByCurrentUser(c.user?.name, {
+                        isLoggedIn: auth.isLoggedIn,
+                        displayName: auth.user?.name,
+                      })
+                    )
+                    .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+                  const displayRows = buildProfileCommentDisplayRows(act.comments ?? [], myCommentsSorted, {
+                    isLoggedIn: auth.isLoggedIn,
+                    displayName: auth.user?.name,
+                  });
+                  const threadGroups = groupProfileCommentDisplayRows(displayRows);
+                  const currentCard = {
+                    countA: act.countA ?? 0,
+                    countB: act.countB ?? 0,
+                    comments: act.comments ?? [],
+                  };
+                  const likedCommentIds = getCommentIdsLikedByCurrentUser(cardId);
+                  const threadHref = `/comments/${cardId}`;
                   return (
-                    <Link key={cardId} href={`/comments/${cardId}`} className="block py-4 first:pt-0">
-                      <div className="rounded-2xl bg-white shadow-sm">
-                        <VoteCardMini
-                          backgroundImageUrl={backgroundForCard(card, cardId)}
-                          patternType={card.patternType ?? "yellow-loops"}
-                          question={card.question}
-                          optionA={card.optionA}
-                          optionB={card.optionB}
-                          countA={merged.countA}
-                          countB={merged.countB}
-                          commentCount={merged.commentCount}
-                          selectedSide={act.userSelectedOption}
-                          userIconUrl={currentUser.iconUrl ?? "/default-avatar.png"}
-                          hasCommented
-                          periodEnd={card.periodEnd}
-                        />
+                    <div key={cardId} className="flex flex-col">
+                      <Link
+                        href={threadHref}
+                        className="block transition-opacity active:opacity-90"
+                      >
+                        <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+                          <VoteCardMini
+                            backgroundImageUrl={backgroundForCard(card, cardId)}
+                            patternType={card.patternType ?? "yellow-loops"}
+                            question={card.question}
+                            optionA={card.optionA}
+                            optionB={card.optionB}
+                            countA={merged.countA}
+                            countB={merged.countB}
+                            commentCount={merged.commentCount}
+                            selectedSide={act.userSelectedOption}
+                            userIconUrl={currentUser.iconUrl ?? "/default-avatar.png"}
+                            hasCommented
+                            periodEnd={card.periodEnd}
+                            expandMiniForCommentsPage
+                            flatOuterShadow
+                            hideFooterIconRow
+                          />
+                        </div>
+                      </Link>
+                      <div className="bg-[#F1F1F1] pt-3 pb-1">
+                        <div className={PROFILE_COMMENT_CONTENT_WIDTH_CLASS}>
+                          {threadGroups.map((g, gi) => (
+                            <CommentThreadGroup
+                              key={`${cardId}-${g.parent.id}-${gi}`}
+                              parent={g.parent}
+                              replies={g.replies}
+                              likedCommentIds={likedCommentIds}
+                              onParentLike={() => addCommentLike(cardId, g.parent.id, currentCard)}
+                              onParentReply={() => {}}
+                              onReplyLike={(r) => addCommentLike(cardId, r.id, currentCard)}
+                              canReply={false}
+                              parentReplyThreadHref={threadHref}
+                              replyToReplyHref={threadHref}
+                              threadInnerFlush
+                              threadConnectorTone="darkOnGray"
+                            />
+                          ))}
+                        </div>
                       </div>
-                      <div className="border-t border-gray-100 px-[5.333vw] py-3">
-                        {myComments.map((comment) => (
-                          <ProfileCommentRow key={comment.id} comment={comment} />
-                        ))}
-                      </div>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>

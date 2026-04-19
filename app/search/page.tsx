@@ -478,7 +478,6 @@ function SearchContent() {
                   title={randomCollectionForTimeline.title}
                   gradient={randomCollectionForTimeline.gradient}
                   titleVariant="blackBlock"
-                  label="コレクション"
                   href={`/collection/${randomCollectionForTimeline.id}`}
                   timelineBanner
                 />
