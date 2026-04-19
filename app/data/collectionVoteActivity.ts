@@ -1,10 +1,13 @@
 /**
  * メンバー限定コレクション内の投票のみを集計する（全体の vote_card_activity とは別）。
- * 同一カードでも、コレクション画面ではここだけの票数・自分の選択を表示する。
+ * KV 設定時は /api/collection/[id]/votes で他ユーザーと共有、未設定時は localStorage のみ。
  */
 
 import { getAuth, getCurrentActivityUserId } from "./auth";
 import type { CardActivity } from "./voteCardActivity";
+
+const VOTES_API = (collectionId: string) =>
+  `/api/collection/${encodeURIComponent(collectionId)}/votes`;
 
 const GLOBAL_KEY_PREFIX = "vote_collection_scoped_global_";
 const USER_KEY_PREFIX = "vote_collection_scoped_user_";
@@ -25,7 +28,14 @@ interface GlobalRow {
   countB: number;
 }
 
-type UserSelectionRow = { userSelectedOption?: "A" | "B"; votedAt?: string };
+export type UserSelectionRow = { userSelectedOption?: "A" | "B"; votedAt?: string };
+
+/** API GET/POST のレスポンスをそのまま保存できる形 */
+export type MemberCollectionVotesSnapshot = {
+  global: Record<string, GlobalRow>;
+  userSelections: Record<string, UserSelectionRow>;
+  participants: Record<string, Omit<CollectionScopedParticipant, "userId">>;
+};
 
 function globalKey(collectionId: string): string {
   return GLOBAL_KEY_PREFIX + collectionId;
@@ -142,6 +152,109 @@ function saveParticipantsMap(collectionId: string, data: Record<string, Omit<Col
   }
 }
 
+function normalizeSnapshot(raw: unknown): MemberCollectionVotesSnapshot | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const globalIn = o.global;
+  const userIn = o.userSelections;
+  const partsIn = o.participants;
+  const global: Record<string, GlobalRow> = {};
+  if (globalIn && typeof globalIn === "object") {
+    for (const [cardId, v] of Object.entries(globalIn as Record<string, unknown>)) {
+      if (!v || typeof v !== "object") continue;
+      const g = v as Record<string, unknown>;
+      const countA = typeof g.countA === "number" && g.countA >= 0 ? g.countA : 0;
+      const countB = typeof g.countB === "number" && g.countB >= 0 ? g.countB : 0;
+      global[cardId] = { countA, countB };
+    }
+  }
+  const userSelections: Record<string, UserSelectionRow> = {};
+  if (userIn && typeof userIn === "object") {
+    for (const [cardId, v] of Object.entries(userIn as Record<string, unknown>)) {
+      if (typeof v === "string" && (v === "A" || v === "B")) {
+        userSelections[cardId] = { userSelectedOption: v };
+        continue;
+      }
+      if (v && typeof v === "object") {
+        const u = v as Record<string, unknown>;
+        const opt = u.userSelectedOption === "A" || u.userSelectedOption === "B" ? u.userSelectedOption : undefined;
+        const votedAt = typeof u.votedAt === "string" ? u.votedAt : undefined;
+        if (opt || votedAt) userSelections[cardId] = { userSelectedOption: opt, votedAt };
+      }
+    }
+  }
+  const participants: Record<string, Omit<CollectionScopedParticipant, "userId">> = {};
+  if (partsIn && typeof partsIn === "object") {
+    for (const [uid, v] of Object.entries(partsIn as Record<string, unknown>)) {
+      if (!v || typeof v !== "object") continue;
+      const p = v as Record<string, unknown>;
+      const name = typeof p.name === "string" && p.name.trim() ? p.name.trim() : "ゲスト";
+      const iconUrl = typeof p.iconUrl === "string" && p.iconUrl.length > 0 ? p.iconUrl : undefined;
+      const lastVotedAt = typeof p.lastVotedAt === "string" ? p.lastVotedAt : new Date(0).toISOString();
+      participants[uid] = { name, iconUrl, lastVotedAt };
+    }
+  }
+  return { global, userSelections, participants };
+}
+
+/** KV から取得した内容で localStorage を上書き（他ユーザー分の集計を反映） */
+export function hydrateCollectionScopedFromSnapshot(collectionId: string, snap: MemberCollectionVotesSnapshot): void {
+  saveScopedGlobal(collectionId, snap.global);
+  saveScopedUserSelections(collectionId, snap.userSelections);
+  saveParticipantsMap(collectionId, snap.participants);
+  notifyCollectionScopedUpdated(collectionId);
+}
+
+/** KV にメンバー限定コレクションがある場合に true（404/503 は false） */
+export async function fetchMemberCollectionVotesRemote(
+  collectionId: string
+): Promise<{ ok: true; snapshot: MemberCollectionVotesSnapshot } | { ok: false; reason: "not_found" | "no_kv" | "error" }> {
+  if (typeof window === "undefined") {
+    return { ok: false, reason: "error" };
+  }
+  const userId = getCurrentActivityUserId();
+  try {
+    const res = await fetch(`${VOTES_API(collectionId)}?userId=${encodeURIComponent(userId)}`);
+    if (res.status === 503) return { ok: false, reason: "no_kv" };
+    if (res.status === 404) return { ok: false, reason: "not_found" };
+    if (!res.ok) return { ok: false, reason: "error" };
+    const snap = normalizeSnapshot(await res.json());
+    if (!snap) return { ok: false, reason: "error" };
+    return { ok: true, snapshot: snap };
+  } catch {
+    return { ok: false, reason: "error" };
+  }
+}
+
+function buildParticipantPayload(): { name: string; iconUrl?: string } {
+  const auth = getAuth();
+  const name =
+    auth.isLoggedIn && typeof auth.user?.name === "string" && auth.user.name.trim()
+      ? auth.user.name.trim()
+      : "ゲスト";
+  const iconUrl =
+    auth.isLoggedIn && typeof auth.user?.iconUrl === "string" && auth.user.iconUrl.length > 0
+      ? auth.user.iconUrl
+      : undefined;
+  return iconUrl ? { name, iconUrl } : { name };
+}
+
+function applyLocalCollectionScopedVoteOnly(collectionId: string, cardId: string, option: "A" | "B"): void {
+  const globalMap = loadScopedGlobal(collectionId);
+  const current = globalMap[cardId] ?? { countA: 0, countB: 0 };
+  const nextRow: GlobalRow = {
+    countA: current.countA + (option === "A" ? 1 : 0),
+    countB: current.countB + (option === "B" ? 1 : 0),
+  };
+  saveScopedGlobal(collectionId, { ...globalMap, [cardId]: nextRow });
+
+  const user = loadScopedUserSelections(collectionId);
+  const votedAt = new Date().toISOString();
+  saveScopedUserSelections(collectionId, { ...user, [cardId]: { userSelectedOption: option, votedAt } });
+  upsertParticipantFromCurrentAuth(collectionId);
+  notifyCollectionScopedUpdated(collectionId);
+}
+
 function upsertParticipantFromCurrentAuth(collectionId: string): void {
   const auth = getAuth();
   const userId = getCurrentActivityUserId();
@@ -201,19 +314,35 @@ export function getAllCollectionScopedActivity(collectionId: string): Record<str
 
 /**
  * メンバー限定コレクションで投票。全体の addVote は呼ばない（通知・HOME集計に影響しない）。
+ * `useKv` true のときは KV API に送り、成功後に localStorage をサーバー状態で上書きする。
  */
-export function addCollectionScopedVote(collectionId: string, cardId: string, option: "A" | "B"): void {
-  const globalMap = loadScopedGlobal(collectionId);
-  const current = globalMap[cardId] ?? { countA: 0, countB: 0 };
-  const nextRow: GlobalRow = {
-    countA: current.countA + (option === "A" ? 1 : 0),
-    countB: current.countB + (option === "B" ? 1 : 0),
-  };
-  saveScopedGlobal(collectionId, { ...globalMap, [cardId]: nextRow });
+export function addCollectionScopedVote(
+  collectionId: string,
+  cardId: string,
+  option: "A" | "B",
+  opts?: { useKv?: boolean }
+): void {
+  applyLocalCollectionScopedVoteOnly(collectionId, cardId, option);
 
-  const user = loadScopedUserSelections(collectionId);
-  const votedAt = new Date().toISOString();
-  saveScopedUserSelections(collectionId, { ...user, [cardId]: { userSelectedOption: option, votedAt } });
-  upsertParticipantFromCurrentAuth(collectionId);
-  notifyCollectionScopedUpdated(collectionId);
+  if (!opts?.useKv) return;
+
+  void (async () => {
+    try {
+      const res = await fetch(VOTES_API(collectionId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: getCurrentActivityUserId(),
+          cardId,
+          option,
+          participant: buildParticipantPayload(),
+        }),
+      });
+      if (!res.ok) return;
+      const snap = normalizeSnapshot(await res.json());
+      if (snap) hydrateCollectionScopedFromSnapshot(collectionId, snap);
+    } catch {
+      // ローカルは既に apply済み。API 失敗時はこの端末のみの集計のまま。
+    }
+  })();
 }

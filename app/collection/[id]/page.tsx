@@ -10,6 +10,7 @@ import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import BottomNav from "../../components/BottomNav";
 import Checkbox from "../../components/Checkbox";
 import {
+  addParticipatedMemberCollectionIfNeeded,
   getCollectionById,
   getCollections,
   getCollectionsUpdatedEventName,
@@ -26,8 +27,10 @@ import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../.
 import {
   addCollectionScopedVote,
   COLLECTION_SCOPED_VOTES_UPDATED_EVENT,
+  fetchMemberCollectionVotesRemote,
   getAllCollectionScopedActivity,
   getCollectionScopedParticipants,
+  hydrateCollectionScopedFromSnapshot,
 } from "../../data/collectionVoteActivity";
 import { addHiddenUser } from "../../data/hiddenUsers";
 import { getShowVoted, setShowVoted } from "../../data/showVotedPreference";
@@ -162,6 +165,10 @@ export default function CollectionPage() {
           gradient,
           visibility: (data.visibility as CollectionVisibility) ?? "public",
           cardIds: Array.isArray(data.cardIds) ? data.cardIds : [],
+          createdByUserId:
+            typeof (data as { createdByUserId?: string }).createdByUserId === "string"
+              ? (data as { createdByUserId: string }).createdByUserId
+              : undefined,
         });
       })
       .catch(() => {
@@ -175,6 +182,33 @@ export default function CollectionPage() {
   const collection = localCollection ?? collectionFromApi;
   const isFromApi = !!collectionFromApi && !localCollection;
   const isMemberCollection = collection?.visibility === "member";
+
+  /** メンバー限定: KV にコレクションがあれば他ユーザーの票を GET で取り込み（定期・フォーカス時） */
+  useEffect(() => {
+    if (!collection?.id || collection.visibility !== "member") return;
+    const colId = collection.id;
+    let cancelled = false;
+
+    const pull = async () => {
+      const r = await fetchMemberCollectionVotesRemote(colId);
+      if (cancelled) return;
+      if (r.ok) {
+        hydrateCollectionScopedFromSnapshot(colId, r.snapshot);
+        setScopedVotesVersion((v) => v + 1);
+      }
+    };
+
+    void pull();
+    const interval = window.setInterval(() => void pull(), 15000);
+    const onFocus = () => void pull();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [collection?.id, collection?.visibility, auth.isLoggedIn, auth.user?.name]);
+
   const scopedActivityMap = useMemo(() => {
     if (!collection || !isMemberCollection) return {} as Record<string, CardActivity>;
     return getAllCollectionScopedActivity(collection.id);
@@ -219,7 +253,8 @@ export default function CollectionPage() {
   const handleCollectionVote = useCallback(
     (cid: string, option: "A" | "B") => {
       if (collection?.visibility === "member") {
-        addCollectionScopedVote(collection.id, cid, option);
+        addCollectionScopedVote(collection.id, cid, option, { useKv: true });
+        addParticipatedMemberCollectionIfNeeded(collection);
         return;
       }
       void sharedAddVote(cid, option);

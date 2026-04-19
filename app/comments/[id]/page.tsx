@@ -86,6 +86,10 @@ export default function CommentsPage() {
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  /**
+   * 下部「関連VOTE／新着VOTE」：投票直後は一覧に残し、別ページ遷移やタブ復帰後に activity に合わせて非表示にする（HOME と同様）。
+   */
+  const [relatedKeepVotedVisibleIds, setRelatedKeepVotedVisibleIds] = useState<Set<string>>(() => new Set());
   /** 遷移直後はコメント帯が画面上部に来るようスクロール（固定ヘッダ分は scroll-mt で確保） */
   const commentsSectionRef = useRef<HTMLDivElement>(null);
   const isLoggedIn = auth.isLoggedIn;
@@ -103,6 +107,20 @@ export default function CommentsPage() {
     const handler = () => setAuth(getAuth());
     window.addEventListener(getAuthUpdatedEventName(), handler);
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
+  }, []);
+
+  useEffect(() => {
+    setRelatedKeepVotedVisibleIds(new Set());
+  }, [id]);
+
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === "visible") {
+        setRelatedKeepVotedVisibleIds(new Set());
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
   }, []);
 
   useEffect(() => {
@@ -139,7 +157,9 @@ export default function CommentsPage() {
     const onlyUnvoted = (cards: VoteCardData[]) =>
       cards.filter((c) => {
         const cid = c.id ?? c.question;
-        return sharedActivity[cid]?.userSelectedOption == null;
+        const voted = sharedActivity[cid]?.userSelectedOption != null;
+        if (!voted) return true;
+        return relatedKeepVotedVisibleIds.has(cid);
       });
 
     const related = onlyUnvoted(getRelatedVoteCardsByTagPriority(card, allCards, id, 10));
@@ -150,7 +170,7 @@ export default function CommentsPage() {
       bottomCards: onlyUnvoted(getNewestVoteCards(allCards, id, 30)).slice(0, 10),
       bottomSectionTitle: "新着VOTE",
     };
-  }, [card, allCards, id, sharedActivity]);
+  }, [card, allCards, id, sharedActivity, relatedKeepVotedVisibleIds]);
 
   /** みんなのコメントページ：カードにタグあり→1個目に似たタグ10件、なし→注目のタグ10件 */
   const commentsPageTagList = useMemo(() => {
@@ -376,6 +396,11 @@ export default function CommentsPage() {
                     hasCommented={commentedCardIds.includes(relatedId)}
                     initialSelectedOption={relActivity.userSelectedOption ?? null}
                     onVote={(cid, option) => {
+                      setRelatedKeepVotedVisibleIds((prev) => {
+                        const next = new Set(prev);
+                        next.add(cid);
+                        return next;
+                      });
                       void sharedAddVote(cid, option);
                     }}
                     onBookmarkClick={setModalCardId}

@@ -27,6 +27,10 @@ export interface Collection {
   gradient?: CollectionGradient;
   visibility: CollectionVisibility;
   cardIds: string[];
+  /** 他人のメンバー限定に参加しただけ（API 同期・削除はオーナー向けと分離） */
+  joinedParticipation?: boolean;
+  /** KV 同期時の作成者（参加判定用） */
+  createdByUserId?: string;
 }
 
 function normalizeCollection(c: Record<string, unknown>): Collection {
@@ -37,6 +41,8 @@ function normalizeCollection(c: Record<string, unknown>): Collection {
     gradient: c.gradient as CollectionGradient | undefined,
     visibility: (c.visibility as CollectionVisibility) ?? "public",
     cardIds: Array.isArray(c.cardIds) ? (c.cardIds as string[]) : [],
+    joinedParticipation: Boolean(c.joinedParticipation),
+    createdByUserId: typeof c.createdByUserId === "string" ? c.createdByUserId : undefined,
   };
 }
 
@@ -125,9 +131,32 @@ export function isOtherUsersCollection(collectionId: string): boolean {
   return OTHER_USERS_COLLECTIONS.some((c) => c.id === collectionId);
 }
 
-/** 現在のユーザーが作ったコレクション一覧を取得（マイページで表示する用） */
+/** 現在のユーザーが作ったコレクション＋参加したメンバー限定（マイページで表示する用） */
 export function getCollections(): Collection[] {
   return load(getCurrentActivityUserId());
+}
+
+/**
+ * メンバー限定に投票したとき、マイページ用リストに追加（既に自分のコレクションにあれば何もしない）。
+ * `createdByUserId` が現在ユーザーと一致する場合はオーナーなので追加しない。
+ */
+export function addParticipatedMemberCollectionIfNeeded(col: Collection): void {
+  if (col.visibility !== "member") return;
+  const uid = getCurrentActivityUserId();
+  if (col.createdByUserId && col.createdByUserId === uid) return;
+  const cols = load(uid);
+  if (cols.some((c) => c.id === col.id)) return;
+  cols.push({
+    id: col.id,
+    name: col.name,
+    color: col.color,
+    gradient: col.gradient,
+    visibility: "member",
+    cardIds: Array.isArray(col.cardIds) ? [...col.cardIds] : [],
+    joinedParticipation: true,
+    createdByUserId: col.createdByUserId,
+  });
+  save(uid, cols);
 }
 
 /** user1 と user2 のブックマークコレクションを空にリセット（一旦0にする用） */
@@ -157,6 +186,7 @@ export function saveCollections(collections: Collection[]): void {
 
 /** 公開・メンバー限定コレクションをAPIに同期（リンクで誰でも見れるように） */
 function syncCollectionToApi(col: Collection): void {
+  if (col.joinedParticipation) return;
   if (col.visibility === "private") return;
   const userId = getCurrentActivityUserId();
   fetch("/api/collection", {
@@ -204,7 +234,7 @@ export function addCardToCollection(collectionId: string, cardId: string): void 
   col.cardIds.push(cardId);
   save(userId, cols);
   addBookmark(cardId);
-  if (col.visibility === "public" || col.visibility === "member") syncCollectionToApi(col);
+  if (!col.joinedParticipation && (col.visibility === "public" || col.visibility === "member")) syncCollectionToApi(col);
 }
 
 /** カードをコレクションから削除 */
@@ -215,7 +245,7 @@ export function removeCardFromCollection(collectionId: string, cardId: string): 
   if (!col) return;
   col.cardIds = col.cardIds.filter((id) => id !== cardId);
   save(userId, cols);
-  if (col.visibility === "public" || col.visibility === "member") syncCollectionToApi(col);
+  if (!col.joinedParticipation && (col.visibility === "public" || col.visibility === "member")) syncCollectionToApi(col);
 }
 
 /** コレクションに含まれるかトグル（追加時はBookmarkにも登録） */
@@ -231,7 +261,7 @@ export function toggleCardInCollection(collectionId: string, cardId: string): vo
     addBookmark(cardId);
   }
   save(userId, cols);
-  if (col.visibility === "public" || col.visibility === "member") syncCollectionToApi(col);
+  if (!col.joinedParticipation && (col.visibility === "public" || col.visibility === "member")) syncCollectionToApi(col);
 }
 
 /** 新規コレクション作成（現在ユーザーが作る。名前必須） */
@@ -265,6 +295,13 @@ export function updateCollection(
   const cols = load(userId);
   const col = cols.find((c) => c.id === id);
   if (!col) return;
+  if (col.joinedParticipation) {
+    if (updates.name !== undefined) col.name = updates.name.trim() || col.name;
+    if (updates.color !== undefined) col.color = updates.color;
+    if (updates.gradient !== undefined) col.gradient = updates.gradient;
+    save(userId, cols);
+    return;
+  }
   if (updates.name !== undefined) col.name = updates.name.trim() || col.name;
   if (updates.color !== undefined) col.color = updates.color;
   if (updates.gradient !== undefined) col.gradient = updates.gradient;
@@ -274,13 +311,16 @@ export function updateCollection(
   else if (updates.visibility === "private") deleteCollectionFromApi(id);
 }
 
-/** コレクションを削除 */
+/** コレクションを削除（参加中のメンバー限定はマイリストから外すだけで KV は触らない） */
 export function deleteCollection(id: string): void {
   const userId = getCurrentActivityUserId();
-  const cols = load(userId).filter((c) => c.id !== id);
+  const prev = load(userId);
+  const target = prev.find((c) => c.id === id);
+  const cols = prev.filter((c) => c.id !== id);
   save(userId, cols);
   const pinned = getPinnedCollectionIds().filter((pid) => pid !== id);
   if (pinned.length < getPinnedCollectionIds().length) savePinnedIds(userId, pinned);
+  if (target?.joinedParticipation) return;
   deleteCollectionFromApi(id);
 }
 

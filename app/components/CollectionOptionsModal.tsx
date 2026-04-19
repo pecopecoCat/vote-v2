@@ -4,6 +4,10 @@ export interface CollectionOptionsModalProps {
   /** メンバー限定コレクションのとき true（VOTEカードの「シェアする」と同様に X で URL 共有） */
   showShare?: boolean;
   collectionId?: string;
+  /** 参加中の他人コレクションのとき true（設定変更を出さない） */
+  hideEdit?: boolean;
+  /** 削除ボタンの文言（参加中はマイリストから外す意味に変更可） */
+  deleteLabel?: string;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -12,6 +16,8 @@ export interface CollectionOptionsModalProps {
 export default function CollectionOptionsModal({
   showShare = false,
   collectionId,
+  hideEdit = false,
+  deleteLabel = "コレクションを削除",
   onClose,
   onEdit,
   onDelete,
@@ -59,19 +65,21 @@ export default function CollectionOptionsModal({
               </button>
             </li>
           ) : null}
-          <li>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-gray-900 active:bg-gray-50"
-              onClick={() => {
-                onClose();
-                onEdit();
-              }}
-            >
-              <img src="/icons/icon_setting.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={20} />
-              設定を変更
-            </button>
-          </li>
+          {!hideEdit ? (
+            <li>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-gray-900 active:bg-gray-50"
+                onClick={() => {
+                  onClose();
+                  onEdit();
+                }}
+              >
+                <img src="/icons/icon_setting.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={20} />
+                設定を変更
+              </button>
+            </li>
+          ) : null}
           <li>
             <button
               type="button"
@@ -82,7 +90,7 @@ export default function CollectionOptionsModal({
               }}
             >
               <img src="/icons/icon_trash.svg" alt="" className="h-[18px] w-[18px] shrink-0" width={18} height={18} />
-              コレクションを削除
+              {deleteLabel}
             </button>
           </li>
         </ul>

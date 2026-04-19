@@ -772,6 +772,7 @@ function ProfileContent() {
                           <p className="text-sm font-bold text-[#191919]">{col.name}</p>
                           <p className="text-xs text-gray-500">
                             登録数 {col.cardIds.length}件 · {VISIBILITY_LABEL[col.visibility]}
+                            {col.joinedParticipation ? " · 参加中" : ""}
                           </p>
                         </div>
                       </Link>
@@ -1016,12 +1017,14 @@ function ProfileContent() {
         />
       )}
 
-      {collectionMenuOpenId != null && (
+      {collectionMenuOpenId != null && (() => {
+        const menuCol = collections.find((c) => c.id === collectionMenuOpenId);
+        return (
         <CollectionOptionsModal
           collectionId={collectionMenuOpenId}
-          showShare={
-            collections.find((c) => c.id === collectionMenuOpenId)?.visibility === "member"
-          }
+          showShare={menuCol?.visibility === "member"}
+          hideEdit={Boolean(menuCol?.joinedParticipation)}
+          deleteLabel={menuCol?.joinedParticipation ? "マイリストから削除" : "コレクションを削除"}
           onClose={() => setCollectionMenuOpenId(null)}
           onEdit={() => {
             const col = collections.find((c) => c.id === collectionMenuOpenId);
@@ -1037,7 +1040,8 @@ function ProfileContent() {
             setCollectionMenuOpenId(null);
           }}
         />
-      )}
+        );
+      })()}
 
       {showCollectionSettings && (
         <CollectionSettingsModal

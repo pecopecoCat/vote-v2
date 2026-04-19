@@ -115,14 +115,17 @@ export default function BookmarkCollectionModal({
     );
   }
 
+  /** 自分が管理するコレクションのみ（参加中の他人コレクションは KV とズレるため除外） */
+  const manageableCollections = collections.filter((c) => !c.joinedParticipation);
+
   const isInCollection = (c: Collection) => c.cardIds.includes(cardId);
   /** ALL＝どのコレクションにも入れない（Bookmarkには残る） */
-  const isInAll = !collections.some((c) => c.cardIds.includes(cardId));
+  const isInAll = !manageableCollections.some((c) => c.cardIds.includes(cardId));
   const bookmarked = isCardBookmarked(cardId);
 
   const handleSelectAll = () => {
     if (!cardId) return;
-    collections.forEach((col) => {
+    manageableCollections.forEach((col) => {
       if (col.cardIds.includes(cardId)) removeCardFromCollection(col.id, cardId);
     });
     setCollections(getCollections());
@@ -198,7 +201,7 @@ export default function BookmarkCollectionModal({
             <span className="text-sm font-medium text-gray-600">コレクション</span>
           </div>
           <ul className="divide-y divide-gray-100">
-            {collections.map((col) => (
+            {manageableCollections.map((col) => (
               <li key={col.id}>
                 <button
                   type="button"
