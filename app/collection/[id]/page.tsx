@@ -23,6 +23,12 @@ import { isCardBookmarked } from "../../data/bookmarks";
 import { getCollectionGradientClass } from "../../data/search";
 import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
 import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../../data/auth";
+import {
+  addCollectionScopedVote,
+  COLLECTION_SCOPED_VOTES_UPDATED_EVENT,
+  getAllCollectionScopedActivity,
+  getCollectionScopedParticipants,
+} from "../../data/collectionVoteActivity";
 import { addHiddenUser } from "../../data/hiddenUsers";
 import { getShowVoted, setShowVoted } from "../../data/showVotedPreference";
 import {
@@ -80,6 +86,7 @@ export default function CollectionPage() {
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
+  const [scopedVotesVersion, setScopedVotesVersion] = useState(0);
   const [auth, setAuth] = useState(() => getAuth());
   const currentUser = useMemo<CurrentUser>(
     () =>
@@ -111,6 +118,16 @@ export default function CollectionPage() {
     window.addEventListener(getAuthUpdatedEventName(), handler);
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    const onScoped = (ev: Event) => {
+      const cid = (ev as CustomEvent<{ collectionId?: string }>).detail?.collectionId;
+      if (cid === id) setScopedVotesVersion((v) => v + 1);
+    };
+    window.addEventListener(COLLECTION_SCOPED_VOTES_UPDATED_EVENT, onScoped as EventListener);
+    return () => window.removeEventListener(COLLECTION_SCOPED_VOTES_UPDATED_EVENT, onScoped as EventListener);
+  }, [id]);
 
   const localCollection = useMemo(() => getCollectionById(id), [id, collections]);
   const [collectionFromApi, setCollectionFromApi] = useState<Collection | null>(null);
@@ -157,6 +174,15 @@ export default function CollectionPage() {
 
   const collection = localCollection ?? collectionFromApi;
   const isFromApi = !!collectionFromApi && !localCollection;
+  const isMemberCollection = collection?.visibility === "member";
+  const scopedActivityMap = useMemo(() => {
+    if (!collection || !isMemberCollection) return {} as Record<string, CardActivity>;
+    return getAllCollectionScopedActivity(collection.id);
+  }, [collection, isMemberCollection, scopedVotesVersion, auth.isLoggedIn, auth.user?.name]);
+  const memberParticipants = useMemo(() => {
+    if (!collection || !isMemberCollection) return [];
+    return getCollectionScopedParticipants(collection.id);
+  }, [collection, isMemberCollection, scopedVotesVersion, auth.isLoggedIn, auth.user?.name]);
   const isPinned = pinnedIds.includes(id);
   const commentedCardIdSet = useMemo(() => {
     const set = new Set<string>();
@@ -184,14 +210,21 @@ export default function CollectionPage() {
 
   const cardsToShow = useMemo(() => {
     if (showVoted) return cardsInCollection;
+    if (isMemberCollection) {
+      return cardsInCollection.filter(({ cardId }) => !scopedActivityMap[cardId]?.userSelectedOption);
+    }
     return cardsInCollection.filter(({ cardId }) => !activity[cardId]?.userSelectedOption);
-  }, [cardsInCollection, showVoted, activity]);
+  }, [cardsInCollection, showVoted, activity, isMemberCollection, scopedActivityMap]);
 
   const handleCollectionVote = useCallback(
     (cid: string, option: "A" | "B") => {
+      if (collection?.visibility === "member") {
+        addCollectionScopedVote(collection.id, cid, option);
+        return;
+      }
       void sharedAddVote(cid, option);
     },
-    [sharedAddVote]
+    [collection, sharedAddVote]
   );
 
   const handleCollectionCardMoreClick = useCallback((cardId: string) => {
@@ -204,6 +237,13 @@ export default function CollectionPage() {
     togglePinnedCollection(id);
     setPinnedIds(getPinnedCollectionIds());
   };
+
+  const handleShareCollection = useCallback(() => {
+    if (typeof window === "undefined" || !id) return;
+    const url = `${window.location.origin}/collection/${encodeURIComponent(id)}`;
+    const shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=VOTE`;
+    window.open(shareUrl, "_blank", "noopener,noreferrer");
+  }, [id]);
 
   if (!collection) {
     if (!apiFetchFailed && !localCollection && id) {
@@ -264,11 +304,56 @@ export default function CollectionPage() {
       </header>
 
       <main className="mx-auto max-w-lg px-[5.333vw] pb-6 pt-4">
-        {/* 登録数・公開設定 */}
-        <p className="text-sm text-gray-600">
-          登録数 {collection.cardIds.length}件
-          {collection.visibility !== "public" && ` · ${VISIBILITY_LABEL[collection.visibility]}`}
-        </p>
+        {/* 登録数・公開設定（メンバー限定時は右端にシェア） */}
+        {collection.visibility === "member" ? (
+          <div className="flex w-full items-center justify-between gap-2">
+            <p className="min-w-0 text-sm text-gray-600">
+              登録数 {collection.cardIds.length}件 · {VISIBILITY_LABEL.member}
+            </p>
+            <button
+              type="button"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-700 transition-opacity active:opacity-70"
+              aria-label="シェアする"
+              onClick={handleShareCollection}
+            >
+              <img src="/icons/icon_share.svg" alt="" className="h-5 w-5" width={20} height={21} />
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">
+            登録数 {collection.cardIds.length}件
+            {collection.visibility !== "public" && ` · ${VISIBILITY_LABEL[collection.visibility]}`}
+          </p>
+        )}
+        {collection.visibility === "member" && memberParticipants.length > 0 && (
+          <div className="mt-2">
+            <p className="text-[10px] font-medium tracking-wide text-gray-400">投票したメンバー</p>
+            <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1.5">
+              {memberParticipants.slice(0, 18).map((p) => (
+                <li key={p.userId} className="flex max-w-[9rem] min-w-0 items-center gap-1.5">
+                  <img
+                    src={p.iconUrl ?? "/default-avatar.png"}
+                    alt=""
+                    className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]"
+                    width={24}
+                    height={24}
+                  />
+                  <span className="truncate text-[11px] leading-tight text-gray-600">{p.name}</span>
+                </li>
+              ))}
+            </ul>
+            {memberParticipants.length > 18 && (
+              <p className="mt-1 text-[10px] text-gray-400">ほか {memberParticipants.length - 18} 人</p>
+            )}
+          </div>
+        )}
+        {collection.visibility === "member" && (
+          <p
+            className={`text-xs text-gray-500 ${memberParticipants.length > 0 ? "mt-2" : "mt-1"}`}
+          >
+            リンクを知っている方のみが閲覧・投票できます。この画面の得票数は、このコレクション内の投票だけを集計しています。
+          </p>
+        )}
 
         {/* 新着順・投票済みを表示（並び替え UI と同じピル見た目） */}
         <div className="mt-3 flex items-center justify-between">
@@ -307,11 +392,21 @@ export default function CollectionPage() {
           <div className="mt-4 flex flex-col gap-[5.333vw]">
             {cardsToShow.map(({ card, cardId }) => {
               const act = activity[cardId];
+              const scopedAct = scopedActivityMap[cardId];
+              const voteActivity: CardActivity = isMemberCollection
+                ? {
+                    countA: scopedAct?.countA ?? 0,
+                    countB: scopedAct?.countB ?? 0,
+                    comments: act?.comments ?? [],
+                    userSelectedOption: scopedAct?.userSelectedOption,
+                    userVotedAt: scopedAct?.userVotedAt,
+                  }
+                : (act ?? { countA: 0, countB: 0, comments: [] });
               const merged = getMergedCounts(
-                card.countA ?? 0,
-                card.countB ?? 0,
+                isMemberCollection ? 0 : (card.countA ?? 0),
+                isMemberCollection ? 0 : (card.countB ?? 0),
                 card.commentCount ?? 0,
-                act ?? { countA: 0, countB: 0, comments: [] }
+                voteActivity
               );
               return (
                 <VoteCard
@@ -331,7 +426,9 @@ export default function CollectionPage() {
                   cardId={cardId}
                   bookmarked={isCardBookmarked(cardId)}
                   hasCommented={commentedCardIdSet.has(cardId)}
-                  initialSelectedOption={act?.userSelectedOption ?? null}
+                  initialSelectedOption={
+                    isMemberCollection ? (scopedAct?.userSelectedOption ?? null) : (act?.userSelectedOption ?? null)
+                  }
                   onVote={handleCollectionVote}
                   onBookmarkClick={setModalCardId}
                   onMoreClick={handleCollectionCardMoreClick}

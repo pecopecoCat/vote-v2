@@ -228,7 +228,7 @@ function SearchContent() {
   /** 人気コレクション（他＋自分の）：ピン留めを上に表示 */
   const collectionsForSection = useMemo(() => {
     const other = getOtherUsersCollections();
-    const combined = [...other, ...collections];
+    const combined = [...other, ...collections.filter((c) => c.visibility !== "member")];
     return combined.sort((a, b) => {
       const aPin = pinnedCollectionIds.includes(a.id);
       const bPin = pinnedCollectionIds.includes(b.id);
@@ -325,11 +325,13 @@ function SearchContent() {
       title: c.name,
       gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
     }));
-    const mine = collections.map((c) => ({
-      id: c.id,
-      title: c.name,
-      gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
-    }));
+    const mine = collections
+      .filter((c) => c.visibility !== "member")
+      .map((c) => ({
+        id: c.id,
+        title: c.name,
+        gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+      }));
     const pool = [...popularCollections, ...other, ...mine];
     if (pool.length === 0) return null;
     return pool[Math.floor(Math.random() * pool.length)];

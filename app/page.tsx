@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef, Suspense, useDeferredValue, useCallback } from "react";
+import { useMemo, useState, useEffect, Suspense, useDeferredValue, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "./components/AppHeader";
 import VoteCard from "./components/VoteCard";
@@ -142,17 +142,21 @@ export type TimelineItem =
   | { type: "pr"; banner: (typeof PR_BANNERS)[number] };
 
 /** 実際にあるコレクションのプール（人気＋他ユーザー＋自分のコレクション）。ランダム表示用 */
-function getTimelineCollectionPool(collections: { id: string; name: string; gradient?: CollectionGradient }[]): { id: string; title: string; gradient: CollectionGradient }[] {
+function getTimelineCollectionPool(
+  collections: { id: string; name: string; gradient?: CollectionGradient; visibility?: string }[]
+): { id: string; title: string; gradient: CollectionGradient }[] {
   const other = getOtherUsersCollections().map((c) => ({
     id: c.id,
     title: c.name,
     gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
   }));
-  const mine = collections.map((c) => ({
-    id: c.id,
-    title: c.name,
-    gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
-  }));
+  const mine = collections
+    .filter((c) => c.visibility !== "member")
+    .map((c) => ({
+      id: c.id,
+      title: c.name,
+      gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+    }));
   const pool = [...popularCollections, ...other, ...mine];
   return pool.length > 0 ? pool : [{ id: "d", title: "マリオのワンダーな\nVOTE", gradient: "orange-yellow" as CollectionGradient }];
 }
@@ -230,7 +234,7 @@ function HomeContent() {
   }, [activeTab]);
   const [collections, setCollections] = useState(() => getCollections());
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
+  const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
@@ -297,13 +301,6 @@ function HomeContent() {
     return set;
   }, [activity, auth.isLoggedIn, auth.user?.name]);
 
-  const handleVote = useCallback(
-    (id: string, option: "A" | "B") => {
-      void sharedAddVote(id, option);
-    },
-    [sharedAddVote]
-  );
-
   const allCards = useMemo(() => {
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
     return [...createdVotesForTimeline, ...seedWithId];
@@ -345,46 +342,49 @@ function HomeContent() {
   );
 
   /**
-   * 急上昇・新着用「この画面を開いた時点の投票済み」セット。
-   * 投票直後は activity は変わるがここは更新しないのでカードはそのまま。
-   * ブラウザのタブを切り替えて戻ったとき（visibility）に activity から再同期。
-   *
-   * 初回だけ SharedData の bootstrap 完了後にスナップショットする（ハイドレーション直後の
-   * 空 activity でロックしてしまう不具合の防止）。
+   * 急上昇・新着：activity の userSelectedOption で投票済みを除外（キーずれを防ぐ）。
+   * 投票したカード ID をここに入れてタブ切替・visibility まで一覧に残す（結果表示のまま）。
    */
-  const [votedIdsAtLoad, setVotedIdsAtLoad] = useState<Set<string>>(() => new Set());
-  const votedIdsInitializedRef = useRef(false);
-  useEffect(() => {
-    if (votedIdsInitializedRef.current) return;
-    if (!activityBootstrapDone) return;
+  const [feedKeepVotedCardVisibleIds, setFeedKeepVotedCardVisibleIds] = useState<Set<string>>(
+    () => new Set()
+  );
 
-    const ids = new Set(
-      Object.entries(activity)
-        .filter(([, a]) => a?.userSelectedOption)
-        .map(([id]) => id)
-    );
-    setVotedIdsAtLoad(ids);
-    votedIdsInitializedRef.current = true;
-  }, [activity, activityBootstrapDone]);
+  const handleVote = useCallback(
+    (id: string, option: "A" | "B") => {
+      setFeedKeepVotedCardVisibleIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+      void sharedAddVote(id, option);
+    },
+    [sharedAddVote]
+  );
+
+  useEffect(() => {
+    setFeedKeepVotedCardVisibleIds(new Set());
+  }, [activeTab]);
 
   useEffect(() => {
     const handler = () => {
-      if (document.visibilityState !== "visible") return;
-      const ids = new Set(
-        Object.entries(activity)
-          .filter(([, a]) => a?.userSelectedOption)
-          .map(([id]) => id)
-      );
-      setVotedIdsAtLoad(ids);
+      if (document.visibilityState === "visible") {
+        setFeedKeepVotedCardVisibleIds(new Set());
+      }
     };
     document.addEventListener("visibilitychange", handler);
     return () => document.removeEventListener("visibilitychange", handler);
-  }, [activity]);
+  }, []);
 
-  /** 急上昇中・新着では投票済みを除外（同期タイミングは上記コメント参照） */
+  /** 急上昇・新着：投票済みは除外。myTimeline は cardsForTab 側で全件 */
   const cardsForFeed = useMemo(
-    () => publicCards.filter((c) => !votedIdsAtLoad.has(c.id ?? c.question)),
-    [publicCards, votedIdsAtLoad]
+    () =>
+      publicCards.filter((c) => {
+        const id = c.id ?? c.question;
+        const voted = activity[id]?.userSelectedOption != null;
+        if (!voted) return true;
+        return feedKeepVotedCardVisibleIds.has(id);
+      }),
+    [publicCards, activity, feedKeepVotedCardVisibleIds]
   );
 
   const cardsForTab = useMemo(() => {
@@ -460,7 +460,7 @@ function HomeContent() {
               );
               return (
                 <VoteCard
-                  key={`vote-${cardId}`}
+                  key={`vote-${cardId}-${activeTab}`}
                   backgroundImageUrl={backgroundForCard(card)}
                   patternType={card.patternType}
                   question={card.question}

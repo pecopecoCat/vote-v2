@@ -165,11 +165,13 @@ export default function CommentsPage() {
       title: c.name,
       gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
     }));
-    const mine = getCollections().map((c) => ({
-      id: c.id,
-      title: c.name,
-      gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
-    }));
+    const mine = getCollections()
+      .filter((c) => c.visibility !== "member")
+      .map((c) => ({
+        id: c.id,
+        title: c.name,
+        gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+      }));
     const pool = [...popularCollections, ...other, ...mine];
     if (pool.length === 0) return null;
     let h = 0;

@@ -1018,6 +1018,10 @@ function ProfileContent() {
 
       {collectionMenuOpenId != null && (
         <CollectionOptionsModal
+          collectionId={collectionMenuOpenId}
+          showShare={
+            collections.find((c) => c.id === collectionMenuOpenId)?.visibility === "member"
+          }
           onClose={() => setCollectionMenuOpenId(null)}
           onEdit={() => {
             const col = collections.find((c) => c.id === collectionMenuOpenId);

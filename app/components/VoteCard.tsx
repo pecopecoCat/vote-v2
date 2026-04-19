@@ -123,7 +123,9 @@ function VoteCard({
   const isSelectingRef = useRef(false);
   useEffect(() => {
     setSelectedOption(initialSelectedOption);
-  }, [initialSelectedOption]);
+    // タップ直後に true のまま残ると、親の activity 同期で選択がリセットされたあと再投票できなくなる
+    isSelectingRef.current = false;
+  }, [initialSelectedOption, cardId]);
   const [isBookmarked, setIsBookmarked] = useState(Boolean(bookmarked));
   useEffect(() => {
     setIsBookmarked(Boolean(bookmarked));
