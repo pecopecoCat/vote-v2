@@ -54,6 +54,7 @@ function normalizeCard(raw: unknown): VoteCardData | null {
     optionAImageUrl: typeof o.optionAImageUrl === "string" ? o.optionAImageUrl : undefined,
     optionBImageUrl: typeof o.optionBImageUrl === "string" ? o.optionBImageUrl : undefined,
     periodEnd: typeof o.periodEnd === "string" ? o.periodEnd : undefined,
+    createdByUserId: typeof o.createdByUserId === "string" ? o.createdByUserId : undefined,
   };
 }
 

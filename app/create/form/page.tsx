@@ -7,7 +7,7 @@ import BottomNav from "../../components/BottomNav";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 import { getCollections, addCardToCollection } from "../../data/collections";
-import { getAuth } from "../../data/auth";
+import { getAuth, getCurrentActivityUserId } from "../../data/auth";
 import { CARD_BACKGROUND_IMAGES, recommendedTagList } from "../../data/voteCards";
 import { useSharedData } from "../../context/SharedDataContext";
 import { addDraft } from "../../data/drafts";
@@ -91,6 +91,7 @@ function CreateFormContent() {
     const periodEnd = useVotePeriod
       ? new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999).toISOString()
       : undefined;
+    const userId = getCurrentActivityUserId();
     const card = {
       id: `created-${Date.now()}`,
       patternType: "yellow-loops" as const,
@@ -107,6 +108,7 @@ function CreateFormContent() {
       optionAImageUrl: optionAImageUrl || undefined,
       optionBImageUrl: optionBImageUrl || undefined,
       periodEnd,
+      createdByUserId: userId || undefined,
     };
     void sharedAddCreatedVote(card)
       .then(() => {
@@ -114,6 +116,9 @@ function CreateFormContent() {
           addCardToCollection(selectedCollectionId.trim(), card.id);
         }
         setShowVoteCreatedModal(true);
+      })
+      .catch(() => {
+        // 楽観的 UI は Context 側で巻き戻し。失敗時はモーダルを出さない
       })
       .finally(() => setIsSubmitting(false));
   }, [

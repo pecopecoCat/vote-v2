@@ -37,6 +37,8 @@ export interface CardActivity {
   comments: VoteComment[];
   /** 現在のユーザーが選んだ選択肢（投票済み表示用・ユーザー別ストレージから） */
   userSelectedOption?: "A" | "B";
+  /** 現在ユーザーがそのカードに投票した日時（myTimeline 並び替え用・省略時は未記録） */
+  userVotedAt?: string;
 }
 
 /** グローバル保存用：投票数・コメントのみ（ユーザーに依存しない） */
@@ -80,19 +82,35 @@ function saveGlobal(data: Record<string, GlobalCardData>): void {
   }
 }
 
-function loadUserSelections(): Record<string, { userSelectedOption?: "A" | "B" }> {
+export type UserVoteSelectionRow = { userSelectedOption?: "A" | "B"; votedAt?: string };
+
+function loadUserSelections(): Record<string, UserVoteSelectionRow> {
   if (typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(getUserStorageKey());
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, { userSelectedOption?: "A" | "B" }>;
-    return typeof parsed === "object" && parsed !== null ? parsed : {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof parsed !== "object" || parsed === null) return {};
+    const out: Record<string, UserVoteSelectionRow> = {};
+    for (const [cardId, v] of Object.entries(parsed)) {
+      if (typeof v === "string" && (v === "A" || v === "B")) {
+        out[cardId] = { userSelectedOption: v };
+        continue;
+      }
+      if (v && typeof v === "object") {
+        const o = v as Record<string, unknown>;
+        const opt = o.userSelectedOption === "A" || o.userSelectedOption === "B" ? o.userSelectedOption : undefined;
+        const votedAt = typeof o.votedAt === "string" ? o.votedAt : undefined;
+        if (opt || votedAt) out[cardId] = { userSelectedOption: opt, votedAt };
+      }
+    }
+    return out;
   } catch {
     return {};
   }
 }
 
-function saveUserSelections(data: Record<string, { userSelectedOption?: "A" | "B" }>): void {
+function saveUserSelections(data: Record<string, UserVoteSelectionRow>): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(getUserStorageKey(), JSON.stringify(data));
@@ -101,12 +119,13 @@ function saveUserSelections(data: Record<string, { userSelectedOption?: "A" | "B
   }
 }
 
-function normalizeCardActivity(g: GlobalCardData | undefined, u: { userSelectedOption?: "A" | "B" } | undefined): CardActivity {
+function normalizeCardActivity(g: GlobalCardData | undefined, u: UserVoteSelectionRow | undefined): CardActivity {
   return {
     countA: g && typeof g.countA === "number" && g.countA >= 0 ? g.countA : 0,
     countB: g && typeof g.countB === "number" && g.countB >= 0 ? g.countB : 0,
     comments: g && Array.isArray(g.comments) ? g.comments : [],
     userSelectedOption: u?.userSelectedOption === "A" || u?.userSelectedOption === "B" ? u.userSelectedOption : undefined,
+    userVotedAt: typeof u?.votedAt === "string" && u.votedAt ? u.votedAt : undefined,
   };
 }
 
@@ -176,7 +195,8 @@ export function addVote(cardId: string, option: "A" | "B"): void {
   saveGlobal({ ...global, [cardId]: nextGlobal });
 
   const user = loadUserSelections();
-  saveUserSelections({ ...user, [cardId]: { userSelectedOption: option } });
+  const votedAt = new Date().toISOString();
+  saveUserSelections({ ...user, [cardId]: { userSelectedOption: option, votedAt } });
 
   const events = loadVoteEvents();
   events.push({ cardId, date: new Date().toISOString(), option });

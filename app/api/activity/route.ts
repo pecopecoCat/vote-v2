@@ -36,17 +36,20 @@ export async function GET(request: Request): Promise<NextResponse<Record<string,
   try {
     const [global, userRaw, voteEvents, bookmarkEvents] = await Promise.all([
       kv.get<Record<string, GlobalCardData>>(KV_GLOBAL),
-      userId ? kv.get<Record<string, { userSelectedOption?: "A" | "B" }>>(KV_USER_PREFIX + userId) : null,
+      userId ? kv.get<Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>>(KV_USER_PREFIX + userId) : null,
       kv.get<VoteEvent[]>(KV_VOTE_EVENTS),
       kv.get<BookmarkEvent[]>(KV_BOOKMARK_EVENTS),
     ]);
     const globalData = global && typeof global === "object" ? global : {};
-    const userSelections: Record<string, "A" | "B"> = {};
+    const userSelections: Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }> = {};
     if (userRaw && typeof userRaw === "object") {
-      type UserSelection = { userSelectedOption?: "A" | "B" };
+      type UserSelection = { userSelectedOption?: "A" | "B"; votedAt?: string };
       for (const [cardId, v] of Object.entries(userRaw) as [string, UserSelection][]) {
         if (v?.userSelectedOption === "A" || v?.userSelectedOption === "B") {
-          userSelections[cardId] = v.userSelectedOption;
+          userSelections[cardId] = {
+            userSelectedOption: v.userSelectedOption,
+            ...(typeof v.votedAt === "string" ? { votedAt: v.votedAt } : {}),
+          };
         }
       }
     }
@@ -93,8 +96,10 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       };
       await kv.set(KV_GLOBAL, nextGlobal);
       const userKey = KV_USER_PREFIX + userId;
-      const userData = (await kv.get<Record<string, { userSelectedOption?: "A" | "B" }>>(userKey)) ?? {};
-      await kv.set(userKey, { ...userData, [cardId]: { userSelectedOption: option } });
+      const userData =
+        (await kv.get<Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>>(userKey)) ?? {};
+      const votedAt = new Date().toISOString();
+      await kv.set(userKey, { ...userData, [cardId]: { userSelectedOption: option, votedAt } });
       // 作成者向け通知用：投票イベントを記録（A/Bバッジ表示用に option も保存）
       const events = (await kv.get<VoteEvent[]>(KV_VOTE_EVENTS)) ?? [];
       events.push({ cardId, date: new Date().toISOString(), option });

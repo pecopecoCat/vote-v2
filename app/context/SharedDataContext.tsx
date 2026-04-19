@@ -65,18 +65,30 @@ function normalizeCardFromApi(raw: { userId?: string; card?: unknown }): VoteCar
 
 function buildActivityFromApi(
   global: Record<string, { countA?: number; countB?: number; comments?: CardActivity["comments"] }>,
-  userSelections: Record<string, "A" | "B">
+  userSelections: Record<string, unknown>
 ): Record<string, CardActivity> {
   const cardIds = new Set([...Object.keys(global), ...Object.keys(userSelections)]);
   const result: Record<string, CardActivity> = {};
   for (const id of cardIds) {
     const g = global[id];
-    const u = userSelections[id];
+    const raw = userSelections[id];
+    let userSelectedOption: "A" | "B" | undefined;
+    let userVotedAt: string | undefined;
+    if (raw === "A" || raw === "B") {
+      userSelectedOption = raw;
+    } else if (raw && typeof raw === "object") {
+      const o = raw as { userSelectedOption?: string; votedAt?: string };
+      if (o.userSelectedOption === "A" || o.userSelectedOption === "B") {
+        userSelectedOption = o.userSelectedOption;
+      }
+      if (typeof o.votedAt === "string" && o.votedAt) userVotedAt = o.votedAt;
+    }
     result[id] = {
       countA: g && typeof g.countA === "number" ? g.countA : 0,
       countB: g && typeof g.countB === "number" ? g.countB : 0,
       comments: g && Array.isArray(g.comments) ? g.comments : [],
-      userSelectedOption: u ?? undefined,
+      userSelectedOption,
+      userVotedAt,
     };
   }
   return result;
@@ -186,12 +198,15 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       if (res.status !== 200) return false;
       const data = (await res.json()) as {
         global?: Record<string, { countA?: number; countB?: number; comments?: CardActivity["comments"] }>;
-        userSelections?: Record<string, "A" | "B">;
+        userSelections?: Record<string, unknown>;
         voteEvents?: VoteEvent[];
         bookmarkEvents?: BookmarkEvent[];
       };
       const global = data?.global && typeof data.global === "object" ? data.global : {};
-      const userSelections = data?.userSelections && typeof data.userSelections === "object" ? data.userSelections : {};
+      const userSelections: Record<string, unknown> =
+        data?.userSelections && typeof data.userSelections === "object" && data.userSelections !== null
+          ? (data.userSelections as Record<string, unknown>)
+          : {};
       setActivity(buildActivityFromApi(global, userSelections));
       setVoteEvents(Array.isArray(data?.voteEvents) ? data.voteEvents : []);
       setBookmarkEvents(Array.isArray(data?.bookmarkEvents) ? data.bookmarkEvents : []);
@@ -241,6 +256,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
             ...a,
             // remote(KV) の userSelectedOption を localStorage(=undefined) で上書きしない
             userSelectedOption: p?.userSelectedOption ?? a.userSelectedOption,
+            userVotedAt: a.userVotedAt ?? p?.userVotedAt,
           };
         }
         return merged;
@@ -280,12 +296,30 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     async (card: VoteCardData) => {
       const userId = getCurrentActivityUserId();
       if (isRemote) {
-        const res = await fetch(CREATED_VOTES_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, card }),
-        });
-        if (res.ok) await fetchCreatedVotes();
+        const cardWithMeta: VoteCardData = {
+          ...card,
+          id: card.id ?? `created-${Date.now()}`,
+          createdAt: card.createdAt ?? new Date().toISOString(),
+          createdByUserId: userId,
+        };
+        setCreatedVotesForTimeline((prev) => [cardWithMeta, ...prev]);
+        try {
+          const res = await fetch(CREATED_VOTES_API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, card: cardWithMeta }),
+          });
+          if (!res.ok) {
+            const id = cardWithMeta.id ?? "";
+            setCreatedVotesForTimeline((prev) => prev.filter((c) => (c.id ?? "") !== id));
+            throw new Error("CREATE_VOTE_FAILED");
+          }
+          void fetchCreatedVotes();
+        } catch (e) {
+          const id = cardWithMeta.id ?? "";
+          setCreatedVotesForTimeline((prev) => prev.filter((c) => (c.id ?? "") !== id));
+          throw e;
+        }
         return;
       }
       addCreatedVoteLocal(card);

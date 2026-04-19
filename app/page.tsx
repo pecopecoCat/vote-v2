@@ -88,6 +88,31 @@ function sortByNewest(cards: VoteCardData[]): VoteCardData[] {
   );
 }
 
+/** myTimeline: 自分の投票・コメントのいずれか新しい方の日時（どちらも無ければカード作成日） */
+function myTimelineLastActivityMs(
+  card: VoteCardData,
+  activity: Record<string, CardActivity>,
+  opts: { isLoggedIn: boolean; displayName?: string }
+): number {
+  const cardId = card.id ?? card.question;
+  const act = activity[cardId];
+  let max = 0;
+  if (act?.userVotedAt) {
+    const t = new Date(act.userVotedAt).getTime();
+    if (!Number.isNaN(t)) max = Math.max(max, t);
+  }
+  if (act?.comments?.length) {
+    for (const c of act.comments) {
+      if (!isCommentAuthoredByCurrentUser(c.user?.name, opts)) continue;
+      const t = new Date(c.date ?? 0).getTime();
+      if (!Number.isNaN(t)) max = Math.max(max, t);
+    }
+  }
+  if (max > 0) return max;
+  const created = new Date(card.createdAt ?? 0).getTime();
+  return Number.isNaN(created) ? 0 : created;
+}
+
 /** IDから安定した背景画像を選ぶ（同じカードは常に同じ背景） */
 function backgroundForCard(card: VoteCardData): string {
   if (card.backgroundImageUrl) return card.backgroundImageUrl;
@@ -355,16 +380,20 @@ function HomeContent() {
       case "new":
         return sortByNewest(cardsForFeed);
       case "myTimeline": {
+        const opts = { isLoggedIn: auth.isLoggedIn, displayName: auth.user?.name };
         return allCardsFiltered
           .filter((card) => bookmarkedIds.has(card.id ?? ""))
-          .sort((a, b) =>
-            (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0")
-          );
+          .sort((a, b) => {
+            const tb = myTimelineLastActivityMs(b, activity, opts);
+            const ta = myTimelineLastActivityMs(a, activity, opts);
+            if (tb !== ta) return tb - ta;
+            return (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0");
+          });
       }
       default:
         return publicCards;
     }
-  }, [activeTab, bookmarkedIds, allCardsFiltered, cardsForFeed, activity]);
+  }, [activeTab, bookmarkedIds, allCardsFiltered, cardsForFeed, activity, auth.isLoggedIn, auth.user?.name]);
 
   /** 実際にあるコレクションからランダム表示用プール */
   const timelineCollectionPool = useMemo(() => getTimelineCollectionPool(collections), [collections]);

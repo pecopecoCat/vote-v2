@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import BottomNav from "../../components/BottomNav";
@@ -32,6 +32,8 @@ function ProfileLoginContent() {
   const [activeListLoaded, setActiveListLoaded] = useState(false);
   /** ユーザー選択を開くためにAPI取得中か */
   const [openingUserChoice, setOpeningUserChoice] = useState(false);
+  /** 連打・StrictMode 二重マウントでも fetch が重ならないようにする */
+  const openChoiceInFlightRef = useRef(false);
   /** APIから取得したニックネーム（キャッシュクリア後も復元用） */
   const [profilesFromApi, setProfilesFromApi] = useState<Record<string, { name?: string; iconUrl?: string }>>({});
 
@@ -53,9 +55,10 @@ function ProfileLoginContent() {
     }
   }, [router, returnTo]);
 
-  /** 「LINEでログインする」タップで一覧取得を開始し、取得完了後にユーザー選択を表示（1回タップで選択可能に） */
+  /** 一覧取得→アカウント選択表示（依存配列なしで安定参照＝自動オープン時の二重 fetch を防ぐ） */
   const openUserChoice = useCallback(() => {
-    if (openingUserChoice) return;
+    if (openChoiceInFlightRef.current) return;
+    openChoiceInFlightRef.current = true;
     setOpeningUserChoice(true);
     setActiveListLoaded(false);
     setShowUserChoice(false);
@@ -82,11 +85,21 @@ function ProfileLoginContent() {
           setShowUserChoice(true);
         }
       } finally {
-        if (!cancelled) setOpeningUserChoice(false);
+        if (!cancelled) {
+          setOpeningUserChoice(false);
+          openChoiceInFlightRef.current = false;
+        }
       }
     };
     void loadActiveAndProfiles();
-  }, [openingUserChoice]);
+  }, []);
+
+  /** プロフィールの「LINEでログイン」から来た直後に 1 回でアカウント一覧へ（ボタン二重タップ不要） */
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    if (getAuth().isLoggedIn) return;
+    openUserChoice();
+  }, [openUserChoice]);
 
   const handleLoginAs = useCallback(
     async (userId: DemoUserId) => {
