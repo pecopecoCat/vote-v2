@@ -185,7 +185,7 @@ function VoteCard({
       )}
       {/* 背景付きエリア（カード左右内側 20px） */}
       <div
-        className={`relative min-h-[100px] rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat px-5 pb-[min(1.25rem,5.333vw)] pt-[min(3.125rem,13.333vw)] ${!useImage ? patternClass : ""}`}
+        className={`relative min-h-[100px] rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat px-5 pb-[5.333vw] pt-[13.333vw] ${!useImage ? patternClass : ""}`}
         style={
           useImage
             ? { backgroundImage: `url(${backgroundImageUrl})` }
@@ -202,7 +202,7 @@ function VoteCard({
         </div>
 
         {/* 選択肢（質問〜A 30px=8vw, A〜B の縦余白80%=3.2vw） */}
-        <div className="mt-[min(1.875rem,8vw)] flex flex-col gap-[min(0.75rem,3.2vw)]">
+        <div className="mt-[8vw] flex flex-col gap-[3.2vw]">
           {!showResult ? (
             <>
               <button
@@ -289,7 +289,7 @@ function VoteCard({
 
       {/* フッター（タグあり時は下0.36em、タグなし時は下2倍の0.72em） */}
       <div
-        className={`flex items-center gap-4 border-t border-gray-100 px-5 pt-[min(0.625rem,2.73vw)] ${tags.length > 0 ? "pb-[0.36em]" : "pb-[0.72em]"}`}
+        className={`flex items-center gap-4 border-t border-gray-100 px-5 pt-[2.73vw] ${tags.length > 0 ? "pb-[0.36em]" : "pb-[0.72em]"}`}
       >
         <span className="flex items-center gap-1" aria-label="2択回答数">
           <img src="/icons/votemark.svg" alt="" className="vote-card-footer-icon-square" />
