@@ -197,11 +197,39 @@ function normalizeSnapshot(raw: unknown): MemberCollectionVotesSnapshot | null {
   return { global, userSelections, participants };
 }
 
+type ParticipantRow = Omit<CollectionScopedParticipant, "userId">;
+
+/** ローカルとサーバーの参加者をマージ（GET が空や遅延でも直前の表示が消えない。同一 userId は lastVotedAt が新しい方を採用） */
+function mergeParticipantRows(local: ParticipantRow, server: ParticipantRow): ParticipantRow {
+  const lt = local.lastVotedAt ?? "";
+  const st = server.lastVotedAt ?? "";
+  if (st > lt) return { name: server.name, iconUrl: server.iconUrl, lastVotedAt: server.lastVotedAt };
+  if (lt > st) return { name: local.name, iconUrl: local.iconUrl, lastVotedAt: local.lastVotedAt };
+  return { name: server.name, iconUrl: server.iconUrl ?? local.iconUrl, lastVotedAt: st || lt };
+}
+
+function mergeParticipantsMaps(
+  local: Record<string, ParticipantRow>,
+  server: Record<string, ParticipantRow>
+): Record<string, ParticipantRow> {
+  const ids = new Set([...Object.keys(local), ...Object.keys(server)]);
+  const out: Record<string, ParticipantRow> = {};
+  for (const uid of ids) {
+    const L = local[uid];
+    const S = server[uid];
+    if (L && S) out[uid] = mergeParticipantRows(L, S);
+    else if (S) out[uid] = S;
+    else if (L) out[uid] = L;
+  }
+  return out;
+}
+
 /** KV から取得した内容で localStorage を上書き（他ユーザー分の集計を反映） */
 export function hydrateCollectionScopedFromSnapshot(collectionId: string, snap: MemberCollectionVotesSnapshot): void {
   saveScopedGlobal(collectionId, snap.global);
   saveScopedUserSelections(collectionId, snap.userSelections);
-  saveParticipantsMap(collectionId, snap.participants);
+  const mergedParticipants = mergeParticipantsMaps(loadParticipantsMap(collectionId), snap.participants);
+  saveParticipantsMap(collectionId, mergedParticipants);
   notifyCollectionScopedUpdated(collectionId);
 }
 

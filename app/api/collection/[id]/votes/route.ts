@@ -124,14 +124,16 @@ export async function POST(
 
     const pK = partsKey(collectionId);
     const parts = (await kv.get<PartsMap>(pK)) ?? {};
-    await kv.set(pK, { ...parts, [userId]: { name, ...(iconUrl ? { iconUrl } : {}), lastVotedAt } });
+    const nextParts: PartsMap = { ...parts, [userId]: { name, ...(iconUrl ? { iconUrl } : {}), lastVotedAt } };
+    await kv.set(pK, nextParts);
+    const participantsOut = (await kv.get<PartsMap>(pK)) ?? nextParts;
 
     const userSelections = (await kv.get<UserMap>(uK)) ?? {};
 
     return NextResponse.json({
       global: nextGlobal,
       userSelections,
-      participants: { ...parts, [userId]: { name, ...(iconUrl ? { iconUrl } : {}), lastVotedAt } },
+      participants: participantsOut,
     });
   } catch (e) {
     console.error("[api/collection/votes] POST error:", e);

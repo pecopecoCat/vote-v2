@@ -341,18 +341,23 @@ export default function CollectionPage() {
       <main className="mx-auto max-w-lg px-[5.333vw] pb-6 pt-4">
         {/* 登録数・公開設定（メンバー限定時は右端にシェア） */}
         {collection.visibility === "member" ? (
-          <div className="flex w-full items-center justify-between gap-2">
-            <p className="min-w-0 text-sm text-gray-600">
-              登録数 {collection.cardIds.length}件 · {VISIBILITY_LABEL.member}
+          <div>
+            <div className="flex w-full items-center justify-between gap-2">
+              <p className="min-w-0 text-sm text-gray-600">
+                登録数 {collection.cardIds.length}件 · {VISIBILITY_LABEL.member}
+              </p>
+              <button
+                type="button"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-700 transition-opacity active:opacity-70"
+                aria-label="シェアする"
+                onClick={handleShareCollection}
+              >
+                <img src="/icons/icon_share.svg" alt="" className="h-5 w-5" width={20} height={21} />
+              </button>
+            </div>
+            <p className="mt-1 text-[10px] leading-snug text-gray-400">
+              登録数は、コレクションに入っている2択の件数です（投票した人数ではありません）。
             </p>
-            <button
-              type="button"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-700 transition-opacity active:opacity-70"
-              aria-label="シェアする"
-              onClick={handleShareCollection}
-            >
-              <img src="/icons/icon_share.svg" alt="" className="h-5 w-5" width={20} height={21} />
-            </button>
           </div>
         ) : (
           <p className="text-sm text-gray-600">
@@ -363,6 +368,9 @@ export default function CollectionPage() {
         {collection.visibility === "member" && memberParticipants.length > 0 && (
           <div className="mt-2">
             <p className="text-[10px] font-medium tracking-wide text-gray-400">投票したメンバー</p>
+            <p className="mt-0.5 text-[10px] leading-snug text-gray-400">
+              他のメンバーは、数秒〜数十秒ほど遅れて表示されることがあります。
+            </p>
             <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1.5">
               {memberParticipants.slice(0, 18).map((p) => (
                 <li key={p.userId} className="flex max-w-[9rem] min-w-0 items-center gap-1.5">
@@ -383,11 +391,14 @@ export default function CollectionPage() {
           </div>
         )}
         {collection.visibility === "member" && (
-          <p
-            className={`text-xs text-gray-500 ${memberParticipants.length > 0 ? "mt-2" : "mt-1"}`}
-          >
-            リンクを知っている方のみが閲覧・投票できます。この画面の得票数は、このコレクション内の投票だけを集計しています。
-          </p>
+          <>
+            <p
+              className={`text-xs text-gray-500 ${memberParticipants.length > 0 ? "mt-2" : "mt-1"}`}
+            >
+              リンクを知っている方のみが閲覧・投票できます。この画面の得票数は、このコレクション内の投票だけを集計しています。
+            </p>
+            <div className="-mx-[5.333vw] mt-3 h-px bg-gray-300" aria-hidden />
+          </>
         )}
 
         {/* 新着順・投票済みを表示（並び替え UI と同じピル見た目） */}
