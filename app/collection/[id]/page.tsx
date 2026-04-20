@@ -323,11 +323,15 @@ export default function CollectionPage() {
   }, [collection, isMemberCollection, scopedVotesVersion, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
 
   const viewerAsOwnerProfile = useMemo(() => {
-    if (!collection?.createdByUserId) return null;
-    if (collection.createdByUserId !== activityUserId) return null;
+    if (!collection) return null;
+    // 旧データで createdByUserId が無い場合でも、オーナー作成（joinedParticipation ではない）なら自分として扱う
+    const isOwner =
+      (collection.createdByUserId && collection.createdByUserId === activityUserId) ||
+      (!collection.joinedParticipation && collection.visibility === "member");
+    if (!isOwner) return null;
     if (!auth.isLoggedIn || !auth.user?.name?.trim()) return null;
     return { name: auth.user.name.trim(), iconUrl: auth.user.iconUrl };
-  }, [collection?.createdByUserId, activityUserId, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
+  }, [collection, activityUserId, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
 
   const isPinned = pinnedIds.includes(id);
   const commentedCardIdSet = useMemo(() => {

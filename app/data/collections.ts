@@ -75,7 +75,14 @@ function load(userId: string): Collection[] {
     }
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((c: Record<string, unknown>) => normalizeCollection(c));
+    const normalized = parsed.map((c: Record<string, unknown>) => normalizeCollection(c));
+    // 旧データ互換：オーナー作成のコレクションに createdByUserId が無い場合は現在ユーザーを補完
+    return normalized.map((c) => {
+      if (!c.joinedParticipation && !c.createdByUserId) {
+        return { ...c, createdByUserId: userId };
+      }
+      return c;
+    });
   } catch {
     return [];
   }
