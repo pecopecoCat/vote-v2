@@ -36,7 +36,7 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 flex h-14 items-center justify-around border-t border-gray-200 bg-white safe-area-pb"
+      className="fixed bottom-0 left-0 right-0 z-30 mx-auto flex h-14 w-full max-w-[430px] items-center justify-around border-t border-gray-200 bg-white safe-area-pb"
       aria-label="メインナビゲーション"
     >
       {navItems.map(({ id, label, href, src, srcOn }) => {

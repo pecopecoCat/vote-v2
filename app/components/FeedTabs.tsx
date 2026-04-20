@@ -11,11 +11,11 @@ export interface FeedTabsProps {
 /** メニューテキスト〜黄色インジケーター上端の余白（線 3px と合わせてバランス） */
 const feedTabButtonPb = "pb-[8px]";
 
-/** 375px 基準の余白。下は 0 にして黄線と nav の border-b（グレー）を同じ高さに揃える */
+/** 375px 基準の余白。`100vw` はデスクトップで画面全体になるため上限を付け、狭い PC カラムでもタブが潰れないようにする */
 const feedTabNavStyle = {
-  paddingLeft: "calc(100vw * 30 / 375)",
-  paddingRight: "calc(100vw * 30 / 375)",
-  paddingTop: "calc(100vw * 20 / 375)",
+  paddingLeft: "min(1.5rem, calc(100vw * 30 / 375))",
+  paddingRight: "min(1.5rem, calc(100vw * 30 / 375))",
+  paddingTop: "min(1.25rem, calc(100vw * 20 / 375))",
   paddingBottom: 0,
 } as const;
 
@@ -27,14 +27,14 @@ export default function FeedTabs({
   return (
     <div className="sticky top-[64px] z-30 w-full min-w-0">
       <nav
-        className="feed-tab-label flex w-full justify-center gap-6 border-b border-gray-200 bg-[#F1F1F1]"
+        className="feed-tab-label flex w-full flex-nowrap justify-center gap-4 border-b border-gray-200 bg-[#F1F1F1] sm:gap-6"
         style={feedTabNavStyle}
         aria-label="フィード切り替え"
       >
       <button
         type="button"
         onClick={() => onSelect("trending")}
-        className={`relative flex items-center justify-center gap-1.5 ${feedTabButtonPb} text-[15px] leading-snug transition-colors ${
+        className={`relative flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap ${feedTabButtonPb} text-[15px] leading-snug transition-colors ${
           activeId === "trending"
             ? "font-bold text-[var(--color-brand-logo)]"
             : "font-normal text-[var(--color-text-gray)]"
@@ -57,7 +57,7 @@ export default function FeedTabs({
       <button
         type="button"
         onClick={() => onSelect("new")}
-        className={`relative flex items-center justify-center ${feedTabButtonPb} text-[15px] leading-snug transition-colors ${
+        className={`relative flex shrink-0 items-center justify-center whitespace-nowrap ${feedTabButtonPb} text-[15px] leading-snug transition-colors ${
           activeId === "new"
             ? "font-bold text-[var(--color-brand-logo)]"
             : "font-normal text-[var(--color-text-gray)]"
@@ -77,7 +77,7 @@ export default function FeedTabs({
         <button
           type="button"
           onClick={() => onSelect("myTimeline")}
-          className={`relative flex items-center justify-center ${feedTabButtonPb} text-[15px] leading-snug transition-colors ${
+          className={`relative flex shrink-0 items-center justify-center whitespace-nowrap ${feedTabButtonPb} text-[15px] leading-snug transition-colors ${
             activeId === "myTimeline"
               ? "font-bold text-[var(--color-brand-logo)]"
               : "font-normal text-[var(--color-text-gray)]"

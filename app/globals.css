@@ -125,32 +125,32 @@ select {
   color: #191919;
 }
 
-/* VOTEカードフッター：votemark・コメント画像（375px時 18×18px・相対） */
+/* VOTEカードフッター：votemark・コメント（375px時 18×18px）。100vw は PC 全体幅になるため上限を付ける */
 .vote-card-footer-icon-square {
-  width: calc(100vw * 18 / 375);
-  height: calc(100vw * 18 / 375);
+  width: min(18px, calc(100vw * 18 / 375));
+  height: min(18px, calc(100vw * 18 / 375));
   flex-shrink: 0;
   object-fit: contain;
 }
 
 /* ブックマークSVG・ON時mask（高さ18px基準、幅は15:18） */
 .vote-card-footer-icon-bookmark {
-  width: calc(100vw * 15 / 375);
-  height: calc(100vw * 18 / 375);
+  width: min(15px, calc(100vw * 15 / 375));
+  height: min(18px, calc(100vw * 18 / 375));
   flex-shrink: 0;
   object-fit: contain;
 }
 
 /* .comment-icon-commented と併用（maskは親クラス） */
 .vote-card-footer-icon-commented {
-  width: calc(100vw * 18 / 375);
-  height: calc(100vw * 18 / 375);
+  width: min(18px, calc(100vw * 18 / 375));
+  height: min(18px, calc(100vw * 18 / 375));
   flex-shrink: 0;
 }
 
 /* フッターアイコン行とハッシュタグの間（375px時 10px基準の約65%・相対） */
 .vote-card-tags-margin-top {
-  padding-top: calc(100vw * 10 / 375 * 0.65);
+  padding-top: min(0.40625rem, calc(100vw * 10 / 375 * 0.65));
 }
 
 /* ブックマークON時：アイコンを #FFE100 に（mask で形状を切り抜き） */
@@ -189,10 +189,10 @@ select {
   background-color: var(--color-brand-logo);
 }
 
-/* 閉じる（×）アイコン：375px時 14×14px・相対 */
+/* 閉じる（×）アイコン：375px時 14×14px・相対（PC 100vw 暴走防止） */
 .icon-close-responsive {
-  width: calc(100vw * 14 / 375);
-  height: calc(100vw * 14 / 375);
+  width: min(14px, calc(100vw * 14 / 375));
+  height: min(14px, calc(100vw * 14 / 375));
   object-fit: contain;
   flex-shrink: 0;
 }

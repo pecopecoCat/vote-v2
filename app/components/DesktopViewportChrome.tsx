@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 
 /**
  * lg 以上: 画面全体を使わず中央にスマホ幅のカラム＋右側に案内（参考デスクトップレイアウト）。
- * `transform` で子の `position: fixed`（下部ナビ等）の包含ブロックをこのカラムにする。
+ * 子の `position: fixed` に `transform` を付けない（付けるとスクロール時に下部ナビがカラムごと流れて見えなくなるため）。
  */
 export default function DesktopViewportChrome({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh w-full bg-[var(--color-bg)] lg:flex lg:min-h-dvh lg:items-start lg:justify-center lg:gap-12 lg:bg-[#E4E4E4] lg:px-8 lg:py-10">
-      <div className="relative w-full min-h-dvh lg:min-h-[calc(100dvh-5rem)] lg:w-[430px] lg:max-w-[430px] lg:shrink-0 lg:overflow-x-hidden lg:rounded-[28px] lg:bg-[var(--color-bg)] lg:shadow-[0_12px_48px_rgba(0,0,0,0.14)] lg:ring-1 lg:ring-black/[0.07] [transform:translate3d(0,0,0)]">
+      <div className="relative w-full min-h-dvh lg:min-h-[calc(100dvh-5rem)] lg:w-[430px] lg:max-w-[430px] lg:shrink-0 lg:rounded-[28px] lg:bg-[var(--color-bg)] lg:shadow-[0_12px_48px_rgba(0,0,0,0.14)] lg:ring-1 lg:ring-black/[0.07]">
         {children}
       </div>
       <aside
