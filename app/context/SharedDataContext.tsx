@@ -25,6 +25,7 @@ import {
 } from "../data/voteCardActivity";
 import { getCurrentActivityUserId, getAuthUpdatedEventName } from "../data/auth";
 import { hydrateParticipatedMemberCollectionsFromRemote } from "../data/collections";
+import { hydrateBookmarksFromRemote } from "../data/bookmarks";
 
 const CREATED_VOTES_API = "/api/created-votes";
 const ACTIVITY_API = "/api/activity";
@@ -248,6 +249,16 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handler = () => {
       void hydrateParticipatedMemberCollectionsFromRemote();
+    };
+    handler();
+    window.addEventListener(getAuthUpdatedEventName(), handler);
+    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
+  }, []);
+
+  // ブックマーク（カード）も別ブラウザで維持（ログインユーザーのみ）
+  useEffect(() => {
+    const handler = () => {
+      void hydrateBookmarksFromRemote();
     };
     handler();
     window.addEventListener(getAuthUpdatedEventName(), handler);

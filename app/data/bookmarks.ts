@@ -4,13 +4,14 @@
  * ユーザーごとに localStorage で永続化。
  */
 
-import { getCurrentActivityUserId } from "./auth";
+import { getAuth, getCurrentActivityUserId } from "./auth";
 
 const STORAGE_KEY_PREFIX = "vote_bookmark_ids_";
 const COLLECTIONS_KEY_PREFIX = "vote_collections_";
 const EVENT_NAME = "vote_bookmarks_updated";
 const BOOKMARK_EVENTS_KEY = "vote_bookmark_events";
 const MAX_BOOKMARK_EVENTS = 100;
+const REMOTE_API = "/api/bookmarks";
 
 /** ブックマークイベント（作成者向けお知らせ「作成した2択がブックマークされました」用） */
 export interface BookmarkEvent {
@@ -86,6 +87,16 @@ function save(userId: string, ids: string[]): void {
   }
 }
 
+function saveRemoteIfLoggedIn(ids: string[]): void {
+  const auth = getAuth();
+  if (!auth.isLoggedIn || !auth.userId) return;
+  fetch(REMOTE_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: auth.userId, ids }),
+  }).catch(() => {});
+}
+
 /** ブックマーク登録済みのカードID一覧（Bookmarkに登録されたVOTE CARD） */
 export function getBookmarkIds(): string[] {
   const userId = getCurrentActivityUserId();
@@ -110,7 +121,9 @@ export function addBookmark(cardId: string): void {
   const userId = getCurrentActivityUserId();
   const ids = load(userId);
   if (ids.includes(cardId)) return;
-  save(userId, [...ids, cardId]);
+  const next = [...ids, cardId];
+  save(userId, next);
+  saveRemoteIfLoggedIn(next);
   const events = loadBookmarkEvents();
   events.push({ cardId, date: new Date().toISOString() });
   saveBookmarkEvents(events);
@@ -119,8 +132,9 @@ export function addBookmark(cardId: string): void {
 /** Bookmarkから削除（コレクションからも一括削除する場合は collections 側で行う） */
 export function removeBookmark(cardId: string): void {
   const userId = getCurrentActivityUserId();
-  const ids = load(userId).filter((id) => id !== cardId);
-  save(userId, ids);
+  const next = load(userId).filter((id) => id !== cardId);
+  save(userId, next);
+  saveRemoteIfLoggedIn(next);
 }
 
 export function getBookmarksUpdatedEventName(): string {
@@ -135,6 +149,23 @@ export function resetUser1AndUser2Bookmarks(): void {
       window.localStorage.removeItem(STORAGE_KEY_PREFIX + userId);
     }
     window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  } catch {
+    // ignore
+  }
+}
+
+/** KVに保存されたブックマークID一覧を取り込み（ログインユーザーのみ）。 */
+export async function hydrateBookmarksFromRemote(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const auth = getAuth();
+  if (!auth.isLoggedIn || !auth.userId) return;
+  try {
+    const res = await fetch(`${REMOTE_API}?userId=${encodeURIComponent(auth.userId)}`);
+    if (!res.ok) return;
+    const data = (await res.json()) as { ids?: unknown };
+    const ids = Array.isArray(data?.ids) ? data.ids.filter((v): v is string => typeof v === "string" && v.length > 0) : [];
+    // このブラウザの currentActivityUserId に保存（デモ環境は userId = currentActivityUserId の想定）
+    save(getCurrentActivityUserId(), ids);
   } catch {
     // ignore
   }
