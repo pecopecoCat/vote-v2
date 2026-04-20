@@ -73,7 +73,7 @@ export default function TagMenuModal({
         aria-hidden
         onClick={onClose}
       />
-      <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white shadow-lg">
+      <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
           <div />
           <span className="text-lg font-bold text-gray-900">メニュー</span>
@@ -110,10 +110,10 @@ export default function TagMenuModal({
                     width={22}
                     height={22}
                   />
-                  <span className="flex flex-col items-start text-sm font-medium">
+                  <span className="flex flex-col items-start text-sm">
                     <span>{item.label}</span>
                     {item.subLabel != null && (
-                      <span className="text-xs font-normal text-gray-500">{item.subLabel}</span>
+                      <span className="text-xs font-bold text-gray-500">{item.subLabel}</span>
                     )}
                   </span>
                 </button>

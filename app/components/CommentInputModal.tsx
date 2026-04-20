@@ -116,7 +116,7 @@ export default function CommentInputModal({
       <>
         <div className="fixed inset-0 z-[60] bg-black/50" aria-hidden onClick={onClose} />
         <div
-          className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white shadow-lg"
+          className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg"
           style={{ bottom: keyboardInsetPx, transition: "bottom 160ms ease-out" }}
           role="dialog"
           aria-modal="true"
@@ -153,7 +153,7 @@ export default function CommentInputModal({
     <>
       <div className="fixed inset-0 z-[60] bg-black/50" aria-hidden onClick={onClose} />
       <div
-        className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white shadow-lg"
+        className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg"
         style={{ bottom: keyboardInsetPx, transition: "bottom 160ms ease-out" }}
         role="dialog"
         aria-modal="true"

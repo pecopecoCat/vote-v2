@@ -34,7 +34,7 @@ export default function CollectionOptionsModal({
   return (
     <>
       <div className="fixed inset-0 z-[60] bg-black/50" aria-hidden onClick={onClose} />
-      <div className="fixed bottom-0 left-0 right-0 z-[70] rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] pt-4 shadow-[0_-2px_10px_rgba(0,0,0,0.08)]">
+      <div className="fixed bottom-0 left-0 right-0 z-[70] rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] pt-4 font-bold shadow-[0_-2px_10px_rgba(0,0,0,0.08)]">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 pb-3">
           <span className="text-sm font-bold text-gray-900" aria-hidden />
           <button
@@ -69,7 +69,7 @@ export default function CollectionOptionsModal({
             <li>
               <button
                 type="button"
-                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-gray-900 active:bg-gray-50"
+                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-900 active:bg-gray-50"
                 onClick={() => {
                   onClose();
                   onEdit();
@@ -83,7 +83,7 @@ export default function CollectionOptionsModal({
           <li>
             <button
               type="button"
-              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-gray-900 active:bg-gray-50"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-900 active:bg-gray-50"
               onClick={() => {
                 onClose();
                 onDelete();
