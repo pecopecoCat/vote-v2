@@ -12,7 +12,16 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
   try {
     const body = (await request.json()) as {
       userId?: string;
-      collection?: { id?: string; name?: string; color?: string; gradient?: string; visibility?: string; cardIds?: string[] };
+      collection?: {
+        id?: string;
+        name?: string;
+        color?: string;
+        gradient?: string;
+        visibility?: string;
+        cardIds?: string[];
+        createdByDisplayName?: string;
+        createdByIconUrl?: string;
+      };
     };
     const userId = typeof body?.userId === "string" ? body.userId : "";
     const col = body?.collection && typeof body.collection === "object" ? body.collection : null;
@@ -29,6 +38,14 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       return NextResponse.json({ ok: true });
     }
 
+    const createdByDisplayName =
+      typeof col.createdByDisplayName === "string" && col.createdByDisplayName.trim()
+        ? col.createdByDisplayName.trim()
+        : undefined;
+    const createdByIconUrl =
+      typeof col.createdByIconUrl === "string" && col.createdByIconUrl.length > 0
+        ? col.createdByIconUrl
+        : undefined;
     const payload = {
       id: col.id,
       name: String(col.name ?? ""),
@@ -37,6 +54,8 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       visibility,
       cardIds,
       createdByUserId: userId || undefined,
+      ...(createdByDisplayName ? { createdByDisplayName } : {}),
+      ...(createdByIconUrl ? { createdByIconUrl } : {}),
     };
     await kv.set(KV_PREFIX + col.id, payload);
     return NextResponse.json({ ok: true });

@@ -33,6 +33,7 @@ import {
   getCollectionScopedParticipants,
   hydrateCollectionScopedFromSnapshot,
   parseMemberCollectionVotesPayload,
+  type CollectionScopedParticipant,
 } from "../../data/collectionVoteActivity";
 import { addHiddenUser } from "../../data/hiddenUsers";
 import { getShowVoted, setShowVoted } from "../../data/showVotedPreference";
@@ -51,6 +52,52 @@ const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   private: "非公開",
   member: "メンバー限定",
 };
+
+/** 投票参加者に加え、作成者を先頭に表示（KV の参加者は投票した人のみのため） */
+function buildMemberParticipantsForDisplay(
+  participants: CollectionScopedParticipant[],
+  collection: {
+    createdByUserId?: string;
+    createdByDisplayName?: string;
+    createdByIconUrl?: string;
+  },
+  cards: { card: VoteCardData; cardId: string }[],
+  viewerAsOwner: { name: string; iconUrl?: string } | null
+): CollectionScopedParticipant[] {
+  const oid = collection.createdByUserId;
+  if (!oid) return participants;
+
+  let fromCard: { name?: string; iconUrl?: string } | undefined;
+  for (const { card } of cards) {
+    if (card.createdByUserId === oid && card.creator?.name) {
+      fromCard = { name: card.creator.name, iconUrl: card.creator.iconUrl };
+      break;
+    }
+  }
+  const displayName =
+    collection.createdByDisplayName?.trim() ||
+    viewerAsOwner?.name ||
+    fromCard?.name ||
+    "作成者";
+  const displayIcon =
+    collection.createdByIconUrl || viewerAsOwner?.iconUrl || fromCard?.iconUrl;
+
+  const others = participants.filter((p) => p.userId !== oid);
+  const existing = participants.find((p) => p.userId === oid);
+  const creatorRow: CollectionScopedParticipant = {
+    userId: oid,
+    name:
+      existing && existing.name.trim() && existing.name !== "ゲスト"
+        ? existing.name
+        : displayName,
+    iconUrl: existing?.iconUrl || displayIcon,
+    lastVotedAt: existing?.lastVotedAt ?? "",
+  };
+  const sortedOthers = [...others].sort((a, b) =>
+    (b.lastVotedAt || "").localeCompare(a.lastVotedAt || "")
+  );
+  return [creatorRow, ...sortedOthers];
+}
 
 function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
   if (id.startsWith("seed-")) {
@@ -174,6 +221,8 @@ export default function CollectionPage() {
           visibility?: string;
           cardIds?: string[];
           memberVotes?: unknown;
+          createdByDisplayName?: string;
+          createdByIconUrl?: string;
         }) => {
           if (cancelled || !data?.id) return;
           const grad = data.gradient as string | undefined;
@@ -205,6 +254,14 @@ export default function CollectionPage() {
             createdByUserId:
               typeof (data as { createdByUserId?: string }).createdByUserId === "string"
                 ? (data as { createdByUserId: string }).createdByUserId
+                : undefined,
+            createdByDisplayName:
+              typeof data.createdByDisplayName === "string" && data.createdByDisplayName.trim()
+                ? data.createdByDisplayName.trim()
+                : undefined,
+            createdByIconUrl:
+              typeof data.createdByIconUrl === "string" && data.createdByIconUrl.length > 0
+                ? data.createdByIconUrl
                 : undefined,
           });
         }
@@ -264,6 +321,14 @@ export default function CollectionPage() {
     if (!collection || !isMemberCollection) return [];
     return getCollectionScopedParticipants(collection.id);
   }, [collection, isMemberCollection, scopedVotesVersion, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
+
+  const viewerAsOwnerProfile = useMemo(() => {
+    if (!collection?.createdByUserId) return null;
+    if (collection.createdByUserId !== activityUserId) return null;
+    if (!auth.isLoggedIn || !auth.user?.name?.trim()) return null;
+    return { name: auth.user.name.trim(), iconUrl: auth.user.iconUrl };
+  }, [collection?.createdByUserId, activityUserId, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
+
   const isPinned = pinnedIds.includes(id);
   const commentedCardIdSet = useMemo(() => {
     const set = new Set<string>();
@@ -288,6 +353,35 @@ export default function CollectionPage() {
       })
       .filter((x): x is { card: VoteCardData; cardId: string } => x != null);
   }, [collection, createdVotesForTimeline]);
+
+  const memberParticipantsForDisplay = useMemo(() => {
+    if (!collection || collection.visibility !== "member") return [];
+    return buildMemberParticipantsForDisplay(
+      memberParticipants,
+      collection,
+      cardsInCollection,
+      viewerAsOwnerProfile
+    );
+  }, [collection, memberParticipants, cardsInCollection, viewerAsOwnerProfile]);
+
+  /** メンバー限定を開いただけでもマイページのコレクション一覧に載せる（投票前でも可） */
+  useEffect(() => {
+    if (!collection || collection.visibility !== "member") return;
+    if (!auth.isLoggedIn) return;
+    if (collection.createdByUserId && collection.createdByUserId === getCurrentActivityUserId()) return;
+    addParticipatedMemberCollectionIfNeeded(collection);
+  }, [
+    collection?.id,
+    collection?.visibility,
+    collection?.createdByUserId,
+    collection?.name,
+    collection?.color,
+    collection?.gradient,
+    collection?.cardIds,
+    collection?.createdByDisplayName,
+    collection?.createdByIconUrl,
+    auth.isLoggedIn,
+  ]);
 
   const cardsToShow = useMemo(() => {
     if (showVoted) return cardsInCollection;
@@ -410,11 +504,11 @@ export default function CollectionPage() {
             <div className="-mx-[5.333vw] h-px shrink-0 bg-gray-300" aria-hidden />
           </div>
         )}
-        {collection.visibility === "member" && memberParticipants.length > 0 && (
+        {collection.visibility === "member" && memberParticipantsForDisplay.length > 0 && (
           <div className="mt-2">
             <ul className="flex flex-wrap gap-x-2.5 gap-y-1">
-              {memberParticipants.slice(0, 18).map((p) => (
-                <li key={p.userId} className="flex max-w-[9rem] min-w-0 items-center gap-1.5">
+              {memberParticipantsForDisplay.slice(0, 18).map((p) => (
+                <li key={p.userId} className="flex max-w-[10rem] min-w-0 items-center gap-1.5">
                   <img
                     src={p.iconUrl ?? "/default-avatar.png"}
                     alt=""
@@ -422,19 +516,26 @@ export default function CollectionPage() {
                     width={24}
                     height={24}
                   />
-                  <span className="truncate text-[11px] leading-tight text-gray-600">{p.name}</span>
+                  <span className="min-w-0 truncate text-[11px] leading-tight text-gray-600">{p.name}</span>
+                  {collection.createdByUserId === p.userId && (
+                    <span className="shrink-0 rounded bg-gray-200 px-1 py-px text-[9px] font-medium text-gray-600">
+                      作成
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
-            {memberParticipants.length > 18 && (
-              <p className="mt-1 text-[10px] text-gray-400">ほか {memberParticipants.length - 18} 人</p>
+            {memberParticipantsForDisplay.length > 18 && (
+              <p className="mt-1 text-[10px] text-gray-400">
+                ほか {memberParticipantsForDisplay.length - 18} 人
+              </p>
             )}
           </div>
         )}
         {collection.visibility === "member" && (
           <>
             <p
-              className={`text-[11px] leading-snug text-gray-500 ${memberParticipants.length > 0 ? "mt-1.5" : "mt-1"}`}
+              className={`text-[11px] leading-snug text-gray-500 ${memberParticipantsForDisplay.length > 0 ? "mt-1.5" : "mt-1"}`}
             >
               リンクを知る方のみ閲覧・投票可。得票はこのコレクション内の票のみ集計です。
             </p>

@@ -13,6 +13,8 @@ export type CollectionPayload = {
   visibility: "public" | "private" | "member";
   cardIds: string[];
   createdByUserId?: string;
+  createdByDisplayName?: string;
+  createdByIconUrl?: string;
 };
 
 /** メンバー限定時のみ GET /api/collection/[id]?userId= に同梱（往復1回で画面を出す） */

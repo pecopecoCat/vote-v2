@@ -6,7 +6,7 @@
  */
 
 import type { CollectionGradient } from "./search";
-import { getCurrentActivityUserId } from "./auth";
+import { getAuth, getCurrentActivityUserId } from "./auth";
 import { addBookmark } from "./bookmarks";
 
 const STORAGE_KEY_PREFIX = "vote_collections_";
@@ -31,6 +31,10 @@ export interface Collection {
   joinedParticipation?: boolean;
   /** KV 同期時の作成者（参加判定用） */
   createdByUserId?: string;
+  /** 作成者表示名（KV・一覧用。未設定時はクライアントで補完可） */
+  createdByDisplayName?: string;
+  /** 作成者アイコンURL */
+  createdByIconUrl?: string;
 }
 
 function normalizeCollection(c: Record<string, unknown>): Collection {
@@ -43,6 +47,11 @@ function normalizeCollection(c: Record<string, unknown>): Collection {
     cardIds: Array.isArray(c.cardIds) ? (c.cardIds as string[]) : [],
     joinedParticipation: Boolean(c.joinedParticipation),
     createdByUserId: typeof c.createdByUserId === "string" ? c.createdByUserId : undefined,
+    createdByDisplayName:
+      typeof c.createdByDisplayName === "string" && c.createdByDisplayName.trim()
+        ? c.createdByDisplayName.trim()
+        : undefined,
+    createdByIconUrl: typeof c.createdByIconUrl === "string" && c.createdByIconUrl.length > 0 ? c.createdByIconUrl : undefined,
   };
 }
 
@@ -155,6 +164,8 @@ export function addParticipatedMemberCollectionIfNeeded(col: Collection): void {
     cardIds: Array.isArray(col.cardIds) ? [...col.cardIds] : [],
     joinedParticipation: true,
     createdByUserId: col.createdByUserId,
+    createdByDisplayName: col.createdByDisplayName,
+    createdByIconUrl: col.createdByIconUrl,
   });
   save(uid, cols);
 }
@@ -189,6 +200,13 @@ function syncCollectionToApi(col: Collection): void {
   if (col.joinedParticipation) return;
   if (col.visibility === "private") return;
   const userId = getCurrentActivityUserId();
+  const auth = getAuth();
+  const ownerName =
+    col.createdByDisplayName?.trim() ||
+    (auth.isLoggedIn && auth.user?.name?.trim() ? auth.user.name.trim() : undefined);
+  const ownerIcon =
+    col.createdByIconUrl ||
+    (auth.isLoggedIn && auth.user?.iconUrl?.length ? auth.user.iconUrl : undefined);
   fetch("/api/collection", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -201,6 +219,8 @@ function syncCollectionToApi(col: Collection): void {
         gradient: col.gradient,
         visibility: col.visibility,
         cardIds: col.cardIds,
+        ...(ownerName ? { createdByDisplayName: ownerName } : {}),
+        ...(ownerIcon ? { createdByIconUrl: ownerIcon } : {}),
       },
     }),
   }).catch(() => {});
@@ -270,6 +290,7 @@ export function createCollection(
   options?: { color?: string; gradient?: CollectionGradient; visibility?: CollectionVisibility }
 ): Collection {
   const userId = getCurrentActivityUserId();
+  const auth = getAuth();
   const cols = load(userId);
   const id = `col-${Date.now()}`;
   const newCol: Collection = {
@@ -280,6 +301,10 @@ export function createCollection(
     visibility: options?.visibility ?? "public",
     cardIds: [],
     createdByUserId: userId,
+    createdByDisplayName:
+      auth.isLoggedIn && auth.user?.name?.trim() ? auth.user.name.trim() : undefined,
+    createdByIconUrl:
+      auth.isLoggedIn && auth.user?.iconUrl?.length ? auth.user.iconUrl : undefined,
   };
   cols.push(newCol);
   save(userId, cols);
