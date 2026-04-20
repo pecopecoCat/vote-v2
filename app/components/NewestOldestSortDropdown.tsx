@@ -15,6 +15,8 @@ export interface NewestOldestSortDropdownProps {
   onChange: (order: NewestOldestSortOrder) => void;
   /** ドロップダウンパネルの水平位置（コメント一覧は right） */
   menuAlign?: "left" | "right";
+  /** 黄丸内の下向き矢印の線色（既定は #191919） */
+  arrowStroke?: string;
 }
 
 const OPTIONS: { value: NewestOldestSortOrder; label: string }[] = [
@@ -22,11 +24,12 @@ const OPTIONS: { value: NewestOldestSortOrder; label: string }[] = [
   { value: "oldest", label: "古い順" },
 ];
 
-/** 白ピル・枠 #DADADA・黄丸に矢印（開閉で回転）・リストは選択行を薄黄ハイライト */
+/** 白ピル・枠 #DADADA・黄丸に矢印（開閉で回転・線色は arrowStroke）・リストは選択行を薄黄ハイライト */
 export default function NewestOldestSortDropdown({
   value,
   onChange,
   menuAlign = "left",
+  arrowStroke = "#191919",
 }: NewestOldestSortDropdownProps) {
   const [open, setOpen] = useState(false);
   const baseId = useId();
@@ -58,13 +61,22 @@ export default function NewestOldestSortDropdown({
           {value === "newest" ? "新着順" : "古い順"}
         </span>
         <span className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-[#FFE100] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-          <img
-            src="/icons/icon_b_arrow.svg"
-            alt=""
+          <svg
             className={`h-2.5 w-2.5 shrink-0 transition-transform duration-200 ease-out ${open ? "rotate-180" : ""}`}
             width={10}
             height={8}
-          />
+            viewBox="0 0 8 6"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden
+          >
+            <path
+              d="M1 1L4 4L7 1"
+              stroke={arrowStroke}
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+          </svg>
         </span>
       </button>
       {open && (

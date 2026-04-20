@@ -300,6 +300,7 @@ export default function CommentsPage() {
               value={commentSortOrder}
               onChange={setCommentSortOrder}
               menuAlign="right"
+              arrowStroke="#787878"
             />
           </div>
           <div className="bg-white">

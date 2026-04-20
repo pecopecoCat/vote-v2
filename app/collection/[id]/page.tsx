@@ -342,36 +342,42 @@ export default function CollectionPage() {
         {/* 登録数・公開設定（メンバー限定時は右端にシェア） */}
         {collection.visibility === "member" ? (
           <div>
-            <div className="flex w-full items-center justify-between gap-2">
-              <p className="min-w-0 text-sm text-gray-600">
-                登録数 {collection.cardIds.length}件 · {VISIBILITY_LABEL.member}
-              </p>
-              <button
-                type="button"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-700 transition-opacity active:opacity-70"
-                aria-label="シェアする"
-                onClick={handleShareCollection}
-              >
-                <img src="/icons/icon_share.svg" alt="" className="h-5 w-5" width={20} height={21} />
-              </button>
+            <div className="flex flex-col gap-2 py-[15px]">
+              <div className="flex w-full items-center justify-between gap-2">
+                <p className="min-w-0 text-[13px] font-normal leading-snug text-gray-600">
+                  登録数 {collection.cardIds.length}件 · {VISIBILITY_LABEL.member}
+                </p>
+                <button
+                  type="button"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-700 transition-opacity active:opacity-70"
+                  aria-label="シェアする"
+                  onClick={handleShareCollection}
+                >
+                  <img src="/icons/icon_share.svg" alt="" className="h-5 w-5" width={20} height={21} />
+                </button>
+              </div>
+              <div className="-mx-[5.333vw] h-px shrink-0 bg-gray-300" aria-hidden />
             </div>
-            <p className="mt-1 text-[10px] leading-snug text-gray-400">
-              登録数は、コレクションに入っている2択の件数です（投票した人数ではありません）。
+            <p className="mt-1 text-[10px] leading-tight text-gray-400">
+              ※登録数＝2択の件数（投票者数ではありません）
             </p>
           </div>
         ) : (
-          <p className="text-sm text-gray-600">
-            登録数 {collection.cardIds.length}件
-            {collection.visibility !== "public" && ` · ${VISIBILITY_LABEL[collection.visibility]}`}
-          </p>
+          <div className="flex flex-col gap-2 py-[15px]">
+            <p className="text-[13px] font-normal leading-snug text-gray-600">
+              登録数 {collection.cardIds.length}件
+              {collection.visibility !== "public" && ` · ${VISIBILITY_LABEL[collection.visibility]}`}
+            </p>
+            <div className="-mx-[5.333vw] h-px shrink-0 bg-gray-300" aria-hidden />
+          </div>
         )}
         {collection.visibility === "member" && memberParticipants.length > 0 && (
-          <div className="mt-2">
-            <p className="text-[10px] font-medium tracking-wide text-gray-400">投票したメンバー</p>
-            <p className="mt-0.5 text-[10px] leading-snug text-gray-400">
-              他のメンバーは、数秒〜数十秒ほど遅れて表示されることがあります。
+          <div className="mt-1.5">
+            <p className="text-[10px] leading-tight text-gray-400">
+              <span className="font-medium text-gray-500">投票メンバー</span>
+              <span className="text-gray-400"> · 表示は数秒〜数十秒遅れることがあります</span>
             </p>
-            <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1.5">
+            <ul className="mt-1 flex flex-wrap gap-x-2.5 gap-y-1">
               {memberParticipants.slice(0, 18).map((p) => (
                 <li key={p.userId} className="flex max-w-[9rem] min-w-0 items-center gap-1.5">
                   <img
@@ -393,11 +399,11 @@ export default function CollectionPage() {
         {collection.visibility === "member" && (
           <>
             <p
-              className={`text-xs text-gray-500 ${memberParticipants.length > 0 ? "mt-2" : "mt-1"}`}
+              className={`text-[11px] leading-snug text-gray-500 ${memberParticipants.length > 0 ? "mt-1.5" : "mt-1"}`}
             >
-              リンクを知っている方のみが閲覧・投票できます。この画面の得票数は、このコレクション内の投票だけを集計しています。
+              リンクを知る方のみ閲覧・投票可。得票はこのコレクション内の票のみ集計です。
             </p>
-            <div className="-mx-[5.333vw] mt-3 h-px bg-gray-300" aria-hidden />
+            <div className="-mx-[5.333vw] mt-2 h-px bg-gray-300" aria-hidden />
           </>
         )}
 

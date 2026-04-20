@@ -616,7 +616,11 @@ function ProfileContent() {
         {activeTab === "myVOTE" && (
           <>
             <div className="relative mb-5 flex items-center justify-between">
-              <NewestOldestSortDropdown value={myVoteSortOrder} onChange={setMyVoteSortOrder} />
+              <NewestOldestSortDropdown
+                value={myVoteSortOrder}
+                onChange={setMyVoteSortOrder}
+                arrowStroke="#787878"
+              />
               <button
                 type="button"
                 className={`text-sm font-bold text-gray-900 ${isMyVoteEditMode ? "text-blue-600" : ""}`}
@@ -692,7 +696,11 @@ function ProfileContent() {
         {activeTab === "vote" && (
           <>
             <div className="relative mb-5 flex items-center justify-between">
-              <NewestOldestSortDropdown value={voteTabSortOrder} onChange={setVoteTabSortOrder} />
+              <NewestOldestSortDropdown
+                value={voteTabSortOrder}
+                onChange={setVoteTabSortOrder}
+                arrowStroke="#787878"
+              />
             </div>
             {votedCards.length === 0 ? (
               <div className="mt-4 rounded-2xl bg-white px-6 py-12 text-center">
