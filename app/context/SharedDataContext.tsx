@@ -24,6 +24,7 @@ import {
   ACTIVITY_GLOBAL_UPDATED_EVENT,
 } from "../data/voteCardActivity";
 import { getCurrentActivityUserId, getAuthUpdatedEventName } from "../data/auth";
+import { hydrateParticipatedMemberCollectionsFromRemote } from "../data/collections";
 
 const CREATED_VOTES_API = "/api/created-votes";
 const ACTIVITY_API = "/api/activity";
@@ -242,6 +243,16 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     window.addEventListener(getAuthUpdatedEventName(), handler);
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, [fetchActivity]);
+
+  // ログインしたユーザーの「参加中メンバー限定コレクション」をKVから取り込み（別ブラウザでも保持）
+  useEffect(() => {
+    const handler = () => {
+      void hydrateParticipatedMemberCollectionsFromRemote();
+    };
+    handler();
+    window.addEventListener(getAuthUpdatedEventName(), handler);
+    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
+  }, []);
 
   // いいねなどで global だけ更新されたとき、既存の activity を上書きせずマージする（API取得分が消えないように）
   useEffect(() => {

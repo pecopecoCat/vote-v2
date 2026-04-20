@@ -149,7 +149,7 @@ export function getCollections(): Collection[] {
  * メンバー限定に投票したとき、マイページ用リストに追加（既に自分のコレクションにあれば何もしない）。
  * `createdByUserId` が現在ユーザーと一致する場合はオーナーなので追加しない。
  */
-export function addParticipatedMemberCollectionIfNeeded(col: Collection): void {
+export function addParticipatedMemberCollectionIfNeeded(col: Collection, opts?: { skipRemote?: boolean }): void {
   if (col.visibility !== "member") return;
   const uid = getCurrentActivityUserId();
   if (col.createdByUserId && col.createdByUserId === uid) return;
@@ -168,6 +168,68 @@ export function addParticipatedMemberCollectionIfNeeded(col: Collection): void {
     createdByIconUrl: col.createdByIconUrl,
   });
   save(uid, cols);
+
+  // ブラウザ/端末が変わっても維持できるよう、ログインユーザーはKVにも保存（KV未設定なら無視）
+  if (opts?.skipRemote) return;
+  const auth = getAuth();
+  if (!auth.isLoggedIn || !auth.userId) return;
+  fetch(`/api/member-collections`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: auth.userId,
+      collection: {
+        id: col.id,
+        name: col.name,
+        color: col.color,
+        gradient: col.gradient,
+        visibility: "member",
+        cardIds: Array.isArray(col.cardIds) ? [...col.cardIds] : [],
+        createdByUserId: col.createdByUserId,
+        createdByDisplayName: col.createdByDisplayName,
+        createdByIconUrl: col.createdByIconUrl,
+      },
+    }),
+  }).catch(() => {});
+}
+
+/** KVに保存された「参加中メンバー限定コレクション」を取り込み（ログインユーザーのみ）。 */
+export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const auth = getAuth();
+  if (!auth.isLoggedIn || !auth.userId) return;
+  try {
+    const res = await fetch(`/api/member-collections?userId=${encodeURIComponent(auth.userId)}`);
+    if (!res.ok) return;
+    const data = (await res.json()) as { collections?: unknown };
+    const list = Array.isArray(data?.collections) ? data.collections : [];
+    for (const raw of list) {
+      if (!raw || typeof raw !== "object") continue;
+      const o = raw as Record<string, unknown>;
+      const id = typeof o.id === "string" ? o.id : "";
+      if (!id) continue;
+      const visibility = o.visibility === "member" ? "member" : null;
+      if (!visibility) continue;
+      const col: Collection = {
+        id,
+        name: typeof o.name === "string" ? o.name : "",
+        color: typeof o.color === "string" ? o.color : "#E5E7EB",
+        gradient: typeof o.gradient === "string" ? (o.gradient as CollectionGradient) : undefined,
+        visibility,
+        cardIds: Array.isArray(o.cardIds) ? o.cardIds.filter((v): v is string => typeof v === "string") : [],
+        joinedParticipation: true,
+        createdByUserId: typeof o.createdByUserId === "string" ? o.createdByUserId : undefined,
+        createdByDisplayName:
+          typeof o.createdByDisplayName === "string" && o.createdByDisplayName.trim()
+            ? o.createdByDisplayName.trim()
+            : undefined,
+        createdByIconUrl: typeof o.createdByIconUrl === "string" && o.createdByIconUrl.length > 0 ? o.createdByIconUrl : undefined,
+      };
+      addParticipatedMemberCollectionIfNeeded(col, { skipRemote: true });
+    }
+  } catch {
+    // ignore
+  }
 }
 
 /** user1 と user2 のブックマークコレクションを空にリセット（一旦0にする用） */
