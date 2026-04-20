@@ -79,8 +79,8 @@ function buildMemberParticipantsForDisplay(
     viewerAsOwner?.name ||
     fromCard?.name ||
     "作成者";
-  const displayIcon =
-    collection.createdByIconUrl || viewerAsOwner?.iconUrl || fromCard?.iconUrl;
+  const displayIconRaw = collection.createdByIconUrl || viewerAsOwner?.iconUrl || fromCard?.iconUrl;
+  const displayIcon = typeof displayIconRaw === "string" && displayIconRaw.length > 0 ? displayIconRaw : undefined;
 
   const others = participants.filter((p) => p.userId !== oid);
   const existing = participants.find((p) => p.userId === oid);
@@ -510,7 +510,7 @@ export default function CollectionPage() {
               {memberParticipantsForDisplay.slice(0, 18).map((p) => (
                 <li key={p.userId} className="flex max-w-[10rem] min-w-0 items-center gap-1.5">
                   <img
-                    src={p.iconUrl ?? "/default-avatar.png"}
+                    src={typeof p.iconUrl === "string" && p.iconUrl.length > 0 ? p.iconUrl : "/default-avatar.png"}
                     alt=""
                     className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]"
                     width={24}
