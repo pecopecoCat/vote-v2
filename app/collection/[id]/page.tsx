@@ -382,30 +382,28 @@ export default function CollectionPage() {
         </button>
       </header>
 
-      <main className="mx-auto max-w-lg px-[5.333vw] pb-6 pt-4">
-        {/* 登録数・公開設定（メンバー限定時は右端にシェア） */}
+      <main
+        className={`mx-auto max-w-lg px-[5.333vw] pb-6 ${
+          collection.visibility === "member" ? "pt-[2.6px]" : "pt-4"
+        }`}
+      >
+        {/* 登録数・公開設定（メンバー限定時は右端にシェア）。ヘッダー直下は main の pt を詰める */}
         {collection.visibility === "member" ? (
-          <div>
-            {/* 上は従来どおり pt、下は pb なし（区切り直後の脚注との間を詰める）。脚注上余白は下の区切り線前 mt-2 と揃える */}
-            <div className="flex flex-col gap-2 pt-[15px] pb-0">
-              <div className="flex w-full items-center justify-between gap-2">
-                <p className="min-w-0 text-[13px] font-normal leading-snug text-gray-600">
-                  登録数 {collection.cardIds.length}件 · {VISIBILITY_LABEL.member}
-                </p>
-                <button
-                  type="button"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-700 transition-opacity active:opacity-70"
-                  aria-label="シェアする"
-                  onClick={handleShareCollection}
-                >
-                  <img src="/icons/icon_share.svg" alt="" className="h-5 w-5" width={20} height={21} />
-                </button>
-              </div>
-              <div className="-mx-[5.333vw] h-px shrink-0 bg-gray-300" aria-hidden />
+          <div className="flex flex-col gap-2 pb-0 pt-[2.4375px]">
+            <div className="flex w-full items-center justify-between gap-2">
+              <p className="min-w-0 text-[13px] font-normal leading-snug text-gray-600">
+                登録数 {collection.cardIds.length}件 · {VISIBILITY_LABEL.member}
+              </p>
+              <button
+                type="button"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-700 transition-opacity active:opacity-70"
+                aria-label="シェアする"
+                onClick={handleShareCollection}
+              >
+                <img src="/icons/icon_share.svg" alt="" className="h-5 w-5" width={20} height={21} />
+              </button>
             </div>
-            <p className="mt-2 text-[10px] leading-tight text-gray-400">
-              ※登録数＝2択の件数（投票者数ではありません）
-            </p>
+            <div className="-mx-[5.333vw] h-px shrink-0 bg-gray-300" aria-hidden />
           </div>
         ) : (
           <div className="flex flex-col gap-2 py-[15px]">
@@ -417,12 +415,8 @@ export default function CollectionPage() {
           </div>
         )}
         {collection.visibility === "member" && memberParticipants.length > 0 && (
-          <div className="mt-1.5">
-            <p className="text-[10px] leading-tight text-gray-400">
-              <span className="font-medium text-gray-500">投票メンバー</span>
-              <span className="text-gray-400"> · 表示は数秒〜数十秒遅れることがあります</span>
-            </p>
-            <ul className="mt-1 flex flex-wrap gap-x-2.5 gap-y-1">
+          <div className="mt-2">
+            <ul className="flex flex-wrap gap-x-2.5 gap-y-1">
               {memberParticipants.slice(0, 18).map((p) => (
                 <li key={p.userId} className="flex max-w-[9rem] min-w-0 items-center gap-1.5">
                   <img

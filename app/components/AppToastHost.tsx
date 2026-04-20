@@ -27,23 +27,13 @@ export default function AppToastHost() {
 
   if (message == null) return null;
 
-  /** 375px 幅を基準に 355px（比率 355/375）でビューポートに比例 */
-  const toastStyle = {
-    width: "calc(100vw * 355 / 375)",
-    borderRadius: 10,
-    color: "#ffffff",
-    backgroundColor: "#191919",
-    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.1)",
-  } as const;
-
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-6 z-[200] flex justify-center"
+      className="pointer-events-none fixed inset-x-0 bottom-6 z-[200] flex justify-center px-4"
       role="status"
     >
       <div
-        className="box-border px-4 py-3 text-center text-sm font-medium"
-        style={toastStyle}
+        className="box-border w-full max-w-[355px] rounded-[10px] bg-[#191919] px-4 py-3 text-center text-sm font-medium text-white shadow-[0_4px_10px_rgba(0,0,0,0.1)]"
       >
         {message}
       </div>

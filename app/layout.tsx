@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Lato, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 import { SharedDataProvider } from "./context/SharedDataContext";
 import AppToastHost from "./components/AppToastHost";
+import DesktopViewportChrome from "./components/DesktopViewportChrome";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,10 +42,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoSansJP.variable} ${lato.variable} antialiased`}
       >
-        <SharedDataProvider>
-          {children}
-          <AppToastHost />
-        </SharedDataProvider>
+        <DesktopViewportChrome>
+          <SharedDataProvider>
+            {children}
+            <AppToastHost />
+          </SharedDataProvider>
+        </DesktopViewportChrome>
       </body>
     </html>
   );
