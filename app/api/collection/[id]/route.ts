@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../../lib/kv";
-import { readMemberVotesMaps } from "../../../lib/memberCollectionVotesKv";
+import {
+  memberGlobalKey,
+  memberPartsHashKey,
+  memberPartsKey,
+  memberUserKey,
+  readMemberVotesMaps,
+} from "../../../lib/memberCollectionVotesKv";
 
 const KV_PREFIX = "vote_collection:";
+const MEMBER_COLLECTIONS_PREFIX = "vote_member_collections:";
+const MEMBER_COLLECTION_MEMBERS_PREFIX = "vote_member_collection_members:";
 
 /** 公開・メンバー限定コレクションのみKVに保存。GETでリンクを知っている人（未ログイン含む）が閲覧可能 */
 export type CollectionPayload = {
@@ -70,7 +78,36 @@ export async function DELETE(
     return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
   }
   try {
+    const raw = await kv.get<CollectionPayload>(KV_PREFIX + id);
     await kv.del(KV_PREFIX + id);
+
+    // メンバー限定: 参加者側の「参加中（bookmark）」も一括で削除
+    if (raw && typeof raw === "object" && raw.visibility === "member") {
+      const membersKey = MEMBER_COLLECTION_MEMBERS_PREFIX + id;
+      const membersRaw = await kv.get<unknown>(membersKey);
+      const memberUserIds = Array.isArray(membersRaw)
+        ? membersRaw.filter((v): v is string => typeof v === "string" && v.length > 0)
+        : [];
+
+      for (const uid of memberUserIds) {
+        const listKey = MEMBER_COLLECTIONS_PREFIX + uid;
+        const listRaw = await kv.get<unknown>(listKey);
+        const list = Array.isArray(listRaw) ? (listRaw as unknown[]) : [];
+        const next = list.filter((x) => !(x && typeof x === "object" && (x as { id?: unknown }).id === id));
+        await kv.set(listKey, next);
+
+        // 可能なら個別ユーザー投票キーも掃除（best-effort）
+        await kv.del(memberUserKey(id, uid));
+      }
+
+      // インデックスと集計も削除
+      await Promise.all([
+        kv.del(membersKey),
+        kv.del(memberGlobalKey(id)),
+        kv.del(memberPartsKey(id)),
+        kv.del(memberPartsHashKey(id)),
+      ]);
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/collection] DELETE error:", e);

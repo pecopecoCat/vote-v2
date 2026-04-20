@@ -3,6 +3,7 @@ import { getKV } from "../../lib/kv";
 import type { CollectionPayload } from "../collection/[id]/route";
 
 const KV_KEY_PREFIX = "vote_member_collections:";
+const KV_MEMBERS_INDEX_PREFIX = "vote_member_collection_members:";
 
 type MemberCollectionEntry = Pick<
   CollectionPayload,
@@ -11,6 +12,10 @@ type MemberCollectionEntry = Pick<
 
 function key(userId: string): string {
   return KV_KEY_PREFIX + userId;
+}
+
+function membersKey(collectionId: string): string {
+  return KV_MEMBERS_INDEX_PREFIX + collectionId;
 }
 
 function normalizeEntry(raw: unknown): MemberCollectionEntry | null {
@@ -73,6 +78,14 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       return NextResponse.json({ ok: true });
     }
     await kv.set(key(userId), [...normalized, entry]);
+
+    // 削除時に参加者側の「参加中」を一括削除できるよう、逆引きインデックスを維持する
+    const membersRaw = await kv.get<unknown>(membersKey(entry.id));
+    const members = Array.isArray(membersRaw) ? membersRaw.filter((v): v is string => typeof v === "string" && v.length > 0) : [];
+    if (!members.includes(userId)) {
+      await kv.set(membersKey(entry.id), [...members, userId]);
+    }
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/member-collections] POST error:", e);

@@ -210,6 +210,7 @@ export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<
     if (!res.ok) return;
     const data = (await res.json()) as { collections?: unknown };
     const list = Array.isArray(data?.collections) ? data.collections : [];
+    const remoteIds = new Set<string>();
     for (const raw of list) {
       if (!raw || typeof raw !== "object") continue;
       const o = raw as Record<string, unknown>;
@@ -217,6 +218,7 @@ export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<
       if (!id) continue;
       const visibility = o.visibility === "member" ? "member" : null;
       if (!visibility) continue;
+      remoteIds.add(id);
       const col: Collection = {
         id,
         name: typeof o.name === "string" ? o.name : "",
@@ -233,6 +235,14 @@ export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<
         createdByIconUrl: typeof o.createdByIconUrl === "string" && o.createdByIconUrl.length > 0 ? o.createdByIconUrl : undefined,
       };
       addParticipatedMemberCollectionIfNeeded(col, { skipRemote: true });
+    }
+
+    // KV側から消えた参加中コレクションはローカルからも掃除（作成者削除の反映）
+    const uid = getCurrentActivityUserId();
+    const current = getCollections();
+    const next = current.filter((c) => !c.joinedParticipation || remoteIds.has(c.id));
+    if (next.length !== current.length) {
+      save(uid, next);
     }
   } catch {
     // ignore
