@@ -279,6 +279,7 @@ export function createCollection(
     gradient: options?.gradient,
     visibility: options?.visibility ?? "public",
     cardIds: [],
+    createdByUserId: userId,
   };
   cols.push(newCol);
   save(userId, cols);

@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import VoteCard from "../../components/VoteCard";
 import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
@@ -31,6 +31,7 @@ import {
   getAllCollectionScopedActivity,
   getCollectionScopedParticipants,
   hydrateCollectionScopedFromSnapshot,
+  parseMemberCollectionVotesPayload,
 } from "../../data/collectionVoteActivity";
 import { addHiddenUser } from "../../data/hiddenUsers";
 import { getShowVoted, setShowVoted } from "../../data/showVotedPreference";
@@ -91,6 +92,12 @@ export default function CollectionPage() {
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [scopedVotesVersion, setScopedVotesVersion] = useState(0);
   const [auth, setAuth] = useState(() => getAuth());
+  /** コレクションAPIの userId クエリ用（ログイン切替で再取得） */
+  const activityUserId = useMemo(
+    () => getCurrentActivityUserId(),
+    [auth.isLoggedIn, auth.user?.name, auth.userId]
+  );
+  const skipNextMemberPullRef = useRef(false);
   const currentUser = useMemo<CurrentUser>(
     () =>
       auth.isLoggedIn && auth.user
@@ -144,7 +151,9 @@ export default function CollectionPage() {
     }
     let cancelled = false;
     setApiFetchFailed(false);
-    fetch(`/api/collection/${encodeURIComponent(id)}`)
+    fetch(
+      `/api/collection/${encodeURIComponent(id)}?userId=${encodeURIComponent(activityUserId)}`
+    )
       .then((res) => {
         if (cancelled) return;
         if (!res.ok) {
@@ -153,31 +162,57 @@ export default function CollectionPage() {
         }
         return res.json();
       })
-      .then((data: { id?: string; name?: string; color?: string; gradient?: string; visibility?: string; cardIds?: string[] }) => {
-        if (cancelled || !data?.id) return;
-        const grad = data.gradient as string | undefined;
-        const validGradients: CollectionGradient[] = ["blue-cyan", "pink-purple", "purple-pink", "orange-yellow", "green-yellow", "cyan-aqua"];
-        const gradient = grad && validGradients.includes(grad as CollectionGradient) ? (grad as CollectionGradient) : undefined;
-        setCollectionFromApi({
-          id: data.id,
-          name: String(data.name ?? ""),
-          color: String(data.color ?? "#E5E7EB"),
-          gradient,
-          visibility: (data.visibility as CollectionVisibility) ?? "public",
-          cardIds: Array.isArray(data.cardIds) ? data.cardIds : [],
-          createdByUserId:
-            typeof (data as { createdByUserId?: string }).createdByUserId === "string"
-              ? (data as { createdByUserId: string }).createdByUserId
-              : undefined,
-        });
-      })
+      .then(
+        (data: {
+          id?: string;
+          name?: string;
+          color?: string;
+          gradient?: string;
+          visibility?: string;
+          cardIds?: string[];
+          memberVotes?: unknown;
+        }) => {
+          if (cancelled || !data?.id) return;
+          const grad = data.gradient as string | undefined;
+          const validGradients: CollectionGradient[] = [
+            "blue-cyan",
+            "pink-purple",
+            "purple-pink",
+            "orange-yellow",
+            "green-yellow",
+            "cyan-aqua",
+          ];
+          const gradient =
+            grad && validGradients.includes(grad as CollectionGradient) ? (grad as CollectionGradient) : undefined;
+          const visibility = (data.visibility as CollectionVisibility) ?? "public";
+          if (visibility === "member" && data.memberVotes != null) {
+            const snap = parseMemberCollectionVotesPayload(data.memberVotes);
+            if (snap) {
+              hydrateCollectionScopedFromSnapshot(data.id, snap);
+              skipNextMemberPullRef.current = true;
+            }
+          }
+          setCollectionFromApi({
+            id: data.id,
+            name: String(data.name ?? ""),
+            color: String(data.color ?? "#E5E7EB"),
+            gradient,
+            visibility,
+            cardIds: Array.isArray(data.cardIds) ? data.cardIds : [],
+            createdByUserId:
+              typeof (data as { createdByUserId?: string }).createdByUserId === "string"
+                ? (data as { createdByUserId: string }).createdByUserId
+                : undefined,
+          });
+        }
+      )
       .catch(() => {
         if (!cancelled) setApiFetchFailed(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [id, localCollection]);
+  }, [id, localCollection, activityUserId]);
 
   const collection = localCollection ?? collectionFromApi;
   const isFromApi = !!collectionFromApi && !localCollection;
@@ -198,25 +233,34 @@ export default function CollectionPage() {
       }
     };
 
-    void pull();
-    const interval = window.setInterval(() => void pull(), 15000);
+    if (skipNextMemberPullRef.current) {
+      skipNextMemberPullRef.current = false;
+    } else {
+      void pull();
+    }
+    const interval = window.setInterval(() => void pull(), 8000);
     const onFocus = () => void pull();
+    const onVis = () => {
+      if (document.visibilityState === "visible") void pull();
+    };
     window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
     };
-  }, [collection?.id, collection?.visibility, auth.isLoggedIn, auth.user?.name]);
+  }, [collection?.id, collection?.visibility, auth.isLoggedIn, auth.user?.name, auth.userId]);
 
   const scopedActivityMap = useMemo(() => {
     if (!collection || !isMemberCollection) return {} as Record<string, CardActivity>;
     return getAllCollectionScopedActivity(collection.id);
-  }, [collection, isMemberCollection, scopedVotesVersion, auth.isLoggedIn, auth.user?.name]);
+  }, [collection, isMemberCollection, scopedVotesVersion, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
   const memberParticipants = useMemo(() => {
     if (!collection || !isMemberCollection) return [];
     return getCollectionScopedParticipants(collection.id);
-  }, [collection, isMemberCollection, scopedVotesVersion, auth.isLoggedIn, auth.user?.name]);
+  }, [collection, isMemberCollection, scopedVotesVersion, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
   const isPinned = pinnedIds.includes(id);
   const commentedCardIdSet = useMemo(() => {
     const set = new Set<string>();
@@ -342,7 +386,8 @@ export default function CollectionPage() {
         {/* 登録数・公開設定（メンバー限定時は右端にシェア） */}
         {collection.visibility === "member" ? (
           <div>
-            <div className="flex flex-col gap-2 py-[15px]">
+            {/* 上は従来どおり pt、下は pb なし（区切り直後の脚注との間を詰める）。脚注上余白は下の区切り線前 mt-2 と揃える */}
+            <div className="flex flex-col gap-2 pt-[15px] pb-0">
               <div className="flex w-full items-center justify-between gap-2">
                 <p className="min-w-0 text-[13px] font-normal leading-snug text-gray-600">
                   登録数 {collection.cardIds.length}件 · {VISIBILITY_LABEL.member}
@@ -358,7 +403,7 @@ export default function CollectionPage() {
               </div>
               <div className="-mx-[5.333vw] h-px shrink-0 bg-gray-300" aria-hidden />
             </div>
-            <p className="mt-1 text-[10px] leading-tight text-gray-400">
+            <p className="mt-2 text-[10px] leading-tight text-gray-400">
               ※登録数＝2択の件数（投票者数ではありません）
             </p>
           </div>

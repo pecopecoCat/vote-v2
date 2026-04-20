@@ -9,6 +9,10 @@ import type { CardActivity } from "./voteCardActivity";
 const VOTES_API = (collectionId: string) =>
   `/api/collection/${encodeURIComponent(collectionId)}/votes`;
 
+/** メンバー限定の集計取得は GET /api/collection?userId=（memberVotes 同梱）を優先（作成者のローカル専用ルートと同じ応答に揃える） */
+const COLLECTION_READ_API = (collectionId: string) =>
+  `/api/collection/${encodeURIComponent(collectionId)}`;
+
 const GLOBAL_KEY_PREFIX = "vote_collection_scoped_global_";
 const USER_KEY_PREFIX = "vote_collection_scoped_user_";
 const PARTICIPANTS_KEY_PREFIX = "vote_collection_scoped_participants_";
@@ -152,6 +156,11 @@ function saveParticipantsMap(collectionId: string, data: Record<string, Omit<Col
   }
 }
 
+/** API（GET votes / collection 同梱 memberVotes）の JSON を検証してスナップショット化 */
+export function parseMemberCollectionVotesPayload(raw: unknown): MemberCollectionVotesSnapshot | null {
+  return normalizeSnapshot(raw);
+}
+
 function normalizeSnapshot(raw: unknown): MemberCollectionVotesSnapshot | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -242,13 +251,28 @@ export async function fetchMemberCollectionVotesRemote(
   }
   const userId = getCurrentActivityUserId();
   try {
-    const res = await fetch(`${VOTES_API(collectionId)}?userId=${encodeURIComponent(userId)}`);
+    const res = await fetch(
+      `${COLLECTION_READ_API(collectionId)}?userId=${encodeURIComponent(userId)}`
+    );
     if (res.status === 503) return { ok: false, reason: "no_kv" };
     if (res.status === 404) return { ok: false, reason: "not_found" };
     if (!res.ok) return { ok: false, reason: "error" };
-    const snap = normalizeSnapshot(await res.json());
-    if (!snap) return { ok: false, reason: "error" };
-    return { ok: true, snapshot: snap };
+    const data = (await res.json()) as Record<string, unknown>;
+    if (typeof data.error === "string") return { ok: false, reason: "error" };
+
+    const memberVotes = data.memberVotes;
+    if (data.visibility === "member" && memberVotes != null) {
+      const snap = parseMemberCollectionVotesPayload(memberVotes);
+      if (snap) return { ok: true, snapshot: snap };
+    }
+
+    const resVotes = await fetch(`${VOTES_API(collectionId)}?userId=${encodeURIComponent(userId)}`);
+    if (resVotes.status === 503) return { ok: false, reason: "no_kv" };
+    if (resVotes.status === 404) return { ok: false, reason: "not_found" };
+    if (!resVotes.ok) return { ok: false, reason: "error" };
+    const snapLegacy = normalizeSnapshot(await resVotes.json());
+    if (!snapLegacy) return { ok: false, reason: "error" };
+    return { ok: true, snapshot: snapLegacy };
   } catch {
     return { ok: false, reason: "error" };
   }

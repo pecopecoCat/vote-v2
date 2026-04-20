@@ -1,42 +1,14 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../../../lib/kv";
-
-const COLLECTION_KV_PREFIX = "vote_collection:";
-const GLOBAL_PREFIX = "vote_coll_member_global:";
-const USER_PREFIX = "vote_coll_member_user:";
-const PARTS_PREFIX = "vote_coll_member_parts:";
-
-type GlobalMap = Record<string, { countA: number; countB: number }>;
-type UserRow = { userSelectedOption?: "A" | "B"; votedAt?: string };
-type UserMap = Record<string, UserRow>;
-type PartRow = { name: string; iconUrl?: string; lastVotedAt: string };
-type PartsMap = Record<string, PartRow>;
-
-type CollectionPayload = {
-  id: string;
-  visibility?: string;
-};
-
-function globalKey(collectionId: string): string {
-  return GLOBAL_PREFIX + collectionId;
-}
-
-function userKey(collectionId: string, userId: string): string {
-  return USER_PREFIX + collectionId + ":" + userId;
-}
-
-function partsKey(collectionId: string): string {
-  return PARTS_PREFIX + collectionId;
-}
-
-async function loadMemberCollectionOrNull(
-  kv: NonNullable<Awaited<ReturnType<typeof getKV>>>,
-  collectionId: string
-): Promise<CollectionPayload | null> {
-  const raw = await kv.get<CollectionPayload>(COLLECTION_KV_PREFIX + collectionId);
-  if (!raw || typeof raw !== "object" || raw.visibility !== "member") return null;
-  return raw;
-}
+import {
+  loadMemberCollectionOrNull,
+  memberGlobalKey,
+  memberUserKey,
+  readMemberVotesMaps,
+  readParticipantsMerged,
+  upsertParticipantInKv,
+  type MemberPartRow,
+} from "../../../../lib/memberCollectionVotesKv";
 
 /** GET: KV にあるメンバー限定コレクションのスコープ投票を全員分の集計＋指定 userId の選択で返す */
 export async function GET(
@@ -57,15 +29,8 @@ export async function GET(
     if (!col) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
-    const [gRaw, uRaw, pRaw] = await Promise.all([
-      kv.get<GlobalMap>(globalKey(collectionId)),
-      userId ? kv.get<UserMap>(userKey(collectionId, userId)) : Promise.resolve(null),
-      kv.get<PartsMap>(partsKey(collectionId)),
-    ]);
-    const global = gRaw && typeof gRaw === "object" ? gRaw : {};
-    const userSelections: UserMap = uRaw && typeof uRaw === "object" ? uRaw : {};
-    const participants: PartsMap = pRaw && typeof pRaw === "object" ? pRaw : {};
-    return NextResponse.json({ global, userSelections, participants });
+    const body = await readMemberVotesMaps(kv, collectionId, userId);
+    return NextResponse.json(body);
   } catch (e) {
     console.error("[api/collection/votes] GET error:", e);
     return NextResponse.json({ error: "KV_ERROR" }, { status: 500 });
@@ -106,10 +71,10 @@ export async function POST(
       typeof participant?.iconUrl === "string" && participant.iconUrl.length > 0 ? participant.iconUrl : undefined;
     const lastVotedAt = new Date().toISOString();
 
-    const gKey = globalKey(collectionId);
-    const global = (await kv.get<GlobalMap>(gKey)) ?? {};
+    const gKey = memberGlobalKey(collectionId);
+    const global = (await kv.get<Record<string, { countA: number; countB: number }>>(gKey)) ?? {};
     const cur = global[cardId] ?? { countA: 0, countB: 0 };
-    const nextGlobal: GlobalMap = {
+    const nextGlobal: Record<string, { countA: number; countB: number }> = {
       ...global,
       [cardId]: {
         countA: cur.countA + (option === "A" ? 1 : 0),
@@ -118,17 +83,15 @@ export async function POST(
     };
     await kv.set(gKey, nextGlobal);
 
-    const uK = userKey(collectionId, userId);
-    const userData = (await kv.get<UserMap>(uK)) ?? {};
+    const uK = memberUserKey(collectionId, userId);
+    const userData = (await kv.get<Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>>(uK)) ?? {};
     await kv.set(uK, { ...userData, [cardId]: { userSelectedOption: option, votedAt: lastVotedAt } });
 
-    const pK = partsKey(collectionId);
-    const parts = (await kv.get<PartsMap>(pK)) ?? {};
-    const nextParts: PartsMap = { ...parts, [userId]: { name, ...(iconUrl ? { iconUrl } : {}), lastVotedAt } };
-    await kv.set(pK, nextParts);
-    const participantsOut = (await kv.get<PartsMap>(pK)) ?? nextParts;
+    const partRow: MemberPartRow = { name, lastVotedAt, ...(iconUrl ? { iconUrl } : {}) };
+    await upsertParticipantInKv(kv, collectionId, userId, partRow);
+    const participantsOut = await readParticipantsMerged(kv, collectionId);
 
-    const userSelections = (await kv.get<UserMap>(uK)) ?? {};
+    const userSelections = (await kv.get<typeof userData>(uK)) ?? {};
 
     return NextResponse.json({
       global: nextGlobal,

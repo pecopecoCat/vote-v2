@@ -21,4 +21,7 @@ export type KVClient = {
   del: (key: string) => Promise<number>;
   /** キーが存在しないときだけセット。1=セットした, 0=既に存在（重複） */
   setnx?: (key: string, value: string) => Promise<number>;
+  /** Redis Hash（@vercel/kv / Upstash に存在）— 参加者 userId フィールドを原子的に更新するのに使用 */
+  hgetall?: (key: string) => Promise<Record<string, string> | null>;
+  hset?: (key: string, fields: Record<string, string>) => Promise<unknown>;
 };

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../../lib/kv";
+import { readMemberVotesMaps } from "../../../lib/memberCollectionVotesKv";
 
 const KV_PREFIX = "vote_collection:";
 
@@ -14,10 +15,17 @@ export type CollectionPayload = {
   createdByUserId?: string;
 };
 
+/** メンバー限定時のみ GET /api/collection/[id]?userId= に同梱（往復1回で画面を出す） */
+export type MemberVotesBundle = {
+  global: Record<string, { countA: number; countB: number }>;
+  userSelections: Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>;
+  participants: Record<string, { name: string; iconUrl?: string; lastVotedAt: string }>;
+};
+
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
-): Promise<NextResponse<CollectionPayload | { error: string }>> {
+): Promise<NextResponse<CollectionPayload | (CollectionPayload & { memberVotes: MemberVotesBundle }) | { error: string }>> {
   const kv = await getKV();
   if (!kv) {
     return NextResponse.json({ error: "KV_NOT_CONFIGURED" }, { status: 503 });
@@ -33,6 +41,11 @@ export async function GET(
     }
     if (raw.visibility === "private") {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+    }
+    if (raw.visibility === "member") {
+      const userId = new URL(request.url).searchParams.get("userId") ?? "";
+      const memberVotes = await readMemberVotesMaps(kv, id, userId);
+      return NextResponse.json({ ...raw, memberVotes });
     }
     return NextResponse.json(raw);
   } catch (e) {
