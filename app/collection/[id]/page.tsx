@@ -7,6 +7,7 @@ import VoteCard from "../../components/VoteCard";
 import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
+import MemberCollectionShareSheet from "../../components/MemberCollectionShareSheet";
 import BottomNav from "../../components/BottomNav";
 import Checkbox from "../../components/Checkbox";
 import {
@@ -90,6 +91,7 @@ export default function CollectionPage() {
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [scopedVotesVersion, setScopedVotesVersion] = useState(0);
   const [auth, setAuth] = useState(() => getAuth());
   /** コレクションAPIの userId クエリ用（ログイン切替で再取得） */
@@ -112,6 +114,7 @@ export default function CollectionPage() {
   useEffect(() => {
     setCollections(getCollections());
     setPinnedIds(getPinnedCollectionIds());
+    setShareSheetOpen(false);
   }, [id]);
   useEffect(() => {
     const handler = () => {
@@ -317,13 +320,6 @@ export default function CollectionPage() {
     setPinnedIds(getPinnedCollectionIds());
   };
 
-  const handleShareCollection = useCallback(() => {
-    if (typeof window === "undefined" || !id) return;
-    const url = `${window.location.origin}/collection/${encodeURIComponent(id)}`;
-    const shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=VOTE`;
-    window.open(shareUrl, "_blank", "noopener,noreferrer");
-  }, [id]);
-
   if (!collection) {
     if (!apiFetchFailed && !localCollection && id) {
       return (
@@ -398,7 +394,7 @@ export default function CollectionPage() {
                 type="button"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-700 transition-opacity active:opacity-70"
                 aria-label="シェアする"
-                onClick={handleShareCollection}
+                onClick={() => setShareSheetOpen(true)}
               >
                 <img src="/icons/icon_share.svg" alt="" className="h-5 w-5" width={20} height={21} />
               </button>
@@ -535,6 +531,14 @@ export default function CollectionPage() {
       </main>
 
       <BottomNav activeId="profile" />
+
+      {shareSheetOpen && id && collection.visibility === "member" && (
+        <MemberCollectionShareSheet
+          open={shareSheetOpen}
+          onClose={() => setShareSheetOpen(false)}
+          collectionId={id}
+        />
+      )}
 
       {cardOptionsCardId != null && (
         <CardOptionsModal
