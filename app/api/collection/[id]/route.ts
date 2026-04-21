@@ -9,6 +9,7 @@ import {
 } from "../../../lib/memberCollectionVotesKv";
 
 const KV_PREFIX = "vote_collection:";
+const INDEX_KEY = "vote_collections_index";
 const MEMBER_COLLECTIONS_PREFIX = "vote_member_collections:";
 const MEMBER_COLLECTION_MEMBERS_PREFIX = "vote_member_collection_members:";
 
@@ -80,6 +81,15 @@ export async function DELETE(
   try {
     const raw = await kv.get<CollectionPayload>(KV_PREFIX + id);
     await kv.del(KV_PREFIX + id);
+    // 検索画面用の一覧からも削除（best-effort）
+    try {
+      const indexRaw = await kv.get<unknown>(INDEX_KEY);
+      const list = Array.isArray(indexRaw) ? indexRaw : [];
+      const next = list.filter((x) => !(x && typeof x === "object" && (x as { id?: unknown }).id === id));
+      await kv.set(INDEX_KEY, next);
+    } catch {
+      // ignore
+    }
 
     // メンバー限定: 参加者側の「参加中（bookmark）」も一括で削除
     if (raw && typeof raw === "object" && raw.visibility === "member") {

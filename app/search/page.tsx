@@ -177,6 +177,9 @@ function SearchContent() {
   const [trendingTagsVisibleCount, setTrendingTagsVisibleCount] = useState(10);
   const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
   const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
+  const [remotePopularCollections, setRemotePopularCollections] = useState<
+    Array<{ id: string; name: string; color: string; gradient?: string; visibility: string; cardIds: string[] }>
+  >([]);
   const [auth, setAuth] = useState(() => getAuth());
   const isLoggedIn = auth.isLoggedIn;
   const currentUser = useMemo<CurrentUser>(
@@ -201,6 +204,37 @@ function SearchContent() {
       window.removeEventListener(getAuthUpdatedEventName(), syncLists);
       window.removeEventListener(PINNED_UPDATED_EVENT, syncLists);
       window.removeEventListener(getCollectionsUpdatedEventName(), syncLists);
+    };
+  }, []);
+
+  // 検索画面の「人気コレクション」候補をKVから取得（public/member のみ。KV未設定なら無視）
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/collections");
+        if (!res.ok) return;
+        const data = (await res.json()) as { collections?: unknown };
+        const list = Array.isArray(data?.collections) ? (data.collections as unknown[]) : [];
+        const normalized = list
+          .map((v) => (v && typeof v === "object" ? (v as Record<string, unknown>) : null))
+          .filter((v): v is Record<string, unknown> => v != null)
+          .map((o) => ({
+            id: typeof o.id === "string" ? o.id : "",
+            name: typeof o.name === "string" ? o.name : "",
+            color: typeof o.color === "string" ? o.color : "#E5E7EB",
+            gradient: typeof o.gradient === "string" ? (o.gradient as string) : undefined,
+            visibility: typeof o.visibility === "string" ? o.visibility : "public",
+            cardIds: Array.isArray(o.cardIds) ? o.cardIds.filter((x): x is string => typeof x === "string") : [],
+          }))
+          .filter((c) => c.id.length > 0);
+        if (!cancelled) setRemotePopularCollections(normalized);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -333,7 +367,19 @@ function SearchContent() {
   /** 人気コレクション（他＋自分の）：ピン留めを上に表示 */
   const collectionsForSection = useMemo(() => {
     const other = getOtherUsersCollections();
-    const combined = [...other, ...collections.filter((c) => c.visibility !== "member")];
+    // KVから取れたらそれを優先（メンバー限定はリンク共有前提なので人気枠では public のみ表示）
+    const remotePublic = remotePopularCollections
+      .filter((c) => c.visibility === "public")
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        color: c.color,
+        gradient: c.gradient as CollectionGradient | undefined,
+        visibility: "public" as const,
+        cardIds: c.cardIds,
+      }));
+    const mine = collections.filter((c) => c.visibility !== "member");
+    const combined = [...remotePublic, ...other, ...mine];
     return combined.sort((a, b) => {
       const aPin = pinnedCollectionIds.includes(a.id);
       const bPin = pinnedCollectionIds.includes(b.id);
@@ -343,7 +389,7 @@ function SearchContent() {
         return pinnedCollectionIds.indexOf(a.id) - pinnedCollectionIds.indexOf(b.id);
       return 0;
     });
-  }, [collections, pinnedCollectionIds]);
+  }, [collections, pinnedCollectionIds, remotePopularCollections]);
 
   /** 注目タグ用の全カード（作成VOTE + シード） */
   const allCardsForTags = useMemo(() => {
