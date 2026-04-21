@@ -9,6 +9,7 @@ import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import MemberCollectionShareSheet from "../../components/MemberCollectionShareSheet";
 import BottomNav from "../../components/BottomNav";
+import AppHeader from "../../components/AppHeader";
 import Checkbox from "../../components/Checkbox";
 import {
   addParticipatedMemberCollectionIfNeeded,
@@ -55,6 +56,28 @@ const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   private: "非公開",
   member: "メンバー限定",
 };
+
+function MemberCollectionLoginGate({ collectionId }: { collectionId: string }) {
+  const returnTo = `/collection/${collectionId}`;
+  return (
+    <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
+      <AppHeader type="title" title="コレクション" backHref="/search" />
+      <main className="mx-auto max-w-lg px-6 py-12 text-center">
+        <p className="text-base font-bold text-[#191919]">ログインが必要です。</p>
+        <p className="mt-3 text-sm leading-relaxed text-[#787878]">
+          メンバー限定コレクションを表示するにはログインしてください。
+        </p>
+        <Link
+          href={`/profile/login?returnTo=${encodeURIComponent(returnTo)}`}
+          className="mt-10 block w-full max-w-sm mx-auto rounded-xl bg-[#FFE100] py-4 text-center text-base font-bold text-gray-900 hover:opacity-90"
+        >
+          ログインする
+        </Link>
+      </main>
+      <BottomNav activeId="search" />
+    </div>
+  );
+}
 
 /** 投票参加者に加え、作成者を先頭に表示（KV の参加者は投票した人のみのため） */
 function buildMemberParticipantsForDisplay(
@@ -199,16 +222,20 @@ export default function CollectionPage() {
   const localCollection = useMemo(() => getCollectionById(id), [id, collections]);
   const [collectionFromApi, setCollectionFromApi] = useState<Collection | null>(null);
   const [apiFetchFailed, setApiFetchFailed] = useState(false);
+  /** メンバー限定を共有URLで開いたが未ログイン（本文は出さずログイン導線） */
+  const [memberShareNeedsLogin, setMemberShareNeedsLogin] = useState(false);
 
   /** 共有リンク等でローカルに無いときは paint 前に fetch を開始し、体感待ちを短くする */
   useLayoutEffect(() => {
     if (!id || localCollection) {
       setCollectionFromApi(null);
       setApiFetchFailed(false);
+      setMemberShareNeedsLogin(false);
       return;
     }
     let cancelled = false;
     setApiFetchFailed(false);
+    setMemberShareNeedsLogin(false);
     fetch(
       `/api/collection/${encodeURIComponent(id)}?userId=${encodeURIComponent(activityUserId)}`
     )
@@ -216,6 +243,7 @@ export default function CollectionPage() {
         if (cancelled) return;
         if (!res.ok) {
           setApiFetchFailed(true);
+          setMemberShareNeedsLogin(false);
           return;
         }
         return res.json();
@@ -245,6 +273,14 @@ export default function CollectionPage() {
           const gradient =
             grad && validGradients.includes(grad as CollectionGradient) ? (grad as CollectionGradient) : undefined;
           const visibility = (data.visibility as CollectionVisibility) ?? "public";
+          if (visibility === "member" && !getAuth().isLoggedIn) {
+            if (!cancelled) {
+              setMemberShareNeedsLogin(true);
+              setCollectionFromApi(null);
+            }
+            return;
+          }
+          if (!cancelled) setMemberShareNeedsLogin(false);
           if (visibility === "member" && data.memberVotes != null) {
             const snap = parseMemberCollectionVotesPayload(data.memberVotes);
             if (snap) {
@@ -275,12 +311,15 @@ export default function CollectionPage() {
         }
       )
       .catch(() => {
-        if (!cancelled) setApiFetchFailed(true);
+        if (!cancelled) {
+          setApiFetchFailed(true);
+          setMemberShareNeedsLogin(false);
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [id, localCollection, activityUserId]);
+  }, [id, localCollection, activityUserId, auth.isLoggedIn]);
 
   const collection = localCollection ?? collectionFromApi;
   const isFromApi = !!collectionFromApi && !localCollection;
@@ -432,6 +471,9 @@ export default function CollectionPage() {
   };
 
   if (!collection) {
+    if (memberShareNeedsLogin && id) {
+      return <MemberCollectionLoginGate collectionId={id} />;
+    }
     if (!apiFetchFailed && !localCollection && id) {
       return (
         <div className="flex min-h-screen items-center justify-center bg-[#F1F1F1]">
@@ -452,6 +494,10 @@ export default function CollectionPage() {
         </div>
       </div>
     );
+  }
+
+  if (collection.visibility === "member" && !auth.isLoggedIn) {
+    return <MemberCollectionLoginGate collectionId={id} />;
   }
 
   return (
