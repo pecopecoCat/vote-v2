@@ -67,7 +67,7 @@ export async function GET(request: Request): Promise<NextResponse<Record<string,
   }
 }
 
-/** POST body: { type: "vote", userId, cardId, option } | { type: "comment", cardId, comment } */
+/** POST body: vote | comment | delete_comment | bookmark */
 export async function POST(request: Request): Promise<NextResponse<{ ok: boolean } | { error: string }>> {
   const kv = await getKV();
   if (!kv) {
@@ -134,6 +134,45 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       if (parentCommentId) {
         nextComments = nextComments.map((c) =>
           c.id === parentCommentId ? { ...c, replyCount: (c.replyCount ?? 0) + 1 } : c
+        );
+      }
+      await kv.set(KV_GLOBAL, {
+        ...global,
+        [cardId]: {
+          countA: current.countA,
+          countB: current.countB,
+          comments: nextComments,
+        },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (type === "delete_comment") {
+      const cardId = body.cardId as string;
+      const commentId = body.commentId as string;
+      const authorName = typeof body.authorName === "string" ? body.authorName.trim() : "";
+      if (!cardId || !commentId || !authorName) {
+        return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+      }
+      const global = (await kv.get<Record<string, GlobalCardData>>(KV_GLOBAL)) ?? {};
+      const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
+      const comments = Array.isArray(current.comments) ? current.comments : [];
+      const target = comments.find((c) => c.id === commentId);
+      if (!target || target.user?.name !== authorName) {
+        return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+      }
+      const idsToRemove = new Set<string>([commentId]);
+      if (!target.parentId) {
+        for (const c of comments) {
+          if (c.parentId === commentId) idsToRemove.add(c.id);
+        }
+      }
+      let nextComments = comments.filter((c) => !idsToRemove.has(c.id));
+      if (target.parentId) {
+        nextComments = nextComments.map((c) =>
+          c.id === target.parentId
+            ? { ...c, replyCount: Math.max(0, (c.replyCount ?? 0) - 1) }
+            : c
         );
       }
       await kv.set(KV_GLOBAL, {

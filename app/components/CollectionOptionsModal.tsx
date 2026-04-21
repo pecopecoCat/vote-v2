@@ -57,11 +57,11 @@ export default function CollectionOptionsModal({
             <li>
               <button
                 type="button"
-                className="flex w-full items-center gap-3 px-4 py-4 text-left text-gray-900 transition-colors hover:bg-gray-50 active:bg-gray-50"
+                className="flex w-full items-center gap-3 px-4 py-4 text-left text-sm font-bold text-gray-900 transition-colors hover:bg-gray-50 active:bg-gray-50"
                 onClick={handleShare}
               >
                 <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />
-                <span className="card-options-modal-item-label text-sm text-gray-900">シェアする</span>
+                シェアする
               </button>
             </li>
           ) : null}
@@ -69,7 +69,7 @@ export default function CollectionOptionsModal({
             <li>
               <button
                 type="button"
-                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-900 active:bg-gray-50"
+                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-gray-900 active:bg-gray-50"
                 onClick={() => {
                   onClose();
                   onEdit();
@@ -83,7 +83,7 @@ export default function CollectionOptionsModal({
           <li>
             <button
               type="button"
-              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-900 active:bg-gray-50"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-gray-900 active:bg-gray-50"
               onClick={() => {
                 onClose();
                 onDelete();

@@ -69,11 +69,11 @@ export default function TagMenuModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/50"
+        className="fixed inset-0 z-[60] bg-black/50"
         aria-hidden
         onClick={onClose}
       />
-      <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg">
+      <div className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
           <div />
           <span className="text-lg font-bold text-gray-900">メニュー</span>

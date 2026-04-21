@@ -53,8 +53,10 @@ function normalizeCard(raw: unknown): VoteCardData | null {
     visibility: o.visibility === "private" ? "private" : "public",
     optionAImageUrl: typeof o.optionAImageUrl === "string" ? o.optionAImageUrl : undefined,
     optionBImageUrl: typeof o.optionBImageUrl === "string" ? o.optionBImageUrl : undefined,
+    periodStart: typeof o.periodStart === "string" ? o.periodStart : undefined,
     periodEnd: typeof o.periodEnd === "string" ? o.periodEnd : undefined,
     createdByUserId: typeof o.createdByUserId === "string" ? o.createdByUserId : undefined,
+    commentsDisabled: o.commentsDisabled === true ? true : undefined,
   };
 }
 

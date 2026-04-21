@@ -29,8 +29,12 @@ export interface VoteCardData {
   optionAImageUrl?: string;
   /** Bの画像URL */
   optionBImageUrl?: string;
+  /** 投票期間開始日時（ISO文字列）。未設定で periodEnd のみのときは終了まで投票可 */
+  periodStart?: string;
   /** 投票期間終了日時（ISO文字列）。お知らせ「設定した投票期間が終わりました」用 */
   periodEnd?: string;
+  /** true のときコメント投稿不可（作成時「コメントを求めない」） */
+  commentsDisabled?: boolean;
 }
 
 export const voteCardsData: VoteCardData[] = [
@@ -333,15 +337,22 @@ export function getRelatedVoteCardsByTagPriority(
   return out;
 }
 
-/** 新着順でカードを返す（関連VOTEが0件のときのフォールバック用）。currentId を除く。 */
+/** 新着順でカードを返す（関連VOTEが0件のときのフォールバック用）。currentId と excludeCardIds を除く。 */
 export function getNewestVoteCards(
   allCards: VoteCardData[],
   currentId: string,
-  limit = 5
+  limit = 5,
+  excludeCardIds?: Set<string>
 ): VoteCardData[] {
   const id = (c: VoteCardData) => c.id ?? c.question;
+  const exclude = excludeCardIds ?? new Set<string>();
   return [...allCards]
-    .filter((c) => id(c) !== currentId)
+    .filter((c) => {
+      const cid = id(c);
+      if (cid === currentId) return false;
+      if (exclude.has(cid)) return false;
+      return true;
+    })
     .sort((a, b) => (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0"))
     .slice(0, limit);
 }

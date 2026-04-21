@@ -68,6 +68,7 @@ export function CommentBody({
   replyNavigateHref,
   replyCountOverride,
   navigateHref,
+  onCommentMore,
 }: {
   comment: VoteComment;
   onLike?: () => void;
@@ -82,6 +83,8 @@ export function CommentBody({
   replyCountOverride?: number;
   /** 指定時は吹き出し全体タップで画面遷移 */
   navigateHref?: string;
+  /** 3点メニュー。未指定時は非表示 */
+  onCommentMore?: () => void;
 }) {
   const router = useRouter();
   const replyCount = replyCountOverride ?? comment.replyCount ?? 0;
@@ -165,14 +168,19 @@ export function CommentBody({
             <span className={isLikedByMe ? "text-[var(--color-select-a)]" : undefined}>{likeCount}</span>
           </button>
         </div>
-        <button
-          type="button"
-          className="shrink-0 p-0.5 text-[#191919] hover:opacity-70"
-          aria-label="その他"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <MoreIcon className="h-5 w-5" />
-        </button>
+        {onCommentMore ? (
+          <button
+            type="button"
+            className="shrink-0 p-0.5 text-[#191919] hover:opacity-70"
+            aria-label="その他"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCommentMore();
+            }}
+          >
+            <MoreIcon className="h-5 w-5" />
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -196,6 +204,8 @@ export interface CommentThreadGroupProps {
   replyListMoreHref?: string;
   /** 指定時、各リプライのコメントアイコンはこのURLへ遷移 */
   replyToReplyHref?: string;
+  /** 3点メニュー（削除・違反報告）。未指定時はボタンを出さない */
+  onCommentMore?: (comment: VoteComment) => void;
   /** 親が max 幅ラッパー内で横パディングを持つとき true（マイページの 335/375 帯など） */
   threadInnerFlush?: boolean;
   /**
@@ -218,6 +228,7 @@ export default function CommentThreadGroup({
   maxRepliesVisible,
   replyListMoreHref,
   replyToReplyHref,
+  onCommentMore,
   threadInnerFlush = false,
   threadConnectorTone = "default",
 }: CommentThreadGroupProps) {
@@ -320,6 +331,7 @@ export default function CommentThreadGroup({
               replyCountOverride={parentReplyCount}
               replyNavigateHref={parentReplyThreadHref}
               navigateHref={parentReplyThreadHref}
+              onCommentMore={onCommentMore ? () => onCommentMore(parent) : undefined}
             />
           </div>
           {showConnector &&
@@ -344,6 +356,7 @@ export default function CommentThreadGroup({
                     replyCountOverride={0}
                     replyDisabled={!canReply && !replyToReplyHref}
                     isLikedByMe={likedCommentIds.includes(r.id)}
+                    onCommentMore={onCommentMore ? () => onCommentMore(r) : undefined}
                   />
                 </div>
               );

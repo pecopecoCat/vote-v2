@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { showAppToast } from "../lib/appToast";
 
-export interface MemberCollectionShareSheetProps {
+export interface VoteCardShareSheetProps {
   open: boolean;
   onClose: () => void;
-  collectionId: string;
+  cardId: string;
 }
 
 function LinkIcon({ className }: { className?: string }) {
@@ -30,11 +30,11 @@ function XLogoIcon({ className }: { className?: string }) {
   );
 }
 
-export default function MemberCollectionShareSheet({ open, onClose, collectionId }: MemberCollectionShareSheetProps) {
+export default function VoteCardShareSheet({ open, onClose, cardId }: VoteCardShareSheetProps) {
   const pageUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
-    return `${window.location.origin}/collection/${encodeURIComponent(collectionId)}`;
-  }, [collectionId]);
+    return `${window.location.origin}/comments/${encodeURIComponent(cardId)}`;
+  }, [cardId]);
 
   const copyLink = useCallback(async () => {
     if (!pageUrl) return;
@@ -82,50 +82,53 @@ export default function MemberCollectionShareSheet({ open, onClose, collectionId
     <>
       <div className="fixed inset-0 z-[75] bg-black/50" aria-hidden onClick={onClose} />
       <div
-        className="fixed bottom-0 left-0 right-0 z-[80] rounded-t-2xl bg-white pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3 shadow-[0_-2px_10px_rgba(0,0,0,0.08)]"
+        className="fixed inset-x-0 bottom-0 z-[80] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-lg"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="member-share-sheet-title"
+        aria-labelledby="vote-card-share-sheet-title"
       >
-        <div className="mx-auto flex max-w-lg items-center justify-end px-3 pb-2">
-          <span id="member-share-sheet-title" className="sr-only">
-            共有
-          </span>
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center text-[var(--color-select-b)] transition-opacity hover:opacity-80"
-            aria-label="閉じる"
-            onClick={onClose}
-          >
-            <svg width={22} height={22} viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M6 6l12 12M18 6L6 18"
-                stroke="currentColor"
-                strokeWidth={2.2}
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
+          <div />
+          <h2 id="vote-card-share-sheet-title" className="text-lg font-bold text-gray-900">
+            シェア
+          </h2>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className="flex h-10 w-10 items-center justify-center text-[var(--color-select-b)] transition-opacity hover:opacity-80"
+              aria-label="閉じる"
+              onClick={onClose}
+            >
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth={2.2}
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
-        <ul className="border-t border-gray-100">
+        <ul className="px-5 py-2">
+          <li className="border-b border-gray-100">
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 py-4 text-left transition-colors hover:bg-gray-50"
+              onClick={() => void copyLink()}
+            >
+              <LinkIcon className="shrink-0 text-gray-900" />
+              <span className="card-options-modal-item-label text-sm font-bold text-gray-900">リンクをコピー</span>
+            </button>
+          </li>
           <li>
             <button
               type="button"
-              className="flex w-full items-center gap-3 px-4 py-4 text-left text-sm font-medium text-[#191919] transition-colors hover:bg-gray-50 active:bg-gray-50"
-              onClick={() => void copyLink()}
-            >
-              <LinkIcon className="shrink-0 text-[#191919]" />
-              リンクをコピー
-            </button>
-          </li>
-          <li className="border-t border-gray-100">
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 px-4 py-4 text-left text-sm font-medium text-[#191919] transition-colors hover:bg-gray-50 active:bg-gray-50"
+              className="flex w-full items-center gap-3 py-4 text-left transition-colors hover:bg-gray-50"
               onClick={shareToX}
             >
-              <XLogoIcon className="shrink-0 text-[#191919]" />
-              Xにシェア
+              <XLogoIcon className="shrink-0 text-gray-900" />
+              <span className="card-options-modal-item-label text-sm font-bold text-gray-900">Xにシェア</span>
             </button>
           </li>
         </ul>

@@ -1,11 +1,12 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
+
 export interface CardOptionsModalProps {
   cardId: string | null;
   onClose: () => void;
-  /** 自分で作ったカードのとき true。このとき「非表示する」「報告する」は表示しない */
+  /** 自分で作ったカードのとき true。このとき「非表示する」「報告する」は表示しない（シェアはカード上のアイコン） */
   isOwnCard?: boolean;
-  onShare?: (cardId: string) => void;
   onHide?: (cardId: string) => void;
   onReport?: (cardId: string) => void;
 }
@@ -14,28 +15,12 @@ export default function CardOptionsModal({
   cardId,
   onClose,
   isOwnCard = false,
-  onShare,
   onHide,
   onReport,
 }: CardOptionsModalProps) {
-  if (cardId == null) return null;
-
-  const handleShare = () => {
-    if (typeof window !== "undefined") {
-      const url = `${window.location.origin}/comments/${cardId}`;
-      const shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=VOTE`;
-      window.open(shareUrl, "_blank", "noopener,noreferrer");
-    }
-    onShare?.(cardId);
-    onClose();
-  };
-
-  const allItems = [
-    {
-      label: "シェアする",
-      icon: <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />,
-      onClick: handleShare,
-    },
+  const items = useMemo(() => {
+    if (cardId == null || isOwnCard) return [];
+    return [
     {
       label: "非表示する",
       icon: (
@@ -69,17 +54,24 @@ export default function CardOptionsModal({
       },
     },
   ];
+  }, [isOwnCard, cardId, onHide, onReport, onClose]);
 
-  const items = isOwnCard ? allItems.slice(0, 1) : allItems;
+  useEffect(() => {
+    if (cardId != null && items.length === 0) {
+      onClose();
+    }
+  }, [cardId, items.length, onClose]);
+
+  if (cardId == null || items.length === 0) return null;
 
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/50"
+        className="fixed inset-0 z-[60] bg-black/50"
         aria-hidden
         onClick={onClose}
       />
-      <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg">
+      <div className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
           <div />
           <span className="text-lg font-bold text-gray-900">メニュー</span>

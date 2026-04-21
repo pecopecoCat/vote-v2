@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "../components/AppHeader";
 import CollectionCard from "../components/CollectionCard";
@@ -46,9 +46,18 @@ import {
   getTrendingTagsByScore,
   popularCollections,
   searchCollections,
+  searchVoteCardsByKeyword,
   trendingTags,
   type CollectionGradient,
+  type PopularCollection,
 } from "../data/search";
+
+function backgroundForSearchCard(card: VoteCardData, cardId: string): string {
+  if (card.backgroundImageUrl) return card.backgroundImageUrl;
+  let h = 0;
+  for (let i = 0; i < cardId.length; i++) h = ((h << 5) - h + cardId.charCodeAt(i)) | 0;
+  return CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
+}
 
 /** ピン留めコレクション用グラデーションのローテーション（検索画面はグラデーション表示に統一） */
 const PINNED_GRADIENTS: CollectionGradient[] = [
@@ -131,8 +140,21 @@ function EllipsisIcon({ className }: { className?: string }) {
 
 function SearchContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const tagFromUrl = searchParams.get("tag") ?? "";
-  const [searchValue, setSearchValue] = useState(tagFromUrl);
+  const qFromUrl = searchParams.get("q") ?? "";
+  /** 2回目の Enter で VOTE 検索結果へ（URL の `vote=1` と同期） */
+  const voteResultsFromUrl = searchParams.get("vote") === "1";
+  const [searchValue, setSearchValue] = useState(() => tagFromUrl || qFromUrl);
+  /** 1回目の Enter で確定したキーワード（タグ・コレ表示用。URL の q と同期） */
+  const [confirmedKeywordForBrowse, setConfirmedKeywordForBrowse] = useState(() =>
+    tagFromUrl.length > 0 ? "" : qFromUrl
+  );
+  /** 2回目の Enter で確定したキーワード（一致する VOTE のみ表示） */
+  const [committedVoteQuery, setCommittedVoteQuery] = useState(() => {
+    if (tagFromUrl.length > 0) return "";
+    return voteResultsFromUrl ? qFromUrl : "";
+  });
   const [activeTab, setActiveTab] = useState<"trending" | "favorite">("trending");
   const [showVoted, setShowVotedState] = useState(() => getShowVoted());
   /** ハッシュタグ一覧の並び（マイページ等と同じプルダウン） */
@@ -190,9 +212,63 @@ function SearchContent() {
   /** ハッシュタグタップで開いたとき（?tag=xxx）→ 従来のカード一覧。虫眼鏡タップ（/search）→ 新しい検索画面 */
   const isTagFilterView = tagFromUrl.length > 0;
 
+  /** URL の tag / q と入力欄を同期（?tag= の画面で別キーワードに変えたら /search?q= に遷移してキーワード検索へ） */
   useEffect(() => {
-    setSearchValue(tagFromUrl);
-  }, [tagFromUrl]);
+    if (tagFromUrl.length > 0) {
+      setSearchValue(tagFromUrl);
+      setConfirmedKeywordForBrowse("");
+      setCommittedVoteQuery("");
+    } else {
+      setSearchValue(qFromUrl);
+      setConfirmedKeywordForBrowse(qFromUrl);
+      setCommittedVoteQuery(voteResultsFromUrl ? qFromUrl : "");
+    }
+  }, [tagFromUrl, qFromUrl, voteResultsFromUrl]);
+
+  const handleSearchValueChange = useCallback(
+    (v: string) => {
+      setSearchValue(v);
+      if (isTagFilterView && v.trim() !== tagFromUrl.trim()) {
+        const t = v.trim();
+        router.replace(t ? `/search?q=${encodeURIComponent(t)}` : "/search");
+        return;
+      }
+      if (!isTagFilterView) {
+        const t = v.trim();
+        setConfirmedKeywordForBrowse((prev) => (t === prev ? prev : ""));
+        setCommittedVoteQuery((prev) => (t === prev ? prev : ""));
+      }
+      if (!isTagFilterView && qFromUrl.length > 0 && v.trim() === "") {
+        router.replace("/search");
+      }
+    },
+    [isTagFilterView, tagFromUrl, qFromUrl, router]
+  );
+
+  const handleKeywordSearchSubmit = useCallback(
+    (value: string) => {
+      if (isTagFilterView) return;
+      const t = value.trim();
+      if (!t) {
+        setConfirmedKeywordForBrowse("");
+        setCommittedVoteQuery("");
+        router.replace("/search");
+        return;
+      }
+      if (committedVoteQuery === t) {
+        return;
+      }
+      if (confirmedKeywordForBrowse === t && committedVoteQuery === "") {
+        setCommittedVoteQuery(t);
+        router.replace(`/search?q=${encodeURIComponent(t)}&vote=1`);
+        return;
+      }
+      setConfirmedKeywordForBrowse(t);
+      setCommittedVoteQuery("");
+      router.replace(`/search?q=${encodeURIComponent(t)}`);
+    },
+    [isTagFilterView, router, confirmedKeywordForBrowse, committedVoteQuery]
+  );
 
   useEffect(() => {
     setTagListSortOrder("newest");
@@ -209,7 +285,33 @@ function SearchContent() {
 
   const query = searchValue.trim();
   const isSearching = query.length > 0;
-  const matchedCollectionsRaw = useMemo(() => searchCollections(query), [query]);
+  /** 人気コレ（デモ）＋自分・他人の登録コレクション名の部分一致 */
+  const matchedCollectionsRaw = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [] as PopularCollection[];
+    const seen = new Set<string>();
+    const out: PopularCollection[] = [];
+    const other = getOtherUsersCollections();
+    const mine = collections.filter((c) => c.visibility !== "member");
+    for (const c of [...other, ...mine]) {
+      if (!c.name.toLowerCase().includes(q)) continue;
+      if (seen.has(c.id)) continue;
+      seen.add(c.id);
+      out.push({
+        id: c.id,
+        title: c.name,
+        gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+        showPin: pinnedCollectionIds.includes(c.id),
+        voteScore: 0,
+      });
+    }
+    for (const p of searchCollections(query)) {
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      out.push(p);
+    }
+    return out;
+  }, [query, collections, pinnedCollectionIds]);
   /** 検索時コレクション：ピン留めを上に表示 */
   const matchedCollections = useMemo(
     () =>
@@ -259,6 +361,12 @@ function SearchContent() {
         (c) => !c.createdByUserId || !hiddenUserIds.includes(c.createdByUserId)
       ),
     [allCardsForTags, hiddenUserIds]
+  );
+
+  /** 質問・選択肢・タグなど本文のキーワード一致（Enter 確定後の語のみ） */
+  const matchedVoteCards = useMemo(
+    () => searchVoteCardsByKeyword(committedVoteQuery, allCardsForTagsFiltered, 15),
+    [committedVoteQuery, allCardsForTagsFiltered]
   );
 
   /** 注目タグ（スコア順：投票+1, コメント+3, bookmark+5, 新着+2, お気に入り+3） */
@@ -399,8 +507,17 @@ function SearchContent() {
       <AppHeader
         type={isTagFilterView ? "hashtag" : "search"}
         value={searchValue}
-        onChange={setSearchValue}
-        backHref={isTagFilterView ? "/search" : "/"}
+        onChange={handleSearchValueChange}
+        {...(!isTagFilterView && { onSubmit: handleKeywordSearchSubmit })}
+        backHref={
+          isTagFilterView
+            ? "/search"
+            : voteResultsFromUrl && qFromUrl.length > 0
+              ? `/search?q=${encodeURIComponent(qFromUrl)}`
+              : qFromUrl.length > 0
+                ? "/search"
+                : "/"
+        }
         {...(isTagFilterView && {
           onFavoriteClick: (tag) => {
             toggleFavoriteTag(tag);
@@ -467,7 +584,9 @@ function SearchContent() {
                       visibility={card.visibility}
                       optionAImageUrl={card.optionAImageUrl}
                       optionBImageUrl={card.optionBImageUrl}
+                      periodStart={card.periodStart}
                       periodEnd={card.periodEnd}
+                      commentsDisabled={card.commentsDisabled === true}
                     />
                   );
                 })
@@ -659,46 +778,110 @@ function SearchContent() {
           </>
         ) : (
           <>
-            {/* 検索時：「検索語」が含まれるタグ */}
-            <section className="border-b border-gray-200">
-              <SectionHeader>「{query}」が含まれるタグ</SectionHeader>
-              <div className="px-[5.333vw]">
-                {matchedTags.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
-                ) : (
-                  matchedTags.map((t) => (
-                    <TagRow
-                      key={t.tag}
-                      tag={t.tag}
-                      count={t.count}
-                      variant="trending"
-                      onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
-                    />
-                  ))
-                )}
-              </div>
-            </section>
+            {committedVoteQuery.length === 0 ? (
+              <>
+                {/* 検索時：1回目 Enter 後（同一キーワードで再 Enter で VOTE 結果へ） */}
+                <section className="border-b border-gray-200">
+                  <SectionHeader>「{query}」が含まれるタグ</SectionHeader>
+                  <div className="px-[5.333vw]">
+                    {matchedTags.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
+                    ) : (
+                      matchedTags.map((t) => (
+                        <TagRow
+                          key={t.tag}
+                          tag={t.tag}
+                          count={t.count}
+                          variant="trending"
+                          onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
+                        />
+                      ))
+                    )}
+                  </div>
+                </section>
 
-            {/* 検索時：コレクション */}
-            <section>
-              <SectionHeader>コレクション</SectionHeader>
-              <div className="flex flex-col gap-3 px-[5.333vw] py-4">
-                {matchedCollections.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
-                ) : (
-                  matchedCollections.map((col) => (
-                    <CollectionCard
-                      key={col.id}
-                      id={col.id}
-                      title={col.title}
-                      gradient={col.gradient}
-                      showPin={col.showPin}
-                      href={`/collection/${col.id}`}
-                    />
-                  ))
-                )}
-              </div>
-            </section>
+                <section>
+                  <SectionHeader>コレクション</SectionHeader>
+                  <div className="flex flex-col gap-3 px-[5.333vw] py-4">
+                    {matchedCollections.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
+                    ) : (
+                      matchedCollections.map((col) => (
+                        <CollectionCard
+                          key={col.id}
+                          id={col.id}
+                          title={col.title}
+                          gradient={col.gradient}
+                          showPin={col.showPin}
+                          href={`/collection/${col.id}`}
+                        />
+                      ))
+                    )}
+                  </div>
+                </section>
+              </>
+            ) : (
+              /* 2回目 Enter 後：一致する VOTE のみ（URL は vote=1） */
+              <section className="border-b border-gray-200">
+                <SectionHeader>「{committedVoteQuery}」に一致するVOTE</SectionHeader>
+                <div className="flex flex-col gap-[5.333vw] px-[5.333vw] py-4">
+                  {matchedVoteCards.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-gray-500">一致するVOTEはありません。</p>
+                  ) : (
+                    matchedVoteCards.map((card) => {
+                      const cardId =
+                        card.id ??
+                        (() => {
+                          const i = voteCardsData.findIndex(
+                            (v) =>
+                              v.question === card.question &&
+                              v.optionA === card.optionA &&
+                              v.optionB === card.optionB
+                          );
+                          return i >= 0 ? `seed-${i}` : `seed-0`;
+                        })();
+                      const act = activity[cardId];
+                      const merged = getMergedCounts(
+                        card.countA ?? 0,
+                        card.countB ?? 0,
+                        card.commentCount ?? 0,
+                        act ?? { countA: 0, countB: 0, comments: [] }
+                      );
+                      return (
+                        <VoteCard
+                          key={cardId}
+                          backgroundImageUrl={backgroundForSearchCard(card, cardId)}
+                          patternType={card.patternType}
+                          question={card.question}
+                          optionA={card.optionA}
+                          optionB={card.optionB}
+                          countA={merged.countA}
+                          countB={merged.countB}
+                          commentCount={merged.commentCount}
+                          tags={card.tags}
+                          readMoreText={card.readMoreText}
+                          creator={card.creator}
+                          currentUser={currentUser}
+                          cardId={cardId}
+                          bookmarked={isCardBookmarked(cardId)}
+                          hasCommented={commentedCardIdSet.has(cardId)}
+                          initialSelectedOption={act?.userSelectedOption ?? null}
+                          onVote={handleVote}
+                          onBookmarkClick={setModalCardId}
+                          onMoreClick={handleTagFilterCardMoreClick}
+                          visibility={card.visibility}
+                          optionAImageUrl={card.optionAImageUrl}
+                          optionBImageUrl={card.optionBImageUrl}
+                          periodStart={card.periodStart}
+                          periodEnd={card.periodEnd}
+                          commentsDisabled={card.commentsDisabled === true}
+                        />
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+            )}
           </>
         )}
           </main>

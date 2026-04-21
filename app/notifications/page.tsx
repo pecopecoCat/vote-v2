@@ -9,6 +9,7 @@ import {
   MOCK_ANNOUNCEMENTS,
   type ActivityItem,
 } from "../data/notifications";
+import { markAnnouncementsAsRead } from "../data/announcementReadState";
 import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../data/auth";
 import { getCreatedVotes } from "../data/createdVotes";
 import {
@@ -251,6 +252,14 @@ export default function NotificationsPage() {
   useEffect(() => {
     refreshActivityItems();
   }, [activeTab, shared.isRemote, shared.createdVotesForTimeline, shared.activity, shared.voteEvents, shared.bookmarkEvents]);
+
+  /** 運営お知らせを画面に出したタイミングで既読化（下部ナビの赤バッジ用） */
+  useEffect(() => {
+    const announcementsVisible = !isLoggedIn || activeTab === "announcements";
+    if (announcementsVisible) {
+      markAnnouncementsAsRead(MOCK_ANNOUNCEMENTS);
+    }
+  }, [isLoggedIn, activeTab]);
 
   return (
     <div className="min-h-screen pb-[50px]">

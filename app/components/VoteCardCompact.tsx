@@ -1,8 +1,11 @@
 "use client";
 
+import { useState, useEffect, useMemo } from "react";
 import type { VoteCardPattern } from "./VoteCard";
+import VoteCardShareSheet from "./VoteCardShareSheet";
 import { removeBookmarkFully } from "../data/bookmarkRemove";
 import { showAppToast } from "../lib/appToast";
+import { getVotePeriodStatusText, isVotingAllowedNow } from "../data/votePeriod";
 
 const patternClasses: Record<VoteCardPattern, string> = {
   "geometric-stripes": "vote-pattern-geometric",
@@ -11,16 +14,6 @@ const patternClasses: Record<VoteCardPattern, string> = {
   "yellow-loops": "vote-pattern-yellow-loops",
   "orange-purple": "vote-pattern-orange-purple",
 };
-
-function getPeriodEndLabel(periodEnd: string): string {
-  const end = new Date(periodEnd);
-  if (Number.isNaN(end.getTime())) return "";
-  const now = new Date();
-  if (end <= now) return "投票期間終了";
-  const diffMs = end.getTime() - now.getTime();
-  const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
-  return `投票終了まで${days}日`;
-}
 
 export interface VoteCardCompactProps {
   backgroundImageUrl?: string;
@@ -47,10 +40,14 @@ export interface VoteCardCompactProps {
   hasCommented?: boolean;
   /** 3点リーダー（その他）タップ時（cardId を渡してモーダル表示用） */
   onMoreClick?: (cardId: string) => void;
+  /** true のときコメント数の代わりに受け付けない旨を表示 */
+  commentsDisabled?: boolean;
   /** ブックマークタップ時（コレクション選択モーダル用。指定時はタップでこのコールバックのみ呼ぶ） */
   onBookmarkClick?: (cardId: string) => void;
   cardId?: string;
-  /** 投票期間終了日時（ISO）。設定時はタグ下に「投票終了までX日」または「投票期間終了」を表示 */
+  /** 投票期間開始日時（ISO） */
+  periodStart?: string;
+  /** 投票期間終了日時（ISO）。設定時はタグ下に期間ステータスを表示 */
   periodEnd?: string;
   /** みんなのコメントページ用 mini：質問20px・全文表示、A/B 折り返し、カード高さ可変 */
   expandMiniForCommentsPage?: boolean;
@@ -79,13 +76,32 @@ export default function VoteCardCompact({
   variant = "default",
   hasCommented = false,
   onMoreClick,
+  commentsDisabled = false,
   onBookmarkClick,
   cardId,
+  periodStart,
   periodEnd,
   expandMiniForCommentsPage = false,
   flatOuterShadow = false,
   hideFooterIconRow = false,
 }: VoteCardCompactProps) {
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [periodTick, setPeriodTick] = useState(0);
+  useEffect(() => {
+    if (!periodEnd) return;
+    const id = window.setInterval(() => setPeriodTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, [periodEnd]);
+
+  const periodAllowsVote = useMemo(
+    () => isVotingAllowedNow(periodStart, periodEnd),
+    [periodStart, periodEnd, periodTick]
+  );
+  const periodStatusText = useMemo(
+    () => getVotePeriodStatusText(periodStart, periodEnd),
+    [periodStart, periodEnd, periodTick]
+  );
+
   const useImage = Boolean(backgroundImageUrl);
   const patternClass = patternClasses[patternType];
   const total = countA + countB;
@@ -133,8 +149,11 @@ export default function VoteCardCompact({
             <>
               <button
                 type="button"
-                className={`flex w-full overflow-hidden rounded-lg bg-white text-left shadow-[0_2px_6px_rgba(0,0,0,0.06)] transition-opacity active:opacity-90 ${expandMini ? "items-stretch" : "items-center"}`}
-                onClick={onVote ? () => onVote("A") : undefined}
+                className={`flex w-full overflow-hidden rounded-lg bg-white text-left shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${
+                  onVote && periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-not-allowed opacity-50"
+                }`}
+                onClick={onVote && periodAllowsVote ? () => onVote("A") : undefined}
+                disabled={!onVote || !periodAllowsVote}
               >
                 <span className="flex w-[14.25%] min-w-[36px] shrink-0 items-center justify-center self-stretch rounded-l-lg bg-[#E63E48] py-2 text-sm font-bold text-white">
                   A
@@ -147,8 +166,11 @@ export default function VoteCardCompact({
               </button>
               <button
                 type="button"
-                className={`flex w-full overflow-hidden rounded-lg bg-white text-left shadow-[0_2px_6px_rgba(0,0,0,0.06)] transition-opacity active:opacity-90 ${expandMini ? "items-stretch" : "items-center"}`}
-                onClick={onVote ? () => onVote("B") : undefined}
+                className={`flex w-full overflow-hidden rounded-lg bg-white text-left shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${
+                  onVote && periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-not-allowed opacity-50"
+                }`}
+                onClick={onVote && periodAllowsVote ? () => onVote("B") : undefined}
+                disabled={!onVote || !periodAllowsVote}
               >
                 <span className="flex w-[14.25%] min-w-[36px] shrink-0 items-center justify-center self-stretch rounded-l-lg bg-[#3273E3] py-2 text-sm font-bold text-white">
                   B
@@ -163,9 +185,9 @@ export default function VoteCardCompact({
           ) : (
             <>
               <div
-                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${onVote && selectedSide == null ? "cursor-pointer active:opacity-90" : ""}`}
-                onClick={onVote && selectedSide == null ? () => onVote("A") : undefined}
-                role={onVote && selectedSide == null ? "button" : undefined}
+                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${onVote && selectedSide == null && periodAllowsVote ? "cursor-pointer active:opacity-90" : ""} ${onVote && selectedSide == null && !periodAllowsVote ? "cursor-not-allowed opacity-50" : ""}`}
+                onClick={onVote && selectedSide == null && periodAllowsVote ? () => onVote("A") : undefined}
+                role={onVote && selectedSide == null && periodAllowsVote ? "button" : undefined}
               >
                 <span className="flex w-[14.25%] min-w-[36px] shrink-0 items-center justify-center self-stretch rounded-l-lg bg-[#E63E48] py-2 text-sm font-bold text-white">
                   A
@@ -198,9 +220,9 @@ export default function VoteCardCompact({
                 </div>
               </div>
               <div
-                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${onVote && selectedSide == null ? "cursor-pointer active:opacity-90" : ""}`}
-                onClick={onVote && selectedSide == null ? () => onVote("B") : undefined}
-                role={onVote && selectedSide == null ? "button" : undefined}
+                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${onVote && selectedSide == null && periodAllowsVote ? "cursor-pointer active:opacity-90" : ""} ${onVote && selectedSide == null && !periodAllowsVote ? "cursor-not-allowed opacity-50" : ""}`}
+                onClick={onVote && selectedSide == null && periodAllowsVote ? () => onVote("B") : undefined}
+                role={onVote && selectedSide == null && periodAllowsVote ? "button" : undefined}
               >
                 <span className="flex w-[14.25%] min-w-[36px] shrink-0 items-center justify-center self-stretch rounded-l-lg bg-[#3273E3] py-2 text-sm font-bold text-white">
                   B
@@ -245,14 +267,20 @@ export default function VoteCardCompact({
             <img src="/icons/votemark.svg" alt="" className="vote-card-footer-icon-square" />
             <span className="vote-card-footer-count">{displayTotal}</span>
           </span>
-          <span className="flex items-center gap-1" aria-label="コメント数">
-            {hasCommented ? (
-              <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
-            ) : (
-              <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
-            )}
-            <span className="vote-card-footer-count">{commentCount}</span>
-          </span>
+          {commentsDisabled ? (
+            <p className="min-w-0 max-w-[58%] text-left text-[10px] font-medium leading-tight text-gray-500">
+              このVOTEはコメントを受け付けていません。
+            </p>
+          ) : (
+            <span className="flex items-center gap-1" aria-label="コメント数">
+              {hasCommented ? (
+                <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
+              ) : (
+                <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
+              )}
+              <span className="vote-card-footer-count">{commentCount}</span>
+            </span>
+          )}
           <button
             type="button"
             className="flex items-center justify-center text-gray-400"
@@ -273,15 +301,33 @@ export default function VoteCardCompact({
               <img src="/icons/bookmark.svg" alt="" className="vote-card-footer-icon-bookmark opacity-40" />
             )}
           </button>
-          <button
-            type="button"
-            className="ml-auto flex items-center justify-center text-[var(--color-brand-logo)] hover:opacity-80"
-            aria-label="その他"
-            onClick={() => cardId != null && onMoreClick?.(cardId)}
-          >
-            <MoreIcon className="h-5 w-5" />
-          </button>
+          <div className="ml-auto flex items-center gap-1">
+            {cardId != null && (
+              <button
+                type="button"
+                className="flex items-center justify-center text-[var(--color-brand-logo)] hover:opacity-80"
+                aria-label="シェア"
+                onClick={() => setShareSheetOpen(true)}
+              >
+                <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />
+              </button>
+            )}
+            {cardId != null && onMoreClick && (
+              <button
+                type="button"
+                className="flex items-center justify-center text-[var(--color-brand-logo)] hover:opacity-80"
+                aria-label="その他"
+                onClick={() => onMoreClick(cardId)}
+              >
+                <MoreIcon className="h-5 w-5" />
+              </button>
+            )}
+          </div>
         </div>
+      )}
+
+      {shareSheetOpen && cardId != null && (
+        <VoteCardShareSheet open={shareSheetOpen} onClose={() => setShareSheetOpen(false)} cardId={cardId} />
       )}
 
       {!hideTags && tags.length > 0 && (
@@ -297,14 +343,14 @@ export default function VoteCardCompact({
         </div>
       )}
 
-      {periodEnd && getPeriodEndLabel(periodEnd) && (
+      {periodStatusText ? (
         <div
           className="px-5 pb-2 text-[15px]"
           style={{ color: "#8A8A8A" }}
         >
-          {getPeriodEndLabel(periodEnd)}
+          {periodStatusText}
         </div>
-      )}
+      ) : null}
     </article>
   );
 }

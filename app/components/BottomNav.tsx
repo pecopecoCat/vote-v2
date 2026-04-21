@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getAuth, getAuthUpdatedEventName } from "../data/auth";
+import { MOCK_ANNOUNCEMENTS } from "../data/notifications";
+import {
+  ANNOUNCEMENTS_READ_STATE_EVENT,
+  hasUnreadAnnouncements,
+} from "../data/announcementReadState";
 
 const DEFAULT_AVATAR = "/default-avatar.png";
 
@@ -23,15 +28,29 @@ const navItems: { id: NavItemId; label: string; href?: string; src: string; srcO
 
 export default function BottomNav({ activeId = "home" }: BottomNavProps) {
   const [userIconUrl, setUserIconUrl] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [announcementUnread, setAnnouncementUnread] = useState(false);
 
   useEffect(() => {
     const update = () => {
       const auth = getAuth();
+      setIsLoggedIn(auth.isLoggedIn);
       setUserIconUrl(auth.isLoggedIn && auth.user?.iconUrl ? auth.user.iconUrl : null);
     };
     update();
     window.addEventListener(getAuthUpdatedEventName(), update);
     return () => window.removeEventListener(getAuthUpdatedEventName(), update);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setAnnouncementUnread(hasUnreadAnnouncements(MOCK_ANNOUNCEMENTS));
+    sync();
+    window.addEventListener(ANNOUNCEMENTS_READ_STATE_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(ANNOUNCEMENTS_READ_STATE_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
   }, []);
 
   return (
@@ -70,7 +89,8 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
                 />
               </span>
             );
-            return isActive ? (
+            /** ログイン時のみ選択中に黒リング（未ログインのデフォルトアイコンはリングなし） */
+            return isActive && isLoggedIn ? (
               <span className={`inline-flex shrink-0 rounded-full ${profileActiveRing}`}>{avatar}</span>
             ) : (
               avatar
@@ -87,7 +107,7 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
                 aria-hidden
               />
             );
-            return isActive ? (
+            return isActive && isLoggedIn ? (
               <span className={`inline-flex shrink-0 rounded-full ${profileActiveRing}`}>{mypageImg}</span>
             ) : (
               mypageImg
@@ -105,15 +125,29 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
           );
         })();
         if (href) {
+          const wrapIcon =
+            id === "notifications" && announcementUnread ? (
+              <span className="relative inline-flex shrink-0">
+                {icon}
+                <span
+                  className="pointer-events-none absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#E63E48] ring-2 ring-white"
+                  aria-hidden
+                />
+              </span>
+            ) : (
+              icon
+            );
           return (
             <Link
               key={id}
               href={href}
               className={className}
-              aria-label={label}
+              aria-label={
+                id === "notifications" && announcementUnread ? `${label}（未読のお知らせがあります）` : label
+              }
               aria-current={isActive ? "page" : undefined}
             >
-              {icon}
+              {wrapIcon}
             </Link>
           );
         }

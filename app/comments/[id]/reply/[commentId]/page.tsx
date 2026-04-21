@@ -6,11 +6,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "../../../../components/AppHeader";
 import CommentInputModal from "../../../../components/CommentInputModal";
+import CommentOptionsModal from "../../../../components/CommentOptionsModal";
+import ReportViolationModal from "../../../../components/ReportViolationModal";
 import { CommentAvatar, CommentBody } from "../../../../components/CommentThreadGroup";
 import { getVoteCardById, voteCardsData } from "../../../../data/voteCards";
 import {
   addCommentLike,
   getCommentIdsLikedByCurrentUser,
+  isCommentAuthoredByCurrentUser,
   COMMENT_LIKES_BY_ME_UPDATED_EVENT,
   type VoteComment,
 } from "../../../../data/voteCardActivity";
@@ -40,7 +43,12 @@ export default function CommentReplyThreadPage() {
   const id = typeof params.id === "string" ? params.id : "0";
   const commentId = typeof params.commentId === "string" ? params.commentId : "";
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity: sharedActivity, addComment: sharedAddComment } = shared;
+  const {
+    createdVotesForTimeline,
+    activity: sharedActivity,
+    addComment: sharedAddComment,
+    removeComment: sharedRemoveComment,
+  } = shared;
   const activity = sharedActivity[id] ?? emptyActivity;
 
   const [card, setCard] = useState<VoteCardData | null>(() => {
@@ -52,9 +60,12 @@ export default function CommentReplyThreadPage() {
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
+  const [commentMenuTarget, setCommentMenuTarget] = useState<VoteComment | null>(null);
+  const [reportCardId, setReportCardId] = useState<string | null>(null);
   const isLoggedIn = auth.isLoggedIn;
+  const commentsDisabled = card?.commentsDisabled === true;
   const canPostByVote = activity.userSelectedOption != null;
-  const canOpenPostModal = !isLoggedIn || canPostByVote;
+  const canOpenPostModal = !commentsDisabled && (!isLoggedIn || canPostByVote);
 
   useEffect(() => {
     const handler = () => setLikedCommentIds(getCommentIdsLikedByCurrentUser(id));
@@ -153,6 +164,7 @@ export default function CommentReplyThreadPage() {
                 onLike={() => addCommentLike(id, parent.id, currentCard)}
                 isLikedByMe={likedCommentIds.includes(parent.id)}
                 replyCountOverride={0}
+                onCommentMore={() => setCommentMenuTarget(parent)}
               />
             </div>
           </div>
@@ -176,6 +188,7 @@ export default function CommentReplyThreadPage() {
                   onLike={() => addCommentLike(id, r.id, currentCard)}
                   isLikedByMe={likedCommentIds.includes(r.id)}
                   replyCountOverride={0}
+                  onCommentMore={() => setCommentMenuTarget(r)}
                 />
               </div>
             ))
@@ -191,7 +204,7 @@ export default function CommentReplyThreadPage() {
         }}
         cardId={id}
         onCommentSubmit={(cardId, payload) => handleCommentSubmit(cardId, payload, replyingToCommentId ?? parent.id)}
-        disabled={!isLoggedIn || activity.userSelectedOption == null}
+        disabled={commentsDisabled || !isLoggedIn || activity.userSelectedOption == null}
         disabledPlaceholder={!isLoggedIn ? "ログインするとコメントできます" : undefined}
         currentUser={currentUser.type === "sns" ? { name: currentUser.name ?? "自分", iconUrl: currentUser.iconUrl } : undefined}
         showLoginButton={!isLoggedIn}
@@ -206,11 +219,14 @@ export default function CommentReplyThreadPage() {
           <button
             type="button"
             className={`w-full rounded-[9999px] py-3.5 text-center text-sm font-bold shadow-lg ${
-              canOpenPostModal
-                ? "bg-[#FFE100] text-gray-900 hover:opacity-95 active:opacity-90"
-                : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
+              commentsDisabled
+                ? "cursor-default bg-[#E5E7EB] text-gray-600"
+                : canOpenPostModal
+                  ? "bg-[#FFE100] text-gray-900 hover:opacity-95 active:opacity-90"
+                  : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
             }`}
             onClick={() => {
+              if (commentsDisabled) return;
               if (!isLoggedIn) {
                 router.push(
                   `/profile/login?returnTo=${encodeURIComponent(`/comments/${id}/reply/${commentId}`)}`
@@ -220,16 +236,42 @@ export default function CommentReplyThreadPage() {
               if (!canPostByVote) return;
               setIsReplyModalOpen(true);
             }}
-            disabled={!canOpenPostModal}
+            disabled={commentsDisabled || !canOpenPostModal}
           >
-            {!isLoggedIn
-              ? "ログインするとリプライできるよ！"
-              : canPostByVote
-                ? "リプライする"
-                : "投票するとリプライできます"}
+            {commentsDisabled
+              ? "このVOTEはコメントを受け付けていません。"
+              : !isLoggedIn
+                ? "ログインするとリプライできるよ！"
+                : canPostByVote
+                  ? "リプライする"
+                  : "投票するとリプライできます"}
           </button>
         </div>
       </div>
+
+      {commentMenuTarget != null && (
+        <CommentOptionsModal
+          showDelete={isCommentAuthoredByCurrentUser(commentMenuTarget.user?.name, {
+            isLoggedIn,
+            displayName: auth.user?.name,
+          })}
+          onClose={() => setCommentMenuTarget(null)}
+          onDelete={() => {
+            const t = commentMenuTarget;
+            if (!t) return;
+            void sharedRemoveComment(id, t.id, {
+              countA: activity.countA ?? 0,
+              countB: activity.countB ?? 0,
+              comments: activity.comments ?? [],
+            });
+          }}
+          onReport={() => setReportCardId(id)}
+        />
+      )}
+
+      {reportCardId != null && (
+        <ReportViolationModal cardId={reportCardId} onClose={() => setReportCardId(null)} />
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import type { VoteCardData } from "../data/voteCards";
+import { isVotingAllowedNow, resolveCardForVotePeriod } from "../data/votePeriod";
 import type { CardActivity } from "../data/voteCardActivity";
 import {
   getCreatedVotesForTimeline,
@@ -21,11 +22,17 @@ import {
   getAllActivity,
   addVote as addVoteLocal,
   addComment as addCommentLocal,
+  removeComment as removeCommentLocal,
   ACTIVITY_GLOBAL_UPDATED_EVENT,
 } from "../data/voteCardActivity";
-import { getCurrentActivityUserId, getAuthUpdatedEventName } from "../data/auth";
+import { getCurrentActivityUserId, getAuthUpdatedEventName, getAuth } from "../data/auth";
 import { hydrateParticipatedMemberCollectionsFromRemote } from "../data/collections";
 import { hydrateBookmarksFromRemote } from "../data/bookmarks";
+
+function isCommentsDisabledOnCard(cardId: string, timeline: VoteCardData[]): boolean {
+  if (!cardId.startsWith("created-")) return false;
+  return timeline.some((c) => c.id === cardId && c.commentsDisabled === true);
+}
 
 const CREATED_VOTES_API = "/api/created-votes";
 const ACTIVITY_API = "/api/activity";
@@ -60,8 +67,10 @@ function normalizeCardFromApi(raw: { userId?: string; card?: unknown }): VoteCar
     visibility: c.visibility === "private" ? "private" : "public",
     optionAImageUrl: typeof c.optionAImageUrl === "string" ? c.optionAImageUrl : undefined,
     optionBImageUrl: typeof c.optionBImageUrl === "string" ? c.optionBImageUrl : undefined,
+    periodStart: typeof c.periodStart === "string" ? c.periodStart : undefined,
     periodEnd: typeof c.periodEnd === "string" ? c.periodEnd : undefined,
     createdByUserId: userId,
+    commentsDisabled: c.commentsDisabled === true ? true : undefined,
   };
 }
 
@@ -122,6 +131,12 @@ export interface SharedDataContextValue {
     parentCommentId?: string,
     commenterVoteOption?: "A" | "B"
   ) => Promise<void>;
+  /** 自分のコメント／リプライのみ削除（KV 時は API 経由） */
+  removeComment: (
+    cardId: string,
+    commentId: string,
+    currentCard?: Pick<CardActivity, "countA" | "countB" | "comments">
+  ) => Promise<boolean>;
   /** ブックマークしたときに API に記録（作成者向け通知用・isRemote 時のみ） */
   recordBookmarkEvent: (cardId: string) => Promise<void>;
   /** 作成VOTEを一覧から除外（mypageの×削除でUI即時反映用） */
@@ -155,6 +170,7 @@ export function useSharedData(): SharedDataContextValue {
         _parentCommentId?: string,
         _commenterVoteOption?: "A" | "B"
       ) => {},
+      removeComment: async () => false,
       recordBookmarkEvent: async () => {},
       removeCreatedVote: () => {},
       activityBootstrapDone: true,
@@ -353,6 +369,11 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const addVote = useCallback(
     async (cardId: string, option: "A" | "B") => {
       const userId = getCurrentActivityUserId();
+      const timeline = isRemote ? createdVotesForTimeline : getCreatedVotesForTimeline();
+      const meta = resolveCardForVotePeriod(cardId, timeline);
+      if (meta && !isVotingAllowedNow(meta.periodStart, meta.periodEnd)) {
+        return;
+      }
       if (isRemote) {
         const res = await fetch(ACTIVITY_API, {
           method: "POST",
@@ -365,7 +386,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       addVoteLocal(cardId, option);
       setActivity((prev) => ({ ...prev, ...getAllActivity() }));
     },
-    [isRemote, fetchActivity]
+    [isRemote, fetchActivity, createdVotesForTimeline]
   );
 
   const addComment = useCallback(
@@ -375,6 +396,10 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       parentCommentId?: string,
       commenterVoteOption?: "A" | "B"
     ) => {
+      const timeline = isRemote ? createdVotesForTimeline : getCreatedVotesForTimeline();
+      if (isCommentsDisabledOnCard(cardId, timeline)) {
+        return;
+      }
       if (isRemote) {
         const res = await fetch(ACTIVITY_API, {
           method: "POST",
@@ -392,6 +417,33 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       }
       addCommentLocal(cardId, comment, parentCommentId, commenterVoteOption);
       setActivity((prev) => ({ ...prev, ...getAllActivity() }));
+    },
+    [isRemote, fetchActivity, createdVotesForTimeline]
+  );
+
+  const removeComment = useCallback(
+    async (
+      cardId: string,
+      commentId: string,
+      currentCard?: Pick<CardActivity, "countA" | "countB" | "comments">
+    ) => {
+      if (isRemote) {
+        const auth = getAuth();
+        const authorName =
+          auth.isLoggedIn && typeof auth.user?.name === "string" && auth.user.name.trim()
+            ? auth.user.name.trim()
+            : "自分";
+        const res = await fetch(ACTIVITY_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "delete_comment", cardId, commentId, authorName }),
+        });
+        if (res.ok) await fetchActivity();
+        return res.ok;
+      }
+      const ok = removeCommentLocal(cardId, commentId, currentCard);
+      if (ok) setActivity((prev) => ({ ...prev, ...getAllActivity() }));
+      return ok;
     },
     [isRemote, fetchActivity]
   );
@@ -429,6 +481,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       addCreatedVote,
       addVote,
       addComment,
+      removeComment,
       recordBookmarkEvent,
       removeCreatedVote,
       activityBootstrapDone,
@@ -442,6 +495,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       addCreatedVote,
       addVote,
       addComment,
+      removeComment,
       recordBookmarkEvent,
       removeCreatedVote,
       activityBootstrapDone,

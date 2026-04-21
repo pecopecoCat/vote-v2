@@ -16,6 +16,7 @@ import RecommendedTags from "../../components/RecommendedTags";
 import NewestOldestSortDropdown from "../../components/NewestOldestSortDropdown";
 import CommentThreadGroup from "../../components/CommentThreadGroup";
 import CommentInputModal from "../../components/CommentInputModal";
+import CommentOptionsModal from "../../components/CommentOptionsModal";
 import {
   getVoteCardById,
   voteCardsData,
@@ -69,7 +70,13 @@ export default function CommentsPage() {
   const router = useRouter();
   const id = typeof params.id === "string" ? params.id : "0";
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity: sharedActivity, addVote: sharedAddVote, addComment: sharedAddComment } = shared;
+  const {
+    createdVotesForTimeline,
+    activity: sharedActivity,
+    addVote: sharedAddVote,
+    addComment: sharedAddComment,
+    removeComment: sharedRemoveComment,
+  } = shared;
   const activity = sharedActivity[id] ?? emptyActivity;
 
   const [card, setCard] = useState<VoteCardData | null>(() => {
@@ -86,6 +93,7 @@ export default function CommentsPage() {
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [commentMenuTarget, setCommentMenuTarget] = useState<VoteComment | null>(null);
   /**
    * 下部「関連VOTE／新着VOTE」：投票直後は一覧に残し、別ページ遷移やタブ復帰後に activity に合わせて非表示にする（HOME と同様）。
    */
@@ -93,9 +101,10 @@ export default function CommentsPage() {
   /** 遷移直後はコメント帯が画面上部に来るようスクロール（固定ヘッダ分は scroll-mt で確保） */
   const commentsSectionRef = useRef<HTMLDivElement>(null);
   const isLoggedIn = auth.isLoggedIn;
+  const commentsDisabled = card?.commentsDisabled === true;
   const canPostByVote = activity.userSelectedOption != null;
-  const canOpenPostModal = !isLoggedIn || canPostByVote;
-  const canUseReplyAction = isLoggedIn && canPostByVote;
+  const canOpenPostModal = !commentsDisabled && (!isLoggedIn || canPostByVote);
+  const canUseReplyAction = !commentsDisabled && isLoggedIn && canPostByVote;
 
   useEffect(() => {
     const handler = () => setLikedCommentIds(getCommentIdsLikedByCurrentUser(id));
@@ -147,12 +156,12 @@ export default function CommentsPage() {
   }, [createdVotesForTimeline]);
 
   /**
-   * 下部一覧: タグ優先で関連最大10件。0件なら新着10件。
-   * bottomSectionTitle: 表示見出し用
+   * 下部一覧: 関連を最大10件。関連が1〜9件のときはその下に新着を別見出しで10件（重複除外）。
+   * 関連0件のときは新着のみ10件。
    */
-  const { bottomCards, bottomSectionTitle } = useMemo(() => {
+  const { relatedBottomCards, newestBottomCards } = useMemo(() => {
     if (!card) {
-      return { bottomCards: [] as VoteCardData[], bottomSectionTitle: "関連VOTE" };
+      return { relatedBottomCards: [] as VoteCardData[], newestBottomCards: [] as VoteCardData[] };
     }
     const onlyUnvoted = (cards: VoteCardData[]) =>
       cards.filter((c) => {
@@ -163,13 +172,25 @@ export default function CommentsPage() {
       });
 
     const related = onlyUnvoted(getRelatedVoteCardsByTagPriority(card, allCards, id, 10));
-    if (related.length > 0) {
-      return { bottomCards: related.slice(0, 10), bottomSectionTitle: "関連VOTE" };
+    const relatedSliced = related.slice(0, 10);
+
+    if (relatedSliced.length === 0) {
+      return {
+        relatedBottomCards: [],
+        newestBottomCards: onlyUnvoted(getNewestVoteCards(allCards, id, 30)).slice(0, 10),
+      };
     }
-    return {
-      bottomCards: onlyUnvoted(getNewestVoteCards(allCards, id, 30)).slice(0, 10),
-      bottomSectionTitle: "新着VOTE",
-    };
+
+    if (relatedSliced.length < 10) {
+      const excludeIds = new Set<string>([id]);
+      for (const c of relatedSliced) {
+        excludeIds.add(c.id ?? c.question);
+      }
+      const newest = onlyUnvoted(getNewestVoteCards(allCards, id, 40, excludeIds)).slice(0, 10);
+      return { relatedBottomCards: relatedSliced, newestBottomCards: newest };
+    }
+
+    return { relatedBottomCards: relatedSliced, newestBottomCards: [] as VoteCardData[] };
   }, [card, allCards, id, sharedActivity, relatedKeepVotedVisibleIds]);
 
   /** みんなのコメントページ：カードにタグあり→1個目に似たタグ10件、なし→注目のタグ10件 */
@@ -235,6 +256,58 @@ export default function CommentsPage() {
     );
   };
 
+  const mapBottomVoteList = (cards: VoteCardData[]) =>
+    cards.map((related) => {
+      const relatedId = related.id ?? related.question;
+      const relActivity = sharedActivity[relatedId] ?? emptyActivity;
+      const relMerged = getMergedCounts(
+        related.countA ?? 0,
+        related.countB ?? 0,
+        related.commentCount ?? 0,
+        relActivity
+      );
+      return (
+        <VoteCard
+          key={relatedId}
+          backgroundImageUrl={backgroundForCard(related, relatedId)}
+          patternType={related.patternType}
+          question={related.question}
+          optionA={related.optionA}
+          optionB={related.optionB}
+          countA={relMerged.countA}
+          countB={relMerged.countB}
+          commentCount={relMerged.commentCount}
+          tags={related.tags}
+          readMoreText={related.readMoreText}
+          creator={related.creator}
+          currentUser={currentUser}
+          cardId={relatedId}
+          bookmarked={isCardBookmarked(relatedId)}
+          hasCommented={commentedCardIds.includes(relatedId)}
+          initialSelectedOption={relActivity.userSelectedOption ?? null}
+          onVote={(cid, option) => {
+            setRelatedKeepVotedVisibleIds((prev) => {
+              const next = new Set(prev);
+              next.add(cid);
+              return next;
+            });
+            void sharedAddVote(cid, option);
+          }}
+          onBookmarkClick={setModalCardId}
+          onMoreClick={() => {
+            setCardOptionsCardId(relatedId);
+            setCardOptionsIsOwnCard(related.createdByUserId === getCurrentActivityUserId());
+          }}
+          visibility={related.visibility}
+          optionAImageUrl={related.optionAImageUrl}
+          optionBImageUrl={related.optionBImageUrl}
+          periodStart={related.periodStart}
+          periodEnd={related.periodEnd}
+          commentsDisabled={related.commentsDisabled === true}
+        />
+      );
+    });
+
   if (!resolved) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F1F1F1]">
@@ -284,8 +357,10 @@ export default function CommentsPage() {
               setCardOptionsCardId(id);
               setCardOptionsIsOwnCard((card?.createdByUserId ?? "") === getCurrentActivityUserId());
             }}
+            periodStart={card?.periodStart}
             periodEnd={card?.periodEnd}
             expandMiniForCommentsPage
+            commentsDisabled={commentsDisabled}
           />
         </div>
 
@@ -306,7 +381,9 @@ export default function CommentsPage() {
           <div className="bg-white">
           {activity.comments.length === 0 ? (
             <div className="px-[5.333vw] py-10 text-center">
-              <p className="text-sm text-[#787878]">まだコメントはありません。</p>
+              <p className="text-sm text-[#787878]">
+                {commentsDisabled ? "このVOTEはコメントを受け付けていません。" : "まだコメントはありません。"}
+              </p>
             </div>
           ) : (
             (() => {
@@ -339,6 +416,7 @@ export default function CommentsPage() {
                     maxRepliesVisible={1}
                     replyListMoreHref={replies.length > 1 ? `/comments/${id}/reply/${c.id}` : undefined}
                     replyToReplyHref={`/comments/${id}/reply/${c.id}`}
+                    onCommentMore={(comment) => setCommentMenuTarget(comment)}
                   />
                 );
               });
@@ -363,60 +441,17 @@ export default function CommentsPage() {
           </div>
         )}
 
-        {/* 一番下：関連VOTE（タグ優先・最大10件）／0件時は新着10件 — HOMEと同じNORMALサイズ */}
-        {bottomCards.length > 0 && (
+        {/* 一番下：関連VOTE（最大10件）。1〜9件のときは下に新着VOTE 10件。関連0件のときは新着のみ — HOMEと同じNORMALサイズ */}
+        {relatedBottomCards.length > 0 && (
           <section className="-mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6">
-            <h2 className="mb-3 text-base font-bold text-gray-900">{bottomSectionTitle}</h2>
-            <div className="flex flex-col gap-[5.333vw]">
-              {bottomCards.map((related) => {
-                const relatedId = related.id ?? related.question;
-                const relActivity = sharedActivity[relatedId] ?? emptyActivity;
-                const relMerged = getMergedCounts(
-                  related.countA ?? 0,
-                  related.countB ?? 0,
-                  related.commentCount ?? 0,
-                  relActivity
-                );
-                return (
-                  <VoteCard
-                    key={relatedId}
-                    backgroundImageUrl={backgroundForCard(related, relatedId)}
-                    patternType={related.patternType}
-                    question={related.question}
-                    optionA={related.optionA}
-                    optionB={related.optionB}
-                    countA={relMerged.countA}
-                    countB={relMerged.countB}
-                    commentCount={relMerged.commentCount}
-                    tags={related.tags}
-                    readMoreText={related.readMoreText}
-                    creator={related.creator}
-                    currentUser={currentUser}
-                    cardId={relatedId}
-                    bookmarked={isCardBookmarked(relatedId)}
-                    hasCommented={commentedCardIds.includes(relatedId)}
-                    initialSelectedOption={relActivity.userSelectedOption ?? null}
-                    onVote={(cid, option) => {
-                      setRelatedKeepVotedVisibleIds((prev) => {
-                        const next = new Set(prev);
-                        next.add(cid);
-                        return next;
-                      });
-                      void sharedAddVote(cid, option);
-                    }}
-                    onBookmarkClick={setModalCardId}
-                    onMoreClick={() => {
-                      setCardOptionsCardId(relatedId);
-                      setCardOptionsIsOwnCard(related.createdByUserId === getCurrentActivityUserId());
-                    }}
-                    visibility={related.visibility}
-                    optionAImageUrl={related.optionAImageUrl}
-                    optionBImageUrl={related.optionBImageUrl}
-                    periodEnd={related.periodEnd}
-                  />
-                );
-              })}
-            </div>
+            <h2 className="mb-3 text-base font-bold text-gray-900">関連VOTE</h2>
+            <div className="flex flex-col gap-[5.333vw]">{mapBottomVoteList(relatedBottomCards)}</div>
+          </section>
+        )}
+        {newestBottomCards.length > 0 && (
+          <section className="-mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6">
+            <h2 className="mb-3 text-base font-bold text-gray-900">新着VOTE</h2>
+            <div className="flex flex-col gap-[5.333vw]">{mapBottomVoteList(newestBottomCards)}</div>
           </section>
         )}
       </main>
@@ -430,7 +465,7 @@ export default function CommentsPage() {
         }}
         cardId={id}
         onCommentSubmit={(cardId, payload) => handleCommentSubmit(cardId, payload, replyingToCommentId ?? undefined)}
-        disabled={!isLoggedIn || activity.userSelectedOption == null}
+        disabled={commentsDisabled || !isLoggedIn || activity.userSelectedOption == null}
         disabledPlaceholder={!isLoggedIn ? "ログインするとコメントできます" : undefined}
         currentUser={currentUser.type === "sns" ? { name: currentUser.name ?? "自分", iconUrl: currentUser.iconUrl } : undefined}
         showLoginButton={!isLoggedIn}
@@ -444,17 +479,20 @@ export default function CommentsPage() {
         onCancelReply={() => setReplyingToCommentId(null)}
       />
 
-      {/* 画面下固定：入力を開くボタン */}
+      {/* 画面下固定：入力を開くボタン（コメント受け付けないVOTEは非表示に近いグレー文言のみ） */}
       <div className="fixed inset-x-0 bottom-14 z-30 bg-transparent px-4 pb-4">
         <div className="mx-auto max-w-lg">
           <button
             type="button"
             className={`w-full rounded-[9999px] py-3.5 text-center text-sm font-bold shadow-lg ${
-              canOpenPostModal
-                ? "bg-[#FFE100] text-gray-900 hover:opacity-95 active:opacity-90"
-                : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
+              commentsDisabled
+                ? "cursor-default bg-[#E5E7EB] text-gray-600"
+                : canOpenPostModal
+                  ? "bg-[#FFE100] text-gray-900 hover:opacity-95 active:opacity-90"
+                  : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
             }`}
             onClick={() => {
+              if (commentsDisabled) return;
               if (!isLoggedIn) {
                 router.push(`/profile/login?returnTo=${encodeURIComponent(`/comments/${id}`)}`);
                 return;
@@ -462,15 +500,17 @@ export default function CommentsPage() {
               if (!canPostByVote) return;
               setIsCommentModalOpen(true);
             }}
-            disabled={!canOpenPostModal}
+            disabled={commentsDisabled || !canOpenPostModal}
           >
-            {!isLoggedIn
-              ? "ログインするとコメントできるよ！"
-              : canPostByVote
-                ? replyingToCommentId
-                  ? "リプライする"
-                  : "コメントする"
-                : "投票するとコメントできます"}
+            {commentsDisabled
+              ? "このVOTEはコメントを受け付けていません。"
+              : !isLoggedIn
+                ? "ログインするとコメントできるよ！"
+                : canPostByVote
+                  ? replyingToCommentId
+                    ? "リプライする"
+                    : "コメントする"
+                  : "投票するとコメントできます"}
           </button>
         </div>
       </div>
@@ -492,6 +532,26 @@ export default function CommentsPage() {
             setReportCardId(cid);
             setCardOptionsCardId(null);
           }}
+        />
+      )}
+
+      {commentMenuTarget != null && (
+        <CommentOptionsModal
+          showDelete={isCommentAuthoredByCurrentUser(commentMenuTarget.user?.name, {
+            isLoggedIn,
+            displayName: auth.user?.name,
+          })}
+          onClose={() => setCommentMenuTarget(null)}
+          onDelete={() => {
+            const t = commentMenuTarget;
+            if (!t) return;
+            void sharedRemoveComment(id, t.id, {
+              countA: activity.countA ?? 0,
+              countB: activity.countB ?? 0,
+              comments: activity.comments ?? [],
+            });
+          }}
+          onReport={() => setReportCardId(id)}
         />
       )}
 

@@ -79,14 +79,21 @@ export async function readParticipantsMerged(kv: KVClient, collectionId: string)
   const legacyKey = memberPartsKey(collectionId);
 
   let fromHash: MemberPartsMap = {};
-  if (kv.hgetall) {
-    const raw = await kv.hgetall(hashKey);
-    fromHash = participantsFromHgetall(raw);
-  }
+  let legacy: MemberPartsMap = {};
 
-  const legacyRaw = await kv.get<MemberPartsMap>(legacyKey);
-  const legacy: MemberPartsMap =
-    legacyRaw && typeof legacyRaw === "object" && !Array.isArray(legacyRaw) ? legacyRaw : {};
+  if (kv.hgetall) {
+    const [raw, legacyRaw] = await Promise.all([
+      kv.hgetall(hashKey),
+      kv.get<MemberPartsMap>(legacyKey),
+    ]);
+    fromHash = participantsFromHgetall(raw);
+    legacy =
+      legacyRaw && typeof legacyRaw === "object" && !Array.isArray(legacyRaw) ? legacyRaw : {};
+  } else {
+    const legacyRaw = await kv.get<MemberPartsMap>(legacyKey);
+    legacy =
+      legacyRaw && typeof legacyRaw === "object" && !Array.isArray(legacyRaw) ? legacyRaw : {};
+  }
 
   const ids = new Set([...Object.keys(legacy), ...Object.keys(fromHash)]);
   const out: MemberPartsMap = {};

@@ -157,8 +157,7 @@ function getTimelineCollectionPool(
       title: c.name,
       gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
     }));
-  const pool = [...popularCollections, ...other, ...mine];
-  return pool.length > 0 ? pool : [{ id: "d", title: "マリオのワンダーな\nVOTE", gradient: "orange-yellow" as CollectionGradient }];
+  return [...popularCollections, ...other, ...mine];
 }
 
 /** タイムライン配列を組み立て（5/10/15ルール・コレクションは位置で安定選択） */
@@ -170,7 +169,7 @@ function buildTimelineItems(
   let prBannerIndex = 0;
   for (let i = 0; i < cards.length; i++) {
     const oneBased = i + 1;
-    if (oneBased % COLLECTION_EVERY === 0) {
+    if (oneBased % COLLECTION_EVERY === 0 && collectionPool.length > 0) {
       const colIndex = Math.floor(oneBased / COLLECTION_EVERY) % collectionPool.length;
       const col = collectionPool[colIndex];
       items.push({
@@ -483,7 +482,9 @@ function HomeContent() {
                   visibility={card.visibility}
                   optionAImageUrl={card.optionAImageUrl}
                   optionBImageUrl={card.optionBImageUrl}
+                  periodStart={card.periodStart}
                   periodEnd={card.periodEnd}
+                  commentsDisabled={card.commentsDisabled === true}
                 />
               );
             }

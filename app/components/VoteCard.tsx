@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { memo } from "react";
 import Link from "next/link";
 import { removeBookmarkFully } from "../data/bookmarkRemove";
 import { showAppToast } from "../lib/appToast";
+import VoteCardShareSheet from "./VoteCardShareSheet";
+import VoteBeforeCommentModal from "./VoteBeforeCommentModal";
+import { getVotePeriodStatusText, isVotingAllowedNow } from "../data/votePeriod";
 
 export type VoteCardPattern =
   | "geometric-stripes"
@@ -62,10 +65,14 @@ export interface VoteCardProps {
   hasCommented?: boolean;
   /** 3点リーダー（その他）タップ時（cardId を渡してモーダル表示用） */
   onMoreClick?: (cardId: string) => void;
+  /** true のときコメント導線を出さず受け付けない旨を表示 */
+  commentsDisabled?: boolean;
   /** Aの画像URL（指定時はフッター下にA/B画像を表示） */
   optionAImageUrl?: string;
   /** Bの画像URL */
   optionBImageUrl?: string;
+  /** 投票期間開始日時（ISO）。終了とセットで指定 */
+  periodStart?: string;
   /** 投票期間終了日時（ISO文字列）。設定時はタグ下に「投票終了までX日」または「投票期間終了」を表示 */
   periodEnd?: string;
 }
@@ -77,17 +84,6 @@ const patternClasses: Record<VoteCardPattern, string> = {
   "yellow-loops": "vote-pattern-yellow-loops",
   "orange-purple": "vote-pattern-orange-purple",
 };
-
-/** 投票期間終了日時（ISO）から表示文言を返す。「投票終了までX日」または「投票期間終了」 */
-function getPeriodEndLabel(periodEnd: string): string {
-  const end = new Date(periodEnd);
-  if (Number.isNaN(end.getTime())) return "";
-  const now = new Date();
-  if (end <= now) return "投票期間終了";
-  const diffMs = end.getTime() - now.getTime();
-  const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
-  return `投票終了まで${days}日`;
-}
 
 function VoteCard({
   backgroundImageUrl,
@@ -112,8 +108,10 @@ function VoteCard({
   visibility,
   hasCommented = false,
   onMoreClick,
+  commentsDisabled = false,
   optionAImageUrl,
   optionBImageUrl,
+  periodStart,
   periodEnd,
 }: VoteCardProps) {
   const patternClass = patternClasses[patternType];
@@ -135,6 +133,23 @@ function VoteCard({
   const [displayPercentA, setDisplayPercentA] = useState(0);
   const [displayPercentB, setDisplayPercentB] = useState(0);
   const [readMoreExpanded, setReadMoreExpanded] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [voteBeforeCommentOpen, setVoteBeforeCommentOpen] = useState(false);
+  const [periodTick, setPeriodTick] = useState(0);
+  useEffect(() => {
+    if (!periodEnd) return;
+    const id = window.setInterval(() => setPeriodTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, [periodEnd]);
+
+  const periodAllowsVote = useMemo(
+    () => isVotingAllowedNow(periodStart, periodEnd),
+    [periodStart, periodEnd, periodTick]
+  );
+  const periodStatusText = useMemo(
+    () => getVotePeriodStatusText(periodStart, periodEnd),
+    [periodStart, periodEnd, periodTick]
+  );
 
   useEffect(() => {
     setLocalCountA(initialCountA);
@@ -160,6 +175,7 @@ function VoteCard({
   }, [selectedOption, percentA, percentB]);
 
   const handleSelectA = () => {
+    if (!periodAllowsVote) return;
     if (isSelectingRef.current || selectedOption) return;
     isSelectingRef.current = true;
     setSelectedOption("A");
@@ -167,6 +183,7 @@ function VoteCard({
     if (cardId != null && onVote) onVote(cardId, "A");
   };
   const handleSelectB = () => {
+    if (!periodAllowsVote) return;
     if (isSelectingRef.current || selectedOption) return;
     isSelectingRef.current = true;
     setSelectedOption("B");
@@ -207,8 +224,11 @@ function VoteCard({
             <>
               <button
                 type="button"
-                className="vote-card-answer-shadow flex w-full overflow-hidden rounded-xl bg-white text-left transition-opacity active:opacity-90"
+                className={`vote-card-answer-shadow flex w-full overflow-hidden rounded-xl bg-white text-left ${
+                  periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-not-allowed opacity-50"
+                }`}
                 onClick={handleSelectA}
+                disabled={!periodAllowsVote}
               >
                 <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#E63E48] py-3.5 text-base font-bold text-white">
                   A
@@ -219,8 +239,11 @@ function VoteCard({
               </button>
               <button
                 type="button"
-                className="vote-card-answer-shadow flex w-full overflow-hidden rounded-xl bg-white text-left transition-opacity active:opacity-90"
+                className={`vote-card-answer-shadow flex w-full overflow-hidden rounded-xl bg-white text-left ${
+                  periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-not-allowed opacity-50"
+                }`}
                 onClick={handleSelectB}
+                disabled={!periodAllowsVote}
               >
                 <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#3273E3] py-3.5 text-base font-bold text-white">
                   B
@@ -295,19 +318,35 @@ function VoteCard({
           <img src="/icons/votemark.svg" alt="" className="vote-card-footer-icon-square" />
           <span className="vote-card-footer-count">{displayTotal}</span>
         </span>
-        {cardId != null ? (
-          <Link
-            href={`/comments/${cardId}`}
-            className="flex items-center gap-1 hover:opacity-80"
-            aria-label={`コメント ${commentCount}件、コメントページへ`}
-          >
-            {hasCommented ? (
-              <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
-            ) : (
+        {commentsDisabled ? (
+          <p className="min-w-0 max-w-[55%] text-left text-xs font-medium leading-snug text-gray-500 sm:max-w-none">
+            このVOTEはコメントを受け付けていません。
+          </p>
+        ) : cardId != null ? (
+          selectedOption != null || hasCommented ? (
+            <Link
+              href={`/comments/${cardId}`}
+              className="flex items-center gap-1 hover:opacity-80"
+              aria-label={`コメント ${commentCount}件、コメントページへ`}
+            >
+              {hasCommented ? (
+                <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
+              ) : (
+                <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
+              )}
+              <span className="vote-card-footer-count">{commentCount}</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="flex items-center gap-1 hover:opacity-80"
+              aria-label={`コメント ${commentCount}件（投票後にコメントできます）`}
+              onClick={() => setVoteBeforeCommentOpen(true)}
+            >
               <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
-            )}
-            <span className="vote-card-footer-count">{commentCount}</span>
-          </Link>
+              <span className="vote-card-footer-count">{commentCount}</span>
+            </button>
+          )
         ) : (
           <span className="flex items-center gap-1" aria-label="コメント数">
             {hasCommented ? (
@@ -349,17 +388,34 @@ function VoteCard({
             />
           )}
         </button>
-        <button
-          type="button"
-          className="ml-auto flex items-center justify-center text-[var(--color-brand-logo)] hover:opacity-80"
-          aria-label="その他"
-          onClick={(e) => {
-            e.preventDefault();
-            if (cardId != null && onMoreClick) onMoreClick(cardId);
-          }}
-        >
-          <MoreIcon className="h-5 w-5" />
-        </button>
+        <div className="ml-auto flex items-center gap-1">
+          {cardId != null && (
+            <button
+              type="button"
+              className="flex items-center justify-center text-[var(--color-brand-logo)] hover:opacity-80"
+              aria-label="シェア"
+              onClick={(e) => {
+                e.preventDefault();
+                setShareSheetOpen(true);
+              }}
+            >
+              <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />
+            </button>
+          )}
+          {cardId != null && onMoreClick && (
+            <button
+              type="button"
+              className="flex items-center justify-center text-[var(--color-brand-logo)] hover:opacity-80"
+              aria-label="その他"
+              onClick={(e) => {
+                e.preventDefault();
+                onMoreClick(cardId);
+              }}
+            >
+              <MoreIcon className="h-5 w-5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* A/B画像（指定時のみ：フッター下・タグ上に2枚並び・角にA/Bバッジ） */}
@@ -370,7 +426,7 @@ function VoteCard({
               type="button"
               className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFE100] disabled:cursor-not-allowed"
               onClick={handleSelectA}
-              disabled={selectedOption !== null}
+              disabled={selectedOption !== null || !periodAllowsVote}
               aria-label="Aを投票"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -392,7 +448,7 @@ function VoteCard({
               type="button"
               className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFE100] disabled:cursor-not-allowed"
               onClick={handleSelectB}
-              disabled={selectedOption !== null}
+              disabled={selectedOption !== null || !periodAllowsVote}
               aria-label="Bを投票"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -415,7 +471,7 @@ function VoteCard({
       {/* タグ（アイコン行〜タグ上 10px@375 を相対指定。タグブロックの下0.78em＝0.6em×1.3） */}
       {tags.length > 0 && (
         <div
-          className={`vote-card-tags-margin-top flex flex-wrap gap-2 px-5 ${!readMoreText && !periodEnd ? "pb-[0.78em]" : ""}`}
+          className={`vote-card-tags-margin-top flex flex-wrap gap-2 px-5 ${!readMoreText && !periodStatusText ? "pb-[0.78em]" : ""}`}
         >
           {tags.map((tag) => (
             <Link
@@ -430,14 +486,14 @@ function VoteCard({
       )}
 
       {/* 投票期間（タグの下・薄いグレー15px。「追加したいコレクションを選択」と同じ色 #8A8A8A） */}
-      {periodEnd && getPeriodEndLabel(periodEnd) && (
+      {periodStatusText ? (
         <div
           className={`px-5 ${tags.length > 0 ? "pt-1" : "pt-2"} pb-[0.78em] text-[15px]`}
           style={{ color: "#8A8A8A" }}
         >
-          {getPeriodEndLabel(periodEnd)}
+          {periodStatusText}
         </div>
-      )}
+      ) : null}
 
       {/* 続きを読む（テキスト下・続きを読む上下のマージンは15px） */}
       {readMoreText && (
@@ -462,6 +518,11 @@ function VoteCard({
       )}
       {/* タグなしの場合の下マージン */}
       {tags.length === 0 && <div className="pb-4" aria-hidden />}
+
+      {shareSheetOpen && cardId != null && (
+        <VoteCardShareSheet open={shareSheetOpen} onClose={() => setShareSheetOpen(false)} cardId={cardId} />
+      )}
+      <VoteBeforeCommentModal open={voteBeforeCommentOpen} onClose={() => setVoteBeforeCommentOpen(false)} />
     </article>
   );
 }

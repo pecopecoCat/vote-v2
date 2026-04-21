@@ -369,11 +369,6 @@ function ProfileContent() {
 
   const commentedCardIdSet = useMemo(() => new Set(commentedCardIds), [commentedCardIds]);
 
-  const handleMyCreatedVoteMoreClick = useCallback((cardId: string) => {
-    setCardOptionsCardId(cardId);
-    setCardOptionsIsOwnCard(true);
-  }, []);
-
   const handleProfileCardMoreClick = useCallback(
     (cardId: string) => {
       setCardOptionsCardId(cardId);
@@ -679,11 +674,12 @@ function ProfileContent() {
                         bookmarked={isCardBookmarked(cardId)}
                         hasCommented={commentedCardIdSet.has(cardId)}
                         onBookmarkClick={setModalCardId}
-                        onMoreClick={handleMyCreatedVoteMoreClick}
                         visibility={card.visibility}
                         optionAImageUrl={card.optionAImageUrl}
                         optionBImageUrl={card.optionBImageUrl}
+                        periodStart={card.periodStart}
                         periodEnd={card.periodEnd}
+                        commentsDisabled={card.commentsDisabled === true}
                       />
                     </div>
                   );
@@ -739,7 +735,9 @@ function ProfileContent() {
                       visibility={card.visibility}
                       optionAImageUrl={card.optionAImageUrl}
                       optionBImageUrl={card.optionBImageUrl}
+                      periodStart={card.periodStart}
                       periodEnd={card.periodEnd}
+                      commentsDisabled={card.commentsDisabled === true}
                     />
                   );
                 })}
@@ -878,7 +876,9 @@ function ProfileContent() {
                             visibility={card.visibility}
                             optionAImageUrl={card.optionAImageUrl}
                             optionBImageUrl={card.optionBImageUrl}
+                            periodStart={card.periodStart}
                             periodEnd={card.periodEnd}
+                            commentsDisabled={card.commentsDisabled === true}
                           />
                         );
                       })}
@@ -949,6 +949,7 @@ function ProfileContent() {
                             selectedSide={act.userSelectedOption}
                             userIconUrl={currentUser.iconUrl ?? "/default-avatar.png"}
                             hasCommented
+                            periodStart={card.periodStart}
                             periodEnd={card.periodEnd}
                             expandMiniForCommentsPage
                             flatOuterShadow

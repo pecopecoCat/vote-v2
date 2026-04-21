@@ -109,6 +109,8 @@ export const MOCK_ACTIVITIES: ActivityItem[] = [
 ];
 
 export interface AnnouncementItem {
+  /** 既読判定用。未指定時は title + date でキー化 */
+  id?: string;
   title: string;
   body: string;
   date: string;

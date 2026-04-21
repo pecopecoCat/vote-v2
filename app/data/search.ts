@@ -1,4 +1,4 @@
-import { voteCardsData } from "./voteCards";
+import { voteCardsData, type VoteCardData } from "./voteCards";
 import type { CardActivity } from "./voteCardActivity";
 import { getMergedCounts } from "./voteCardActivity";
 
@@ -162,16 +162,8 @@ export const COLLECTION_GRADIENT_OPTIONS: { id: CollectionGradient; start: strin
   { id: "cyan-aqua", start: "#CA76E8", end: "#E1CAFF" },
 ];
 
-/** デモ用：人気コレクション一覧（voteScore 降順で表示用） */
-export const popularCollections: PopularCollection[] = [
-  { id: "1", title: "究極のグルメ対決", gradient: "blue-cyan", showPin: true, voteScore: 320 },
-  { id: "2", title: "ここだけで聞いてみたい、相談VOTE", gradient: "pink-purple", showPin: true, voteScore: 280 },
-  { id: "3", title: "永遠に好みの猫種を選択していく2択", gradient: "purple-pink", voteScore: 250 },
-  { id: "4", title: "語り合おう、懐かしもう、名作アニメなVOTE", gradient: "purple-pink", voteScore: 210 },
-  { id: "5", title: "マリオなワンダーなVOTE", gradient: "orange-yellow", voteScore: 190 },
-  { id: "6", title: "ランクル好きあつまれ~ 好きじゃないと伝わらない2択", gradient: "green-yellow", voteScore: 170 },
-  { id: "7", title: "新のイケメンは誰? アニメキャラ2択", gradient: "cyan-aqua", voteScore: 150 },
-];
+/** 人気コレクション一覧（検索のデモ用。未登録時は空で、ユーザー作成分のみ表示） */
+export const popularCollections: PopularCollection[] = [];
 
 export function getCollectionGradientClass(g: CollectionGradient): string {
   return COLLECTION_GRADIENTS[g] ?? "from-gray-200 to-gray-300";
@@ -204,4 +196,29 @@ export function searchCollections(query: string): PopularCollection[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   return popularCollections.filter((c) => c.title.toLowerCase().includes(q));
+}
+
+/**
+ * キーワードが質問・選択肢・タグ・readMore・作成者名のいずれかに部分一致するVOTE（新着順で最大 limit 件）
+ */
+export function searchVoteCardsByKeyword(
+  query: string,
+  cards: VoteCardData[],
+  limit = 15
+): VoteCardData[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const includesQ = (s?: string) => (s ?? "").toLowerCase().includes(q);
+  const matches = (c: VoteCardData) => {
+    if (includesQ(c.question) || includesQ(c.optionA) || includesQ(c.optionB) || includesQ(c.readMoreText)) {
+      return true;
+    }
+    if (includesQ(c.creator?.name)) return true;
+    if (c.tags?.some((t) => t.toLowerCase().includes(q))) return true;
+    return false;
+  };
+  return [...cards]
+    .filter(matches)
+    .sort((a, b) => (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0"))
+    .slice(0, limit);
 }

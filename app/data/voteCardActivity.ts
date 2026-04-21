@@ -239,6 +239,60 @@ export function addComment(
   saveGlobal({ ...global, [cardId]: next });
 }
 
+/**
+ * 自分のコメント／リプライのみ削除。親を消すとその下のリプライもまとめて削除し、リプライのみ消すと親の replyCount を減らす。
+ * currentCard を渡すとその comments を基準に更新する（メモリ上の activity とストレージのズレ防止）。
+ */
+export function removeComment(
+  cardId: string,
+  commentId: string,
+  currentCard?: { countA: number; countB: number; comments: VoteComment[] }
+): boolean {
+  const auth = getAuth();
+  const opts = { isLoggedIn: auth.isLoggedIn, displayName: auth.user?.name ?? null };
+  const global = loadGlobal();
+  const fromStorage = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
+  const current = currentCard ?? fromStorage;
+  const comments = Array.isArray(current.comments) ? current.comments : [];
+  const target = comments.find((c) => c.id === commentId);
+  if (!target || !isCommentAuthoredByCurrentUser(target.user?.name, opts)) {
+    return false;
+  }
+
+  const idsToRemove = new Set<string>([commentId]);
+  if (!target.parentId) {
+    for (const c of comments) {
+      if (c.parentId === commentId) idsToRemove.add(c.id);
+    }
+  }
+
+  let nextComments = comments.filter((c) => !idsToRemove.has(c.id));
+  if (target.parentId) {
+    nextComments = nextComments.map((c) =>
+      c.id === target.parentId
+        ? { ...c, replyCount: Math.max(0, (c.replyCount ?? 0) - 1) }
+        : c
+    );
+  }
+
+  saveGlobal({
+    ...global,
+    [cardId]: {
+      countA: current.countA ?? 0,
+      countB: current.countB ?? 0,
+      comments: nextComments,
+    },
+  });
+
+  const byMe = loadCommentLikesByMe();
+  const cardLikes = byMe[cardId] ?? [];
+  const filtered = cardLikes.filter((cid) => !idsToRemove.has(cid));
+  if (filtered.length !== cardLikes.length) {
+    saveCommentLikesByMe({ ...byMe, [cardId]: filtered });
+  }
+  return true;
+}
+
 function loadCommentLikesByMe(): Record<string, string[]> {
   if (typeof window === "undefined") return {};
   try {

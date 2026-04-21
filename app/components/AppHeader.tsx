@@ -45,7 +45,7 @@ export type AppHeaderProps =
 
 /** 全ヘッダー共通の高さ（キーワード検索時の高さに統一） */
 const HEADER_HEIGHT = "h-[64px]";
-const HEADER_BASE = `sticky top-0 z-40 flex items-center bg-[#FFE100] px-[5.333vw] shadow-sm ${HEADER_HEIGHT}`;
+const HEADER_BASE = `sticky top-0 z-50 flex items-center bg-[#FFE100] px-[5.333vw] shadow-sm ${HEADER_HEIGHT}`;
 
 /**
  * アプリ共通ヘッダー（4タイプ・高さ統一）
@@ -103,7 +103,7 @@ export default function AppHeader(props: AppHeaderProps) {
       );
     };
     return (
-      <header className={`sticky top-0 z-40 relative flex ${HEADER_HEIGHT} items-center bg-[#FFE100] pl-2.5 pr-[5.333vw] shadow-sm`} aria-label={title}>
+      <header className={`sticky top-0 z-50 relative flex ${HEADER_HEIGHT} items-center bg-[#FFE100] pl-2.5 pr-[5.333vw] shadow-sm`} aria-label={title}>
         <BackButton />
         <h1 className="absolute left-1/2 top-1/2 min-w-0 max-w-[calc(100%-5.5rem)] -translate-x-1/2 -translate-y-1/2 truncate px-2 text-center text-base font-bold text-gray-900">
           {title}
@@ -117,14 +117,14 @@ export default function AppHeader(props: AppHeaderProps) {
 
   const isSearch = props.type === "search";
   const placeholder = isSearch ? "気になるキーワードで検索" : "ハッシュタグ";
+  const backHref =
+    (props.type === "search" || props.type === "hashtag") && props.backHref?.trim()
+      ? props.backHref.trim()
+      : undefined;
 
-  const BackButton = () => (
-    <button
-      type="button"
-      className="flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]"
-      aria-label="1つ前のページに戻る"
-      onClick={() => window.history.back()}
-    >
+  const BackButton = () => {
+    const className = "flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]";
+    const img = (
       <img
         src="/icons/icon_back.svg"
         alt=""
@@ -132,12 +132,29 @@ export default function AppHeader(props: AppHeaderProps) {
         width={8}
         height={18}
       />
-    </button>
-  );
+    );
+    if (backHref) {
+      return (
+        <Link href={backHref} className={className} aria-label="戻る">
+          {img}
+        </Link>
+      );
+    }
+    return (
+      <button
+        type="button"
+        className={className}
+        aria-label="1つ前のページに戻る"
+        onClick={() => window.history.back()}
+      >
+        {img}
+      </button>
+    );
+  };
 
   return (
     <header
-      className={`sticky top-0 z-40 flex ${HEADER_HEIGHT} items-center gap-2 bg-[#FFE100] py-3 pl-2.5 pr-[5.333vw] shadow-sm`}
+      className={`sticky top-0 z-50 flex ${HEADER_HEIGHT} items-center gap-2 bg-[#FFE100] py-3 pl-2.5 pr-[5.333vw] shadow-sm`}
       aria-label={isSearch ? "検索" : "ハッシュタグ"}
     >
       <BackButton />
@@ -170,7 +187,10 @@ export default function AppHeader(props: AppHeaderProps) {
           value={props.value}
           onChange={(e) => props.onChange?.(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") props.onSubmit?.(props.value);
+            if (e.key === "Enter") {
+              e.preventDefault();
+              props.onSubmit?.(props.value);
+            }
           }}
           placeholder={placeholder}
           className="search-header-input min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
@@ -187,9 +207,9 @@ export default function AppHeader(props: AppHeaderProps) {
               <img
                 src="/icons/icon_close.svg"
                 alt=""
-                className="icon-close-responsive"
-                width={14}
-                height={14}
+                className="h-4 w-4 shrink-0 object-contain"
+                width={16}
+                height={16}
               />
             </button>
           )

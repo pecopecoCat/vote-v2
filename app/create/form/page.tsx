@@ -87,6 +87,9 @@ function CreateFormContent() {
     setIsSubmitting(true);
     const now = new Date().toISOString();
     const tagList = tags.length > 0 ? tags : undefined;
+    const periodStart = useVotePeriod
+      ? new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0).toISOString()
+      : undefined;
     const periodEnd = useVotePeriod
       ? new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999).toISOString()
       : undefined;
@@ -106,8 +109,10 @@ function CreateFormContent() {
       visibility,
       optionAImageUrl: optionAImageUrl || undefined,
       optionBImageUrl: optionBImageUrl || undefined,
+      periodStart,
       periodEnd,
       createdByUserId: userId || undefined,
+      commentsDisabled: noComments ? true : undefined,
     };
     void sharedAddCreatedVote(card)
       .then(() => {
@@ -139,10 +144,14 @@ function CreateFormContent() {
     visibility,
     isSubmitting,
     useVotePeriod,
+    startYear,
+    startMonth,
+    startDay,
     endYear,
     endMonth,
     endDay,
     selectedCollectionId,
+    noComments,
   ]);
 
   const handleSaveDraftAndGoToDrafts = useCallback(() => {

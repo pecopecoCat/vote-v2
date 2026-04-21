@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import VoteCard from "../../components/VoteCard";
 import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
@@ -44,6 +44,8 @@ import {
 } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
 import type { VoteCardData } from "../../data/voteCards";
+import { getCreatedVotesForTimeline } from "../../data/createdVotes";
+import { isVotingAllowedNow, resolveCardForVotePeriod } from "../../data/votePeriod";
 import type { CurrentUser } from "../../components/VoteCard";
 import type { CollectionGradient } from "../../data/search";
 
@@ -126,7 +128,7 @@ export default function CollectionPage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
+  const { createdVotesForTimeline, activity, addVote: sharedAddVote, isRemote } = shared;
   const [collections, setCollections] = useState<Collection[]>([]);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [showVoted, setShowVotedState] = useState(() => getShowVoted());
@@ -193,7 +195,8 @@ export default function CollectionPage() {
   const [collectionFromApi, setCollectionFromApi] = useState<Collection | null>(null);
   const [apiFetchFailed, setApiFetchFailed] = useState(false);
 
-  useEffect(() => {
+  /** 共有リンク等でローカルに無いときは paint 前に fetch を開始し、体感待ちを短くする */
+  useLayoutEffect(() => {
     if (!id || localCollection) {
       setCollectionFromApi(null);
       setApiFetchFailed(false);
@@ -397,6 +400,11 @@ export default function CollectionPage() {
 
   const handleCollectionVote = useCallback(
     (cid: string, option: "A" | "B") => {
+      const entry = cardsInCollection.find((x) => x.cardId === cid);
+      const fromCol = entry?.card;
+      const timeline = isRemote ? createdVotesForTimeline : getCreatedVotesForTimeline();
+      const meta = fromCol ?? resolveCardForVotePeriod(cid, timeline);
+      if (meta && !isVotingAllowedNow(meta.periodStart, meta.periodEnd)) return;
       if (collection?.visibility === "member") {
         addCollectionScopedVote(collection.id, cid, option, { useKv: true });
         addParticipatedMemberCollectionIfNeeded(collection);
@@ -404,7 +412,7 @@ export default function CollectionPage() {
       }
       void sharedAddVote(cid, option);
     },
-    [collection, sharedAddVote]
+    [collection, sharedAddVote, cardsInCollection, isRemote, createdVotesForTimeline]
   );
 
   const handleCollectionCardMoreClick = useCallback((cardId: string) => {
@@ -627,7 +635,9 @@ export default function CollectionPage() {
                   visibility={card.visibility}
                   optionAImageUrl={card.optionAImageUrl}
                   optionBImageUrl={card.optionBImageUrl}
+                  periodStart={card.periodStart}
                   periodEnd={card.periodEnd}
+                  commentsDisabled={card.commentsDisabled === true}
                 />
               );
             })}
