@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import BottomNav from "../components/BottomNav";
 import VoteCard from "../components/VoteCard";
 import { getCreatedVotes, deleteCreatedVote, getCreatedVotesUpdatedEventName } from "../data/createdVotes";
-import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
+import { voteCardsData, CARD_BACKGROUND_IMAGES, resolveStableVoteCardId } from "../data/voteCards";
 import {
   addCommentLike,
   COMMENT_LIKES_BY_ME_UPDATED_EVENT,
@@ -328,7 +328,7 @@ function ProfileContent() {
   const allCardsFiltered = useMemo(
     () =>
       allCards.filter((c) => {
-        const cardId = c.id ?? c.question;
+        const cardId = resolveStableVoteCardId(c);
         if (hiddenCardIds.includes(cardId)) return false;
         if (c.createdByUserId && hiddenUserIds.includes(c.createdByUserId)) return false;
         return true;
@@ -337,7 +337,7 @@ function ProfileContent() {
   );
 
   const votedCardsRaw = useMemo(
-    () => allCardsFiltered.filter((c) => activity[c.id ?? ""]?.userSelectedOption),
+    () => allCardsFiltered.filter((c) => activity[resolveStableVoteCardId(c)]?.userSelectedOption),
     [allCardsFiltered, activity]
   );
   const votedCards = useMemo(() => {
@@ -348,7 +348,7 @@ function ProfileContent() {
 
   const allBookmarkedIds = useMemo(() => getBookmarkIds(), [collections, bookmarkRefreshKey, auth]);
   const bookmarkedCards = useMemo(
-    () => allCardsFiltered.filter((c) => allBookmarkedIds.includes(c.id ?? "")),
+    () => allCardsFiltered.filter((c) => allBookmarkedIds.includes(resolveStableVoteCardId(c))),
     [allCardsFiltered, allBookmarkedIds]
   );
 
@@ -372,7 +372,7 @@ function ProfileContent() {
   const handleProfileCardMoreClick = useCallback(
     (cardId: string) => {
       setCardOptionsCardId(cardId);
-      const card = allCardsFiltered.find((c) => (c.id ?? c.question) === cardId);
+      const card = allCardsFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
       setCardOptionsIsOwnCard(card?.createdByUserId === userId);
     },
     [allCardsFiltered, userId]
@@ -631,7 +631,7 @@ function ProfileContent() {
             ) : (
               <div className="flex flex-col gap-[5.333vw]">
                 {createdVotes.map((card) => {
-                  const cardId = card.id ?? card.question;
+                  const cardId = resolveStableVoteCardId(card);
                   const act = activity[cardId];
                   const merged = getMergedCounts(
                     card.countA ?? 0,
@@ -705,7 +705,7 @@ function ProfileContent() {
             ) : (
               <div className="mt-4 flex flex-col gap-[5.333vw]">
                 {votedCards.map((card) => {
-                  const cardId = card.id ?? card.question;
+                  const cardId = resolveStableVoteCardId(card);
                   const act = activity[cardId];
                   const merged = getMergedCounts(
                     card.countA ?? 0,
@@ -830,7 +830,7 @@ function ProfileContent() {
                   const ids = selectedBookmarkId === "all"
                     ? allBookmarkedIds
                     : (collections.find((c) => c.id === selectedBookmarkId)?.cardIds ?? []);
-                  const cardsToShow = allCardsFiltered.filter((c) => ids.includes(c.id ?? ""));
+                  const cardsToShow = allCardsFiltered.filter((c) => ids.includes(resolveStableVoteCardId(c)));
                   if (cardsToShow.length === 0) {
                     return (
                       <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
@@ -843,7 +843,7 @@ function ProfileContent() {
                   return (
                     <div className="flex flex-col gap-[5.333vw]">
                       {cardsToShow.map((card) => {
-                        const cardId = card.id ?? card.question;
+                        const cardId = resolveStableVoteCardId(card);
                         const act = activity[cardId];
                         const merged = getMergedCounts(
                           card.countA ?? 0,
@@ -901,7 +901,7 @@ function ProfileContent() {
             ) : (
               <div className="flex flex-col gap-5">
                 {commentedCardIdsNewestFirst.map((cardId) => {
-                  const card = allCardsFiltered.find((c) => (c.id ?? c.question) === cardId);
+                  const card = allCardsFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
                   if (!card) return null;
                   const act = activity[cardId] ?? { countA: 0, countB: 0, comments: [] };
                   const merged = getMergedCounts(
@@ -1003,9 +1003,7 @@ function ProfileContent() {
           isOwnCard={cardOptionsIsOwnCard}
           onClose={() => setCardOptionsCardId(null)}
           onHide={(cardId) => {
-            const card = allCards.find(
-              (c) => (c.id ?? c.question) === cardId
-            );
+            const card = allCards.find((c) => resolveStableVoteCardId(c) === cardId);
             if (card?.createdByUserId) addHiddenUser(card.createdByUserId);
             addHiddenCard(cardId);
             setHiddenUserIds(getHiddenUserIds());

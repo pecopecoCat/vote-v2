@@ -148,7 +148,14 @@ export async function hydrateUserOwnedCollectionsFromRemote(): Promise<void> {
       return;
     }
 
-    const merged = [...ownedServer, ...joined];
+    // PUT 完了前に GET が走るとサーバー側にまだ無い作成コレが消えるため、サーバー優先＋ローカルのみの id を残す
+    const serverIds = new Set(ownedServer.map((c) => c.id));
+    const mergedOwned = [...ownedServer];
+    for (const c of ownedLocal) {
+      if (serverIds.has(c.id)) continue;
+      mergedOwned.push(c);
+    }
+    const merged = [...mergedOwned, ...joined];
     save(uid, merged, { skipRemotePush: true });
   } catch {
     // ignore
