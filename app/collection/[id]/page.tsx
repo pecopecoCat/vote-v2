@@ -568,9 +568,9 @@ export default function CollectionPage() {
           </div>
         )}
         {collection.visibility === "member" && memberParticipantsForDisplay.length > 0 && (
-          <div className="mt-2">
-            <ul className="flex flex-wrap gap-x-2.5 gap-y-1">
-              {memberParticipantsForDisplay.slice(0, 18).map((p) => (
+          <div className="mt-2 max-h-52 overflow-y-auto overscroll-contain pr-0.5">
+            <ul className="flex flex-wrap gap-x-2.5 gap-y-1.5">
+              {memberParticipantsForDisplay.map((p) => (
                 <li key={p.userId} className="flex max-w-[10rem] min-w-0 items-center gap-1.5">
                   <img
                     src={typeof p.iconUrl === "string" && p.iconUrl.length > 0 ? p.iconUrl : "/default-avatar.png"}
@@ -588,11 +588,6 @@ export default function CollectionPage() {
                 </li>
               ))}
             </ul>
-            {memberParticipantsForDisplay.length > 18 && (
-              <p className="mt-1 text-[10px] text-gray-400">
-                ほか {memberParticipantsForDisplay.length - 18} 人
-              </p>
-            )}
           </div>
         )}
         {collection.visibility === "member" && (

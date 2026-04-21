@@ -233,10 +233,70 @@ function mergeParticipantsMaps(
   return out;
 }
 
+/** GET が POST より先に返ると投票直後のローカルが消えるため、票数は max、選択は votedAt が新しい方を採用 */
+function mergeScopedGlobalMaps(
+  local: Record<string, GlobalRow>,
+  server: Record<string, GlobalRow>
+): Record<string, GlobalRow> {
+  const ids = new Set([...Object.keys(local), ...Object.keys(server)]);
+  const out: Record<string, GlobalRow> = {};
+  for (const id of ids) {
+    const L = local[id];
+    const S = server[id];
+    if (L && S) {
+      out[id] = {
+        countA: Math.max(L.countA, S.countA),
+        countB: Math.max(L.countB, S.countB),
+      };
+    } else if (S) out[id] = S;
+    else if (L) out[id] = L;
+  }
+  return out;
+}
+
+function mergeUserSelectionRow(
+  local: UserSelectionRow | undefined,
+  server: UserSelectionRow | undefined
+): UserSelectionRow | undefined {
+  const lHas = Boolean(local?.userSelectedOption || local?.votedAt);
+  const sHas = Boolean(server?.userSelectedOption || server?.votedAt);
+  if (!lHas && !sHas) return undefined;
+  if (!lHas) return server;
+  if (!sHas) return local;
+  if (local === undefined || server === undefined) {
+    return local ?? server;
+  }
+  const L = local;
+  const S = server;
+  const lt = L.votedAt ?? "";
+  const st = S.votedAt ?? "";
+  if (st > lt) return { ...S };
+  if (lt > st) return { ...L };
+  return {
+    userSelectedOption: S.userSelectedOption ?? L.userSelectedOption,
+    votedAt: st || lt,
+  };
+}
+
+function mergeScopedUserSelectionsMaps(
+  local: Record<string, UserSelectionRow>,
+  server: Record<string, UserSelectionRow>
+): Record<string, UserSelectionRow> {
+  const ids = new Set([...Object.keys(local), ...Object.keys(server)]);
+  const out: Record<string, UserSelectionRow> = {};
+  for (const id of ids) {
+    const row = mergeUserSelectionRow(local[id], server[id]);
+    if (row && (row.userSelectedOption || row.votedAt)) out[id] = row;
+  }
+  return out;
+}
+
 /** KV から取得した内容で localStorage を上書き（他ユーザー分の集計を反映） */
 export function hydrateCollectionScopedFromSnapshot(collectionId: string, snap: MemberCollectionVotesSnapshot): void {
-  saveScopedGlobal(collectionId, snap.global);
-  saveScopedUserSelections(collectionId, snap.userSelections);
+  const mergedGlobal = mergeScopedGlobalMaps(loadScopedGlobal(collectionId), snap.global);
+  saveScopedGlobal(collectionId, mergedGlobal);
+  const mergedUser = mergeScopedUserSelectionsMaps(loadScopedUserSelections(collectionId), snap.userSelections);
+  saveScopedUserSelections(collectionId, mergedUser);
   const mergedParticipants = mergeParticipantsMaps(loadParticipantsMap(collectionId), snap.participants);
   saveParticipantsMap(collectionId, mergedParticipants);
   notifyCollectionScopedUpdated(collectionId);

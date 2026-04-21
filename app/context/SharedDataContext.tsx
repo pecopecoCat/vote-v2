@@ -7,6 +7,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -105,6 +106,33 @@ function buildActivityFromApi(
   return result;
 }
 
+/** GET が POST 直後に古い userSelections を返すと投票済みが消えるため、サーバー優先だが欠けたら直前の React 状態を残す */
+function mergeActivityFromApiFetch(
+  prev: Record<string, CardActivity>,
+  global: Record<string, { countA?: number; countB?: number; comments?: CardActivity["comments"] }>,
+  userSelections: Record<string, unknown>
+): Record<string, CardActivity> {
+  const built = buildActivityFromApi(global, userSelections);
+  const merged: Record<string, CardActivity> = {};
+  const allIds = new Set([...Object.keys(built), ...Object.keys(prev)]);
+  for (const cardId of allIds) {
+    const b = built[cardId];
+    const p = prev[cardId];
+    if (b && p) {
+      merged[cardId] = {
+        ...b,
+        userSelectedOption: b.userSelectedOption ?? p.userSelectedOption,
+        userVotedAt: b.userVotedAt ?? p.userVotedAt,
+      };
+    } else if (b) {
+      merged[cardId] = b;
+    } else if (p) {
+      merged[cardId] = p;
+    }
+  }
+  return merged;
+}
+
 /** 作成者向け通知用（API から取得） */
 export type VoteEvent = { cardId: string; date: string; option?: "A" | "B" };
 export type BookmarkEvent = { cardId: string; date: string };
@@ -180,6 +208,8 @@ export function useSharedData(): SharedDataContextValue {
 }
 
 export function SharedDataProvider({ children }: { children: ReactNode }) {
+  /** fetchActivity のマージは同一 userId のときのみ（アカウント切替で前ユーザーの投票済みが残らないように） */
+  const lastActivityFetchUserIdRef = useRef<string>("");
   const [createdVotesForTimeline, setCreatedVotesForTimeline] = useState<VoteCardData[]>(() =>
     typeof window !== "undefined" ? getCreatedVotesForTimeline() : []
   );
@@ -225,7 +255,13 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         data?.userSelections && typeof data.userSelections === "object" && data.userSelections !== null
           ? (data.userSelections as Record<string, unknown>)
           : {};
-      setActivity(buildActivityFromApi(global, userSelections));
+      setActivity((prev) => {
+        if (lastActivityFetchUserIdRef.current !== userId) {
+          lastActivityFetchUserIdRef.current = userId;
+          return buildActivityFromApi(global, userSelections);
+        }
+        return mergeActivityFromApiFetch(prev, global, userSelections);
+      });
       setVoteEvents(Array.isArray(data?.voteEvents) ? data.voteEvents : []);
       setBookmarkEvents(Array.isArray(data?.bookmarkEvents) ? data.bookmarkEvents : []);
       return true;
@@ -380,7 +416,18 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "vote", userId, cardId, option }),
         });
-        if (res.ok) await fetchActivity();
+        if (res.ok) {
+          const votedAt = new Date().toISOString();
+          setActivity((prev) => ({
+            ...prev,
+            [cardId]: {
+              ...(prev[cardId] ?? { countA: 0, countB: 0, comments: [] }),
+              userSelectedOption: option,
+              userVotedAt: votedAt,
+            },
+          }));
+          await fetchActivity();
+        }
         return;
       }
       addVoteLocal(cardId, option);
