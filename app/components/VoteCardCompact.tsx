@@ -268,9 +268,7 @@ export default function VoteCardCompact({
             <span className="vote-card-footer-count">{displayTotal}</span>
           </span>
           {commentsDisabled ? (
-            <p className="min-w-0 max-w-[58%] text-left text-[10px] font-medium leading-tight text-gray-500">
-              このVOTEはコメントを受け付けていません。
-            </p>
+            <span className="min-w-0 flex-1" aria-hidden />
           ) : (
             <span className="flex items-center gap-1" aria-label="コメント数">
               {hasCommented ? (

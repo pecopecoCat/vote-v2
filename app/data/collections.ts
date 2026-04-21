@@ -387,7 +387,7 @@ export function updateCollection(
   else if (updates.visibility === "private") deleteCollectionFromApi(id);
 }
 
-/** コレクションを削除（参加中のメンバー限定はマイリストから外すだけで KV は触らない） */
+/** コレクションを削除（参加中のメンバー限定はローカル＋参加中KVから外す。オーナーの本体KVは触らない） */
 export function deleteCollection(id: string): void {
   const userId = getCurrentActivityUserId();
   const prev = load(userId);
@@ -403,7 +403,17 @@ export function deleteCollection(id: string): void {
       if (!stillInSomeCollection) removeBookmark(cardId);
     }
   }
-  if (target?.joinedParticipation) return;
+  if (target?.joinedParticipation) {
+    const auth = getAuth();
+    if (auth.isLoggedIn && auth.userId) {
+      fetch("/api/member-collections", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: auth.userId, collectionId: id }),
+      }).catch(() => {});
+    }
+    return;
+  }
   deleteCollectionFromApi(id);
 }
 

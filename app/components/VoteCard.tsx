@@ -319,9 +319,7 @@ function VoteCard({
           <span className="vote-card-footer-count">{displayTotal}</span>
         </span>
         {commentsDisabled ? (
-          <p className="min-w-0 max-w-[55%] text-left text-xs font-medium leading-snug text-gray-500 sm:max-w-none">
-            このVOTEはコメントを受け付けていません。
-          </p>
+          <span className="min-w-0 flex-1" aria-hidden />
         ) : cardId != null ? (
           selectedOption != null || hasCommented ? (
             <Link

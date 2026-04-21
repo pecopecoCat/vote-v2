@@ -85,8 +85,8 @@ export default function CollectionOptionsModal({
               type="button"
               className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-gray-900 active:bg-gray-50"
               onClick={() => {
-                onClose();
                 onDelete();
+                onClose();
               }}
             >
               <img src="/icons/icon_trash.svg" alt="" className="h-[18px] w-[18px] shrink-0" width={18} height={18} />

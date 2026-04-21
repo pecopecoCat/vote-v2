@@ -93,3 +93,37 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
   }
 }
 
+/** DELETE body: { userId, collectionId } → 参加中リストから外す（マイリストから削除） */
+export async function DELETE(
+  request: Request
+): Promise<NextResponse<{ ok: boolean } | { error: string }>> {
+  const kv = await getKV();
+  if (!kv) return NextResponse.json({ ok: true });
+  try {
+    const body = (await request.json()) as { userId?: string; collectionId?: string };
+    const userId = typeof body?.userId === "string" ? body.userId : "";
+    const collectionId = typeof body?.collectionId === "string" ? body.collectionId : "";
+    if (!userId || !collectionId) {
+      return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+    }
+
+    const existing = await kv.get<unknown>(key(userId));
+    const list = Array.isArray(existing) ? existing : [];
+    const normalized = list.map(normalizeEntry).filter((v): v is MemberCollectionEntry => v != null);
+    const next = normalized.filter((c) => c.id !== collectionId);
+    await kv.set(key(userId), next);
+
+    const membersRaw = await kv.get<unknown>(membersKey(collectionId));
+    const members = Array.isArray(membersRaw)
+      ? membersRaw.filter((v): v is string => typeof v === "string" && v.length > 0)
+      : [];
+    const nextMembers = members.filter((uid) => uid !== userId);
+    await kv.set(membersKey(collectionId), nextMembers);
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("[api/member-collections] DELETE error:", e);
+    return NextResponse.json({ error: "KV_ERROR" }, { status: 500 });
+  }
+}
+
