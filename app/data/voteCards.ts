@@ -272,6 +272,22 @@ export const voteCardsData: VoteCardData[] = [
   },
 ];
 
+const VOTE_SEED_KEY_TO_ID: Map<string, string> = (() => {
+  const m = new Map<string, string>();
+  voteCardsData.forEach((c, i) => {
+    m.set(`${c.question}\0${c.optionA}\0${c.optionB}`, `seed-${i}`);
+  });
+  return m;
+})();
+
+/**
+ * シードカードの安定 ID（一覧レンダーでの `indexOf` / `findIndex` 連打を避ける）。
+ * 作成カードは `id` が付いている想定でそのまま返す。
+ */
+export function resolveStableVoteCardId(card: VoteCardData): string {
+  if (typeof card.id === "string" && card.id.length > 0) return card.id;
+  return VOTE_SEED_KEY_TO_ID.get(`${card.question}\0${card.optionA}\0${card.optionB}`) ?? "seed-0";
+}
 
 export function getVoteCardById(id: string): VoteCardData | null {
   const index = parseInt(id, 10);

@@ -15,7 +15,7 @@ import ReportViolationModal from "./components/ReportViolationModal";
 import type { CurrentUser } from "./components/VoteCard";
 import type { FeedTabId } from "./components/FeedTabs";
 import type { VoteCardData } from "./data/voteCards";
-import { voteCardsData, CARD_BACKGROUND_IMAGES } from "./data/voteCards";
+import { voteCardsData, CARD_BACKGROUND_IMAGES, resolveStableVoteCardId } from "./data/voteCards";
 import {
   getMergedCounts,
   isCommentAuthoredByCurrentUser,
@@ -50,7 +50,7 @@ function getTrendingPoints(
   card: VoteCardData,
   activity: Record<string, CardActivity>
 ): number {
-  const cardId = card.id ?? card.question;
+  const cardId = resolveStableVoteCardId(card);
   const act = activity[cardId] ?? { countA: 0, countB: 0, comments: [] };
   const merged = getMergedCounts(card.countA, card.countB, card.commentCount, act);
   const votes = merged.countA + merged.countB;
@@ -72,12 +72,12 @@ function sortByTrending(
 ): VoteCardData[] {
   const pointsMap = new Map<string, number>();
   for (const c of cards) {
-    const id = c.id ?? c.question;
+    const id = resolveStableVoteCardId(c);
     pointsMap.set(id, getTrendingPoints(c, activity));
   }
   return [...cards].sort((a, b) => {
-    const pa = pointsMap.get(a.id ?? a.question) ?? 0;
-    const pb = pointsMap.get(b.id ?? b.question) ?? 0;
+    const pa = pointsMap.get(resolveStableVoteCardId(a)) ?? 0;
+    const pb = pointsMap.get(resolveStableVoteCardId(b)) ?? 0;
     return pb - pa;
   });
 }
@@ -95,7 +95,7 @@ function myTimelineLastActivityMs(
   activity: Record<string, CardActivity>,
   opts: { isLoggedIn: boolean; displayName?: string }
 ): number {
-  const cardId = card.id ?? card.question;
+  const cardId = resolveStableVoteCardId(card);
   const act = activity[cardId];
   let max = 0;
   if (act?.userVotedAt) {
@@ -118,7 +118,7 @@ function myTimelineLastActivityMs(
 function backgroundForCard(card: VoteCardData): string {
   if (card.backgroundImageUrl) return card.backgroundImageUrl;
   let h = 0;
-  const id = card.id ?? card.question;
+  const id = resolveStableVoteCardId(card);
   for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
   const idx = Math.abs(h) % CARD_BACKGROUND_IMAGES.length;
   return CARD_BACKGROUND_IMAGES[idx];
@@ -286,20 +286,6 @@ function HomeContent() {
     return () => window.removeEventListener(eventName, handler);
   }, []);
 
-  const commentedCardIdSet = useMemo(() => {
-    const set = new Set<string>();
-    const opts = {
-      isLoggedIn: auth.isLoggedIn,
-      displayName: auth.user?.name,
-    };
-    for (const [id, a] of Object.entries(activity)) {
-      if ((a.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
-        set.add(id);
-      }
-    }
-    return set;
-  }, [activity, auth.isLoggedIn, auth.user?.name]);
-
   const allCards = useMemo(() => {
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
     return [...createdVotesForTimeline, ...seedWithId];
@@ -309,7 +295,7 @@ function HomeContent() {
   const allCardsFiltered = useMemo(
     () =>
       allCards.filter((c) => {
-        const cardId = c.id ?? c.question;
+        const cardId = resolveStableVoteCardId(c);
         if (hiddenCardIds.includes(cardId)) return false;
         if (c.createdByUserId && hiddenUserIds.includes(c.createdByUserId)) return false;
         return true;
@@ -317,9 +303,25 @@ function HomeContent() {
     [allCards, hiddenUserIds, hiddenCardIds]
   );
 
+  const commentedCardIdSet = useMemo(() => {
+    const set = new Set<string>();
+    const opts = {
+      isLoggedIn: auth.isLoggedIn,
+      displayName: auth.user?.name,
+    };
+    for (const card of allCardsFiltered) {
+      const id = resolveStableVoteCardId(card);
+      const a = activity[id];
+      if ((a?.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
+        set.add(id);
+      }
+    }
+    return set;
+  }, [allCardsFiltered, activity, auth.isLoggedIn, auth.user?.name]);
+
   const handleCardMoreClick = useCallback((cardId: string) => {
     setCardOptionsCardId(cardId);
-    const card = allCardsFiltered.find((c) => (c.id ?? c.question) === cardId);
+    const card = allCardsFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
     setCardOptionsIsOwnCard(card?.createdByUserId === getCurrentActivityUserId());
   }, [allCardsFiltered]);
 
@@ -378,7 +380,7 @@ function HomeContent() {
   const cardsForFeed = useMemo(
     () =>
       publicCards.filter((c) => {
-        const id = c.id ?? c.question;
+        const id = resolveStableVoteCardId(c);
         const voted = activity[id]?.userSelectedOption != null;
         if (!voted) return true;
         return feedKeepVotedCardVisibleIds.has(id);
@@ -395,7 +397,7 @@ function HomeContent() {
       case "myTimeline": {
         const opts = { isLoggedIn: auth.isLoggedIn, displayName: auth.user?.name };
         return allCardsFiltered
-          .filter((card) => bookmarkedIds.has(card.id ?? ""))
+          .filter((card) => bookmarkedIds.has(resolveStableVoteCardId(card)))
           .sort((a, b) => {
             const tb = myTimelineLastActivityMs(b, activity, opts);
             const ta = myTimelineLastActivityMs(a, activity, opts);
@@ -449,7 +451,7 @@ function HomeContent() {
           {deferredTimelineItems.map((item, idx) => {
             if (item.type === "vote") {
               const card = item.card;
-              const cardId = card.id ?? card.question;
+              const cardId = resolveStableVoteCardId(card);
               const act = activity[cardId];
               const merged = getMergedCounts(
                 card.countA ?? 0,
@@ -459,7 +461,7 @@ function HomeContent() {
               );
               return (
                 <VoteCard
-                  key={`vote-${cardId}-${activeTab}`}
+                  key={`vote-${cardId}`}
                   backgroundImageUrl={backgroundForCard(card)}
                   patternType={card.patternType}
                   question={card.question}

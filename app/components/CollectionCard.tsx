@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { getCollectionGradientClass } from "../data/search";
 import type { CollectionGradient } from "../data/search";
@@ -24,7 +25,7 @@ export interface CollectionCardProps {
 }
 
 
-export default function CollectionCard({
+function CollectionCard({
   id,
   title,
   gradient = "orange-yellow",
@@ -128,3 +129,5 @@ export default function CollectionCard({
   }
   return content;
 }
+
+export default memo(CollectionCard);

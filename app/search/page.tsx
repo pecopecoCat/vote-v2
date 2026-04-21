@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense, useDeferredValue, startTransition } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "../components/AppHeader";
@@ -17,7 +17,7 @@ import EmptyStatePanel from "../components/EmptyStatePanel";
 import BottomNav from "../components/BottomNav";
 import type { CurrentUser } from "../components/VoteCard";
 import type { VoteCardData } from "../data/voteCards";
-import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../data/voteCards";
+import { voteCardsData, CARD_BACKGROUND_IMAGES, resolveStableVoteCardId } from "../data/voteCards";
 import { getMergedCounts, isCommentAuthoredByCurrentUser, type CardActivity } from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
 import {
@@ -207,34 +207,53 @@ function SearchContent() {
     };
   }, []);
 
-  // 検索画面の「人気コレクション」候補をKVから取得（public/member のみ。KV未設定なら無視）
+  // 検索画面の「人気コレクション」候補をKVから取得（初回ペイントを塞ぎにくくする）
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/collections");
-        if (!res.ok) return;
-        const data = (await res.json()) as { collections?: unknown };
-        const list = Array.isArray(data?.collections) ? (data.collections as unknown[]) : [];
-        const normalized = list
-          .map((v) => (v && typeof v === "object" ? (v as Record<string, unknown>) : null))
-          .filter((v): v is Record<string, unknown> => v != null)
-          .map((o) => ({
-            id: typeof o.id === "string" ? o.id : "",
-            name: typeof o.name === "string" ? o.name : "",
-            color: typeof o.color === "string" ? o.color : "#E5E7EB",
-            gradient: typeof o.gradient === "string" ? (o.gradient as string) : undefined,
-            visibility: typeof o.visibility === "string" ? o.visibility : "public",
-            cardIds: Array.isArray(o.cardIds) ? o.cardIds.filter((x): x is string => typeof x === "string") : [],
-          }))
-          .filter((c) => c.id.length > 0);
-        if (!cancelled) setRemotePopularCollections(normalized);
-      } catch {
-        // ignore
-      }
-    })();
+    const run = () => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/collections");
+          if (!res.ok) return;
+          const data = (await res.json()) as { collections?: unknown };
+          const list = Array.isArray(data?.collections) ? (data.collections as unknown[]) : [];
+          const normalized = list
+            .map((v) => (v && typeof v === "object" ? (v as Record<string, unknown>) : null))
+            .filter((v): v is Record<string, unknown> => v != null)
+            .map((o) => ({
+              id: typeof o.id === "string" ? o.id : "",
+              name: typeof o.name === "string" ? o.name : "",
+              color: typeof o.color === "string" ? o.color : "#E5E7EB",
+              gradient: typeof o.gradient === "string" ? (o.gradient as string) : undefined,
+              visibility: typeof o.visibility === "string" ? o.visibility : "public",
+              cardIds: Array.isArray(o.cardIds) ? o.cardIds.filter((x): x is string => typeof x === "string") : [],
+            }))
+            .filter((c) => c.id.length > 0);
+          if (!cancelled) {
+            startTransition(() => {
+              setRemotePopularCollections(normalized);
+            });
+          }
+        } catch {
+          // ignore
+        }
+      })();
+    };
+    let idleHandle: number | ReturnType<typeof setTimeout> = 0;
+    let usedIdleCallback = false;
+    if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+      usedIdleCallback = true;
+      idleHandle = window.requestIdleCallback(run, { timeout: 2500 });
+    } else {
+      idleHandle = setTimeout(run, 1);
+    }
     return () => {
       cancelled = true;
+      if (usedIdleCallback && typeof window !== "undefined" && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleHandle as number);
+      } else {
+        clearTimeout(idleHandle as ReturnType<typeof setTimeout>);
+      }
     };
   }, []);
 
@@ -419,6 +438,9 @@ function SearchContent() {
     [allCardsForTags, hiddenUserIds]
   );
 
+  /** activity の高頻度更新で注目タグ計算が主スレッドを占有しないよう遅延反映 */
+  const deferredActivityForTags = useDeferredValue(activity);
+
   /** 質問・選択肢・タグなど本文のキーワード一致（Enter 確定後の語のみ） */
   const matchedVoteCards = useMemo(
     () => searchVoteCardsByKeyword(committedVoteQuery, allCardsForTagsFiltered, 15),
@@ -427,8 +449,8 @@ function SearchContent() {
 
   /** 注目タグ（スコア順：投票+1, コメント+3, bookmark+5, 新着+2, お気に入り+3） */
   const trendingTagsByScore = useMemo(
-    () => getTrendingTagsByScore(allCardsForTagsFiltered, activity, favoriteTags),
-    [allCardsForTagsFiltered, activity, favoriteTags]
+    () => getTrendingTagsByScore(allCardsForTagsFiltered, deferredActivityForTags, favoriteTags),
+    [allCardsForTagsFiltered, deferredActivityForTags, favoriteTags]
   );
 
   /** 注目タグ（興味がないで非表示にしたタグを除く） */
@@ -474,16 +496,25 @@ function SearchContent() {
       isLoggedIn: auth.isLoggedIn,
       displayName: auth.user?.name,
     };
-    for (const [cid, a] of Object.entries(activity)) {
-      if ((a.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
+    for (const card of allCardsForTagFilterFiltered) {
+      const cid = resolveStableVoteCardId(card);
+      const a = activity[cid];
+      if ((a?.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
         set.add(cid);
       }
     }
     return set;
-  }, [activity, auth.isLoggedIn, auth.user?.name]);
+  }, [allCardsForTagFilterFiltered, activity, auth.isLoggedIn, auth.user?.name]);
 
-  /** 検索結果タイムライン用：実際にあるコレクションから1件ランダム */
+  /** 検索結果タイムライン用：実際にあるコレクションから1件（プール内容から決定的に選択し再レイアウトを抑制） */
   const randomCollectionForTimeline = useMemo(() => {
+    const remotePublic = remotePopularCollections
+      .filter((c) => c.visibility === "public")
+      .map((c) => ({
+        id: c.id,
+        title: c.name,
+        gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+      }));
     const other = getOtherUsersCollections().map((c) => ({
       id: c.id,
       title: c.name,
@@ -497,35 +528,28 @@ function SearchContent() {
         gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
       }));
     const seen = new Set<string>();
-    const pool = [...popularCollections, ...other, ...mine].filter((c) => {
+    const pool = [...remotePublic, ...popularCollections, ...other, ...mine].filter((c) => {
       if (!c?.id) return false;
       if (seen.has(c.id)) return false;
       seen.add(c.id);
       return true;
     });
     if (pool.length === 0) return null;
-    return pool[Math.floor(Math.random() * pool.length)];
-  }, [collections]);
+    const sig = pool.map((p) => p.id).join("\n");
+    let h = 0;
+    for (let i = 0; i < sig.length; i++) h = ((h << 5) - h + sig.charCodeAt(i)) | 0;
+    return pool[Math.abs(h) % pool.length];
+  }, [collections, remotePopularCollections]);
 
   /** ON: 全カード表示（投票済み含む） / OFF: ユーザーが投票していないカードのみ */
   const cardsToShow = useMemo(() => {
     if (showVoted) return filteredCards;
     return filteredCards.filter((card) => {
-      const cardId = card.id ?? `seed-${voteCardsData.indexOf(card)}`;
+      const cardId = resolveStableVoteCardId(card);
       if (keepVotedCardVisible[cardId]) return true;
       return !activity[cardId]?.userSelectedOption;
     });
   }, [filteredCards, showVoted, activity, keepVotedCardVisible]);
-  const backgroundPerCard = useMemo(
-    () =>
-      voteCardsData.map(
-        () =>
-          CARD_BACKGROUND_IMAGES[
-            Math.floor(Math.random() * CARD_BACKGROUND_IMAGES.length)
-          ]
-      ),
-    []
-  );
   const handleVote = useCallback(
     (cardId: string, option: "A" | "B") => {
       if (!showVoted) {
@@ -594,8 +618,7 @@ function SearchContent() {
                 </EmptyStatePanel>
               ) : (
                 cardsToShow.map((card) => {
-                  const index = voteCardsData.indexOf(card);
-                  const cardId = card.id ?? `seed-${index}`;
+                  const cardId = resolveStableVoteCardId(card);
                   const act = activity[cardId];
                   const merged = getMergedCounts(
                     card.countA ?? 0,
@@ -603,8 +626,7 @@ function SearchContent() {
                     card.commentCount ?? 0,
                     act ?? { countA: 0, countB: 0, comments: [] }
                   );
-                  const bgUrl =
-                    card.backgroundImageUrl ?? backgroundPerCard[Math.max(0, index)];
+                  const bgUrl = card.backgroundImageUrl ?? backgroundForSearchCard(card, cardId);
                   return (
                     <VoteCard
                       key={cardId}
@@ -876,17 +898,7 @@ function SearchContent() {
                     <p className="py-6 text-center text-sm text-gray-500">一致するVOTEはありません。</p>
                   ) : (
                     matchedVoteCards.map((card) => {
-                      const cardId =
-                        card.id ??
-                        (() => {
-                          const i = voteCardsData.findIndex(
-                            (v) =>
-                              v.question === card.question &&
-                              v.optionA === card.optionA &&
-                              v.optionB === card.optionB
-                          );
-                          return i >= 0 ? `seed-${i}` : `seed-0`;
-                        })();
+                      const cardId = resolveStableVoteCardId(card);
                       const act = activity[cardId];
                       const merged = getMergedCounts(
                         card.countA ?? 0,
