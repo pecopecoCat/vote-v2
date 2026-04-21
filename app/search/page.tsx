@@ -379,7 +379,14 @@ function SearchContent() {
         cardIds: c.cardIds,
       }));
     const mine = collections.filter((c) => c.visibility !== "member");
-    const combined = [...remotePublic, ...other, ...mine];
+    // 同じコレが remote + local 両方に存在すると二重表示になるので id で重複排除（remote を優先）
+    const seen = new Set<string>();
+    const combined = [...remotePublic, ...other, ...mine].filter((c) => {
+      if (!c?.id) return false;
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
     return combined.sort((a, b) => {
       const aPin = pinnedCollectionIds.includes(a.id);
       const bPin = pinnedCollectionIds.includes(b.id);
@@ -489,7 +496,13 @@ function SearchContent() {
         title: c.name,
         gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
       }));
-    const pool = [...popularCollections, ...other, ...mine];
+    const seen = new Set<string>();
+    const pool = [...popularCollections, ...other, ...mine].filter((c) => {
+      if (!c?.id) return false;
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
     if (pool.length === 0) return null;
     return pool[Math.floor(Math.random() * pool.length)];
   }, [collections]);
