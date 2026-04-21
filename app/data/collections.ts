@@ -7,7 +7,7 @@
 
 import type { CollectionGradient } from "./search";
 import { getAuth, getCurrentActivityUserId } from "./auth";
-import { addBookmark } from "./bookmarks";
+import { addBookmark, removeBookmark } from "./bookmarks";
 
 const STORAGE_KEY_PREFIX = "vote_collections_";
 const PINNED_STORAGE_KEY_PREFIX = "vote_pinned_collection_ids_";
@@ -396,6 +396,13 @@ export function deleteCollection(id: string): void {
   save(userId, cols);
   const pinned = getPinnedCollectionIds().filter((pid) => pid !== id);
   if (pinned.length < getPinnedCollectionIds().length) savePinnedIds(userId, pinned);
+  /** 削除コレクションにだけ入っていた VOTE は、他コレクションに無ければ Bookmark からも外す */
+  if (target?.cardIds?.length) {
+    for (const cardId of target.cardIds) {
+      const stillInSomeCollection = cols.some((c) => c.cardIds.includes(cardId));
+      if (!stillInSomeCollection) removeBookmark(cardId);
+    }
+  }
   if (target?.joinedParticipation) return;
   deleteCollectionFromApi(id);
 }

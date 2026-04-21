@@ -187,18 +187,21 @@ function SearchContent() {
     [auth.isLoggedIn, auth.user]
   );
   useEffect(() => {
-    setAuth(getAuth());
-    setFavoriteTags(getFavoriteTags());
-    setCollections(getCollections());
-    setPinnedCollectionIds(getPinnedCollectionIds());
-    const handler = () => {
+    const syncLists = () => {
       setAuth(getAuth());
       setFavoriteTags(getFavoriteTags());
       setCollections(getCollections());
       setPinnedCollectionIds(getPinnedCollectionIds());
     };
-    window.addEventListener(getAuthUpdatedEventName(), handler);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
+    syncLists();
+    window.addEventListener(getAuthUpdatedEventName(), syncLists);
+    window.addEventListener(PINNED_UPDATED_EVENT, syncLists);
+    window.addEventListener(getCollectionsUpdatedEventName(), syncLists);
+    return () => {
+      window.removeEventListener(getAuthUpdatedEventName(), syncLists);
+      window.removeEventListener(PINNED_UPDATED_EVENT, syncLists);
+      window.removeEventListener(getCollectionsUpdatedEventName(), syncLists);
+    };
   }, []);
 
   useEffect(() => {
@@ -445,22 +448,6 @@ function SearchContent() {
     return pool[Math.floor(Math.random() * pool.length)];
   }, [collections]);
 
-  useEffect(() => {
-    setPinnedCollectionIds(getPinnedCollectionIds());
-    setCollections(getCollections());
-  }, []);
-  useEffect(() => {
-    const handler = () => {
-      setPinnedCollectionIds(getPinnedCollectionIds());
-      setCollections(getCollections());
-    };
-    window.addEventListener(PINNED_UPDATED_EVENT, handler);
-    window.addEventListener(getCollectionsUpdatedEventName(), handler);
-    return () => {
-      window.removeEventListener(PINNED_UPDATED_EVENT, handler);
-      window.removeEventListener(getCollectionsUpdatedEventName(), handler);
-    };
-  }, []);
   /** ON: 全カード表示（投票済み含む） / OFF: ユーザーが投票していないカードのみ */
   const cardsToShow = useMemo(() => {
     if (showVoted) return filteredCards;
@@ -755,7 +742,7 @@ function SearchContent() {
                   人気コレクション
                 </h2>
               </div>
-              <div className="flex flex-col gap-3 px-[5.333vw] pb-2 pt-4">
+              <div className="flex flex-col gap-3 px-[5.333vw] pt-4 pb-5">
                 {collectionsForSection.length === 0 ? (
                   <p className="py-6 text-center text-sm text-gray-500">
                     {isLoggedIn ? "コレクションがありません。マイページで作成しよう。" : "コレクションはありません。"}
@@ -802,7 +789,7 @@ function SearchContent() {
 
                 <section>
                   <SectionHeader>コレクション</SectionHeader>
-                  <div className="flex flex-col gap-3 px-[5.333vw] py-4">
+                  <div className="flex flex-col gap-3 px-[5.333vw] pt-4 pb-5">
                     {matchedCollections.length === 0 ? (
                       <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
                     ) : (
@@ -813,6 +800,7 @@ function SearchContent() {
                           title={col.title}
                           gradient={col.gradient}
                           showPin={col.showPin}
+                          popularBanner
                           href={`/collection/${col.id}`}
                         />
                       ))

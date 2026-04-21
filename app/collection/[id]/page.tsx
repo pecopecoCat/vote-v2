@@ -16,6 +16,7 @@ import {
   getCollections,
   getCollectionsUpdatedEventName,
   getPinnedCollectionIds,
+  PINNED_UPDATED_EVENT,
   isOtherUsersCollection,
   togglePinnedCollection,
   type Collection,
@@ -172,7 +173,11 @@ export default function CollectionPage() {
     };
     const eventName = getCollectionsUpdatedEventName();
     window.addEventListener(eventName, handler);
-    return () => window.removeEventListener(eventName, handler);
+    window.addEventListener(PINNED_UPDATED_EVENT, handler);
+    return () => {
+      window.removeEventListener(eventName, handler);
+      window.removeEventListener(PINNED_UPDATED_EVENT, handler);
+    };
   }, []);
 
   useEffect(() => {
