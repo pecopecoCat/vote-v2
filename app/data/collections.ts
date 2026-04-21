@@ -2,7 +2,8 @@
  * ブックマークコレクション（COLLECTION）
  * 関係図: ログイン後のユーザーが作ることができる。管理も作成ユーザーのみ。
  * 公開設定により、全員がみれたり・個人だけ・リンクを知っているメンバのみ見れる（public / private / member）。
- * ユーザーごとに localStorage で永続化。マイページには「そのユーザーが作った」コレクションのみ表示。
+ * ユーザーごとに localStorage で永続化しつつ、ログイン時は KV（/api/user-collections）に作成分を同期して端末をまたいで同じ一覧にする。
+ * 非公開は共有用 vote_collection:{id} には載せず、ユーザー専用キーにのみ保存する。
  */
 
 import type { CollectionGradient } from "./search";
@@ -88,11 +89,67 @@ function load(userId: string): Collection[] {
   }
 }
 
-function save(userId: string, collections: Collection[]): void {
+function save(userId: string, collections: Collection[], opts?: { skipRemotePush?: boolean }): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(collections));
     window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  } catch {
+    // ignore
+  }
+  if (!opts?.skipRemotePush) {
+    void pushUserOwnedCollectionsToRemoteIfLoggedIn(userId, collections);
+  }
+}
+
+/** 作成したコレのみ（参加中のメンバー限定は除外）を KV に同期 */
+async function pushUserOwnedCollectionsToRemoteIfLoggedIn(userId: string, allCollections: Collection[]): Promise<void> {
+  const auth = getAuth();
+  if (!auth.isLoggedIn || !auth.userId || auth.userId !== userId) return;
+  const owned = allCollections.filter((c) => !c.joinedParticipation);
+  try {
+    await fetch("/api/user-collections", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: auth.userId, collections: owned }),
+    });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * KV に保存された「自分が作成したコレクション」を取り込み（非公開含む・ログインユーザーのみ）。
+ * 参加中メンバー限定は /api/member-collections 側のまま。
+ */
+export async function hydrateUserOwnedCollectionsFromRemote(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const auth = getAuth();
+  if (!auth.isLoggedIn || !auth.userId) return;
+  const uid = auth.userId;
+  try {
+    const res = await fetch(`/api/user-collections?userId=${encodeURIComponent(uid)}`);
+    if (res.status === 503) return;
+    if (!res.ok) return;
+    const data = (await res.json()) as { collections?: unknown };
+    const list = Array.isArray(data?.collections) ? data.collections : [];
+    const ownedServer: Collection[] = [];
+    for (const raw of list) {
+      if (!raw || typeof raw !== "object") continue;
+      ownedServer.push(normalizeCollection(raw as Record<string, unknown>));
+    }
+
+    const local = load(uid);
+    const joined = local.filter((c) => c.joinedParticipation);
+    const ownedLocal = local.filter((c) => !c.joinedParticipation);
+
+    if (ownedServer.length === 0 && ownedLocal.length > 0) {
+      await pushUserOwnedCollectionsToRemoteIfLoggedIn(uid, local);
+      return;
+    }
+
+    const merged = [...ownedServer, ...joined];
+    save(uid, merged, { skipRemotePush: true });
   } catch {
     // ignore
   }

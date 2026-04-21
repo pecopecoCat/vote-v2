@@ -27,7 +27,10 @@ import {
   ACTIVITY_GLOBAL_UPDATED_EVENT,
 } from "../data/voteCardActivity";
 import { getCurrentActivityUserId, getAuthUpdatedEventName, getAuth } from "../data/auth";
-import { hydrateParticipatedMemberCollectionsFromRemote } from "../data/collections";
+import {
+  hydrateParticipatedMemberCollectionsFromRemote,
+  hydrateUserOwnedCollectionsFromRemote,
+} from "../data/collections";
 import { hydrateBookmarksFromRemote } from "../data/bookmarks";
 
 function isCommentsDisabledOnCard(cardId: string, timeline: VoteCardData[]): boolean {
@@ -297,14 +300,18 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, [fetchActivity]);
 
-  // ログインしたユーザーの「参加中メンバー限定コレクション」をKVから取り込み（別ブラウザでも保持）
+  // ログインしたユーザーのコレクションをKVから取り込み（作成分は非公開含む・参加中は別キー）
   useEffect(() => {
-    const handler = () => {
-      void hydrateParticipatedMemberCollectionsFromRemote();
+    const handler = async () => {
+      await hydrateUserOwnedCollectionsFromRemote();
+      await hydrateParticipatedMemberCollectionsFromRemote();
     };
-    handler();
-    window.addEventListener(getAuthUpdatedEventName(), handler);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
+    void handler();
+    const onAuth = () => {
+      void handler();
+    };
+    window.addEventListener(getAuthUpdatedEventName(), onAuth);
+    return () => window.removeEventListener(getAuthUpdatedEventName(), onAuth);
   }, []);
 
   // ブックマーク（カード）も別ブラウザで維持（ログインユーザーのみ）
