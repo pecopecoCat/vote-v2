@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { showAppToast } from "../lib/appToast";
 
 export interface VoteCardShareSheetProps {
@@ -76,9 +77,18 @@ export default function VoteCardShareSheet({ open, onClose, cardId }: VoteCardSh
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
-  return (
+  const node = (
     <>
       <div className="fixed inset-0 z-[75] bg-black/50" aria-hidden onClick={onClose} />
       <div
@@ -135,4 +145,6 @@ export default function VoteCardShareSheet({ open, onClose, cardId }: VoteCardSh
       </div>
     </>
   );
+  if (typeof document === "undefined") return null;
+  return createPortal(node, document.body);
 }
