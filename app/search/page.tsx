@@ -173,8 +173,8 @@ function SearchContent() {
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [tagMenu, setTagMenu] = useState<{ tag: string; variant: TagMenuVariant } | null>(null);
   const [hiddenTagsVersion, setHiddenTagsVersion] = useState(0);
-  /** 注目タグの表示件数（初期10件、もっと表示するで10件ずつ追加） */
-  const [trendingTagsVisibleCount, setTrendingTagsVisibleCount] = useState(10);
+  /** 注目タグの表示件数（初期5件、もっと表示するで10件ずつ追加） */
+  const [trendingTagsVisibleCount, setTrendingTagsVisibleCount] = useState(5);
   const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
   const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
   const [remotePopularCollections, setRemotePopularCollections] = useState<
@@ -756,7 +756,7 @@ function SearchContent() {
                           onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
                         />
                       ))}
-                      {displayedTrendingTags.length > 10 && trendingTagsVisibleCount < displayedTrendingTags.length && (
+                      {displayedTrendingTags.length > trendingTagsVisibleCount && (
                         <div className="mb-[50px] flex justify-center pb-3 pt-6">
                           <button
                             type="button"
