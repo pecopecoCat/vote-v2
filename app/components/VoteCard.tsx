@@ -135,20 +135,14 @@ function VoteCard({
   const [readMoreExpanded, setReadMoreExpanded] = useState(false);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [voteBeforeCommentOpen, setVoteBeforeCommentOpen] = useState(false);
-  const [periodTick, setPeriodTick] = useState(0);
-  useEffect(() => {
-    if (!periodEnd) return;
-    const id = window.setInterval(() => setPeriodTick((n) => n + 1), 60_000);
-    return () => window.clearInterval(id);
-  }, [periodEnd]);
 
   const periodAllowsVote = useMemo(
     () => isVotingAllowedNow(periodStart, periodEnd),
-    [periodStart, periodEnd, periodTick]
+    [periodStart, periodEnd]
   );
   const periodStatusText = useMemo(
     () => getVotePeriodStatusText(periodStart, periodEnd),
-    [periodStart, periodEnd, periodTick]
+    [periodStart, periodEnd]
   );
 
   useEffect(() => {
@@ -192,6 +186,16 @@ function VoteCard({
   };
 
   const showResult = selectedOption !== null;
+  const handleNavigateToComments = () => {
+    if (typeof window === "undefined") return;
+    if (cardId == null) return;
+    if (selectedOption == null) return;
+    try {
+      window.sessionStorage.setItem(`vote_last_selection_${cardId}`, selectedOption);
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <article className="relative w-full overflow-visible rounded-[18px] bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
@@ -326,6 +330,7 @@ function VoteCard({
               href={`/comments/${cardId}`}
               className="flex items-center gap-1 hover:opacity-80"
               aria-label={`コメント ${commentCount}件、コメントページへ`}
+              onClick={handleNavigateToComments}
             >
               {hasCommented ? (
                 <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />

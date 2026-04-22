@@ -42,17 +42,6 @@ function ProfileLoginContent() {
       router.replace(returnTo);
       return;
     }
-    // ログアウトせずに閉じた場合、サーバーの「ログイン中」を解除（この端末で最後にログインしたユーザー）
-    const lastId = getLastLoggedInUserId();
-    if (lastId && DEMO_USER_IDS.includes(lastId as DemoUserId)) {
-      fetch("/api/active-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logoutUserId: lastId }),
-      })
-        .then(() => clearLastLoggedInUserId())
-        .catch(() => clearLastLoggedInUserId());
-    }
   }, [router, returnTo]);
 
   /** 一覧取得→アカウント選択表示（依存配列なしで安定参照＝自動オープン時の二重 fetch を防ぐ） */
@@ -65,6 +54,20 @@ function ProfileLoginContent() {
     let cancelled = false;
     const loadActiveAndProfiles = async () => {
       try {
+        // ログアウトせずに閉じた場合、サーバーの「ログイン中」を先に解除してから一覧を取る。
+        // 解除が間に合わないと、直後の再ログインが 409 になることがあるため await で直列化する。
+        const lastId = getLastLoggedInUserId();
+        if (lastId && DEMO_USER_IDS.includes(lastId as DemoUserId)) {
+          try {
+            await fetch("/api/active-user", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ logoutUserId: lastId }),
+            });
+          } finally {
+            clearLastLoggedInUserId();
+          }
+        }
         const [activeRes, ...profileResults] = await Promise.all([
           fetch("/api/active-user").then((r) => r.json()) as Promise<{ userIds?: string[] }>,
           ...DEMO_USER_IDS.map((uid) => fetchUserProfileFromApi(uid)),

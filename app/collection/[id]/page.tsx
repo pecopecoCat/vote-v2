@@ -52,6 +52,7 @@ import { getCreatedVotesForTimeline } from "../../data/createdVotes";
 import { isVotingAllowedNow, resolveCardForVotePeriod } from "../../data/votePeriod";
 import type { CurrentUser } from "../../components/VoteCard";
 import type { CollectionGradient } from "../../data/search";
+import { normalizeCardIdKey, resolveAvatarSrc } from "../../lib/normalize";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   public: "公開",
@@ -348,7 +349,7 @@ export default function CollectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, localCollection, activityUserId, auth.isLoggedIn]);
+  }, [id, localCollection, activityUserId]);
 
   const collection = localCollection ?? collectionFromApi;
   const isFromApi = !!collectionFromApi && !localCollection;
@@ -387,16 +388,16 @@ export default function CollectionPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [collection?.id, collection?.visibility, auth.isLoggedIn, auth.user?.name, auth.userId]);
+  }, [collection?.id, collection?.visibility, activityUserId]);
 
   const scopedActivityMap = useMemo(() => {
     if (!collection || !isMemberCollection) return {} as Record<string, CardActivity>;
     return getAllCollectionScopedActivity(collection.id);
-  }, [collection, isMemberCollection, scopedVotesVersion, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
+  }, [collection?.id, isMemberCollection, scopedVotesVersion, activityUserId]);
   const memberParticipants = useMemo(() => {
     if (!collection || !isMemberCollection) return [];
     return getCollectionScopedParticipants(collection.id);
-  }, [collection, isMemberCollection, scopedVotesVersion, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
+  }, [collection?.id, isMemberCollection, scopedVotesVersion]);
 
   const viewerAsOwnerProfile = useMemo(() => {
     if (!collection) return null;
@@ -427,7 +428,8 @@ export default function CollectionPage() {
   const cardsInCollection = useMemo(() => {
     if (!collection) return [];
     return collection.cardIds
-      .map((cardId) => {
+      .map((rawCardId) => {
+        const cardId = normalizeCardIdKey(rawCardId);
         const card = getCardByStableId(cardId, createdVotesForTimeline);
         return card ? { card, cardId } : null;
       })
@@ -625,11 +627,15 @@ export default function CollectionPage() {
               {memberParticipantsForDisplay.map((p) => (
                 <li key={p.userId} className="flex max-w-[10rem] min-w-0 items-center gap-1.5">
                   <img
-                    src={typeof p.iconUrl === "string" && p.iconUrl.length > 0 ? p.iconUrl : "/default-avatar.png"}
+                    src={resolveAvatarSrc(p.iconUrl)}
                     alt=""
                     className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]"
                     width={24}
                     height={24}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "/default-avatar.png";
+                    }}
                   />
                   <span className="min-w-0 truncate text-[11px] leading-tight text-gray-600">{p.name}</span>
                   {collection.createdByUserId === p.userId && (

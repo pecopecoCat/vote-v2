@@ -33,6 +33,7 @@ import {
 } from "../data/collections";
 import { hydrateBookmarksFromRemote } from "../data/bookmarks";
 import type { MemberJoinOwnerEvent } from "../lib/memberJoinOwnerNotifications";
+import { normalizeCardIdKey, normalizeKeyedRows } from "../lib/normalize";
 
 export type { MemberJoinOwnerEvent };
 
@@ -53,6 +54,12 @@ function normalizeCardFromApi(raw: { userId?: string; card?: unknown }): VoteCar
   const optionB = typeof c.optionB === "string" ? c.optionB : "";
   if (!question.trim() || !optionA.trim() || !optionB.trim()) return null;
   const userId = typeof raw.userId === "string" ? raw.userId : undefined;
+  const readMoreTextRaw =
+    typeof c.readMoreText === "string"
+      ? c.readMoreText
+      : typeof (c as { reason?: unknown }).reason === "string"
+        ? ((c as { reason: string }).reason as string)
+        : undefined;
   return {
     patternType: (c.patternType as VoteCardData["patternType"]) ?? "yellow-loops",
     question,
@@ -62,7 +69,7 @@ function normalizeCardFromApi(raw: { userId?: string; card?: unknown }): VoteCar
     countB: typeof c.countB === "number" ? c.countB : 0,
     commentCount: typeof c.commentCount === "number" ? c.commentCount : 0,
     tags: Array.isArray(c.tags) ? (c.tags as string[]) : undefined,
-    readMoreText: typeof c.readMoreText === "string" ? c.readMoreText : undefined,
+    readMoreText: readMoreTextRaw,
     creator:
       c.creator && typeof c.creator === "object" && typeof (c.creator as { name: string }).name === "string"
         ? (c.creator as { name: string; iconUrl?: string })
@@ -81,15 +88,38 @@ function normalizeCardFromApi(raw: { userId?: string; card?: unknown }): VoteCar
   };
 }
 
+function mergeCommentsPreferNewest(
+  prev: CardActivity["comments"] | undefined,
+  next: CardActivity["comments"] | undefined
+): CardActivity["comments"] {
+  const p = Array.isArray(prev) ? prev : [];
+  const n = Array.isArray(next) ? next : [];
+  if (p.length === 0) return n;
+  if (n.length === 0) return p;
+
+  const byId = new Map<string, CardActivity["comments"][number]>();
+  for (const c of p) {
+    if (c && typeof c.id === "string") byId.set(c.id, c);
+  }
+  for (const c of n) {
+    if (c && typeof c.id === "string") byId.set(c.id, c);
+  }
+  const merged = Array.from(byId.values());
+  merged.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  return merged;
+}
+
 function buildActivityFromApi(
   global: Record<string, { countA?: number; countB?: number; comments?: CardActivity["comments"] }>,
   userSelections: Record<string, unknown>
 ): Record<string, CardActivity> {
-  const cardIds = new Set([...Object.keys(global), ...Object.keys(userSelections)]);
+  const globalN = normalizeKeyedRows(global);
+  const userN = normalizeKeyedRows(userSelections);
+  const cardIds = new Set([...Object.keys(globalN), ...Object.keys(userN)]);
   const result: Record<string, CardActivity> = {};
   for (const id of cardIds) {
-    const g = global[id];
-    const raw = userSelections[id];
+    const g = globalN[id];
+    const raw = userN[id];
     let userSelectedOption: "A" | "B" | undefined;
     let userVotedAt: string | undefined;
     if (raw === "A" || raw === "B") {
@@ -127,6 +157,8 @@ function mergeActivityFromApiFetch(
     if (b && p) {
       merged[cardId] = {
         ...b,
+        // GETが古いcommentsを返しても、送信直後のローカル分が消えないようにマージする
+        comments: mergeCommentsPreferNewest(p.comments, b.comments),
         userSelectedOption: b.userSelectedOption ?? p.userSelectedOption,
         userVotedAt: b.userVotedAt ?? p.userVotedAt,
       };
@@ -233,6 +265,10 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [memberJoinEvents, setMemberJoinEvents] = useState<MemberJoinOwnerEvent[]>([]);
   const [isRemote, setIsRemote] = useState(false);
   const [activityBootstrapDone, setActivityBootstrapDone] = useState(false);
+
+  /** addVote / addComment の依存から外し、タイムライン更新のたびに子の onVote が変わらないようにする */
+  const createdVotesForTimelineRef = useRef(createdVotesForTimeline);
+  createdVotesForTimelineRef.current = createdVotesForTimeline;
 
   const fetchCreatedVotes = useCallback(async (): Promise<boolean> => {
     try {
@@ -433,35 +469,56 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const addVote = useCallback(
     async (cardId: string, option: "A" | "B") => {
       const userId = getCurrentActivityUserId();
-      const timeline = isRemote ? createdVotesForTimeline : getCreatedVotesForTimeline();
+      const timeline = isRemote
+        ? createdVotesForTimelineRef.current
+        : getCreatedVotesForTimeline();
       const meta = resolveCardForVotePeriod(cardId, timeline);
       if (meta && !isVotingAllowedNow(meta.periodStart, meta.periodEnd)) {
         return;
       }
       if (isRemote) {
+        // 体感改善：POST/再取得を待たずに「投票済み」+ 票数を即反映（結果表示・コメント導線の遅延を防ぐ）
+        const votedAt = new Date().toISOString();
+        setActivity((prev) => ({
+          ...prev,
+          [cardId]: {
+            ...(prev[cardId] ?? { countA: 0, countB: 0, comments: [] }),
+            countA: (prev[cardId]?.countA ?? 0) + (option === "A" ? 1 : 0),
+            countB: (prev[cardId]?.countB ?? 0) + (option === "B" ? 1 : 0),
+            userSelectedOption: option,
+            userVotedAt: votedAt,
+          },
+        }));
         const res = await fetch(ACTIVITY_API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "vote", userId, cardId, option }),
         });
         if (res.ok) {
-          const votedAt = new Date().toISOString();
-          setActivity((prev) => ({
-            ...prev,
-            [cardId]: {
-              ...(prev[cardId] ?? { countA: 0, countB: 0, comments: [] }),
-              userSelectedOption: option,
-              userVotedAt: votedAt,
-            },
-          }));
+          // カウント/コメントを最新化（遅れてきてもOK）
           await fetchActivity();
+        } else {
+          // 失敗時は楽観更新を戻す（投票済みの誤表示を避ける）
+          setActivity((prev) => {
+            const cur = prev[cardId];
+            if (!cur) return prev;
+            const next = { ...prev };
+            next[cardId] = {
+              ...cur,
+              countA: Math.max(0, (cur.countA ?? 0) - (option === "A" ? 1 : 0)),
+              countB: Math.max(0, (cur.countB ?? 0) - (option === "B" ? 1 : 0)),
+              userSelectedOption: undefined,
+              userVotedAt: undefined,
+            };
+            return next;
+          });
         }
         return;
       }
       addVoteLocal(cardId, option);
       setActivity((prev) => ({ ...prev, ...getAllActivity() }));
     },
-    [isRemote, fetchActivity, createdVotesForTimeline]
+    [isRemote, fetchActivity]
   );
 
   const addComment = useCallback(
@@ -471,11 +528,37 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       parentCommentId?: string,
       commenterVoteOption?: "A" | "B"
     ) => {
-      const timeline = isRemote ? createdVotesForTimeline : getCreatedVotesForTimeline();
+      const timeline = isRemote
+        ? createdVotesForTimelineRef.current
+        : getCreatedVotesForTimeline();
       if (isCommentsDisabledOnCard(cardId, timeline)) {
         return;
       }
       if (isRemote) {
+        // 体感改善：送信後に即表示（POST/再取得待ちの遅延をなくす）
+        const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const now = new Date().toISOString();
+        setActivity((prev) => {
+          const cur = prev[cardId] ?? { countA: 0, countB: 0, comments: [] as CardActivity["comments"] };
+          const nextComments = Array.isArray(cur.comments) ? cur.comments : [];
+          return {
+            ...prev,
+            [cardId]: {
+              ...cur,
+              comments: [
+                ...nextComments,
+                {
+                  id: optimisticId,
+                  user: comment.user,
+                  text: comment.text,
+                  date: now,
+                  parentId: parentCommentId,
+                  userVoteOption: commenterVoteOption,
+                },
+              ],
+            },
+          };
+        });
         const res = await fetch(ACTIVITY_API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -487,13 +570,27 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
             commenterVoteOption,
           }),
         });
-        if (res.ok) await fetchActivity();
+        if (res.ok) {
+          await fetchActivity();
+        } else {
+          // 失敗時は追加した分だけ取り消し（楽観コメントの残存を避ける）
+          setActivity((prev) => {
+            const cur = prev[cardId];
+            if (!cur) return prev;
+            const next = { ...prev };
+            next[cardId] = {
+              ...cur,
+              comments: (cur.comments ?? []).filter((c) => c.id !== optimisticId),
+            };
+            return next;
+          });
+        }
         return;
       }
       addCommentLocal(cardId, comment, parentCommentId, commenterVoteOption);
       setActivity((prev) => ({ ...prev, ...getAllActivity() }));
     },
-    [isRemote, fetchActivity, createdVotesForTimeline]
+    [isRemote, fetchActivity]
   );
 
   const removeComment = useCallback(

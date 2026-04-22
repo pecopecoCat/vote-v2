@@ -36,7 +36,8 @@
   --color-foreground: var(--foreground);
   /* 欧文・数字 Lato → 日本語は Noto（--font-body-stack と同等の意図） */
   --font-sans: var(--font-lato), var(--font-noto-sans-jp), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
 }
 
 @media (prefers-color-scheme: dark) {

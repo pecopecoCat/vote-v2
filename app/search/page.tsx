@@ -175,6 +175,8 @@ function SearchContent() {
   const [hiddenTagsVersion, setHiddenTagsVersion] = useState(0);
   /** 注目タグの表示件数（初期5件、もっと表示するで10件ずつ追加） */
   const [trendingTagsVisibleCount, setTrendingTagsVisibleCount] = useState(5);
+  /** 人気コレクション：初回レンダ負荷を抑える（多い環境での体感改善） */
+  const [popularCollectionsVisibleCount, setPopularCollectionsVisibleCount] = useState(8);
   const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
   const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
   const [remotePopularCollections, setRemotePopularCollections] = useState<
@@ -329,6 +331,10 @@ function SearchContent() {
   useEffect(() => {
     setTagListSortOrder("newest");
   }, [tagFromUrl]);
+  useEffect(() => {
+    // 検索条件が変わったら件数をリセット（初回レンダ負荷を一定に）
+    setPopularCollectionsVisibleCount(8);
+  }, [tagFromUrl, qFromUrl, activeTab]);
 
   /**
    * 「投票済みを表示」OFF のとき、投票直後はカードをタイムラインに残す（結果表示のまま）。
@@ -416,6 +422,10 @@ function SearchContent() {
       return 0;
     });
   }, [collections, pinnedCollectionIds, remotePopularCollections]);
+  const displayedCollectionsForSection = useMemo(
+    () => collectionsForSection.slice(0, popularCollectionsVisibleCount),
+    [collectionsForSection, popularCollectionsVisibleCount]
+  );
 
   /** 注目タグ用の全カード（作成VOTE + シード） */
   const allCardsForTags = useMemo(() => {
@@ -829,17 +839,35 @@ function SearchContent() {
                     {isLoggedIn ? "コレクションがありません。マイページで作成しよう。" : "コレクションはありません。"}
                   </p>
                 ) : (
-                  collectionsForSection.map((col, i) => (
-                    <CollectionCard
-                      key={col.id}
-                      id={col.id}
-                      title={col.name}
-                      gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
-                      showPin={pinnedCollectionIds.includes(col.id)}
-                      popularBanner
-                      href={`/collection/${col.id}`}
-                    />
-                  ))
+                  <>
+                    {displayedCollectionsForSection.map((col, i) => (
+                      <div
+                        key={col.id}
+                        className="[content-visibility:auto] [contain-intrinsic-size:auto_88px]"
+                      >
+                        <CollectionCard
+                          id={col.id}
+                          title={col.name}
+                          gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
+                          showPin={pinnedCollectionIds.includes(col.id)}
+                          popularBanner
+                          href={`/collection/${col.id}`}
+                        />
+                      </div>
+                    ))}
+                    {collectionsForSection.length > displayedCollectionsForSection.length ? (
+                      <div className="flex justify-center py-2">
+                        <button
+                          type="button"
+                          className="inline-block text-center"
+                          onClick={() => setPopularCollectionsVisibleCount((prev) => prev + 8)}
+                        >
+                          <span className="text-sm font-medium text-gray-600">もっと表示する</span>
+                          <span className="mt-2.5 block h-0.5 w-full bg-[#FFE100]" aria-hidden />
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </div>
             </section>

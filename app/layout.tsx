@@ -1,18 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Lato, Noto_Sans_JP } from "next/font/google";
+import { Lato, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 import { SharedDataProvider } from "./context/SharedDataContext";
 import AppToastHost from "./components/AppToastHost";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",
@@ -39,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${notoSansJP.variable} ${lato.variable} antialiased`}
+        className={`${notoSansJP.variable} ${lato.variable} antialiased`}
       >
         <div className="min-h-dvh w-full bg-[var(--color-bg)]">
           <SharedDataProvider>

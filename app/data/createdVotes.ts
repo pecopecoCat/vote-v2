@@ -32,6 +32,12 @@ function normalizeCard(raw: unknown): VoteCardData | null {
   const tags = Array.isArray(o.tags)
     ? (o.tags.filter((t): t is string => typeof t === "string") as string[])
     : undefined;
+  const readMoreTextRaw =
+    typeof o.readMoreText === "string"
+      ? o.readMoreText
+      : typeof (o as { reason?: unknown }).reason === "string"
+        ? ((o as { reason: string }).reason as string)
+        : undefined;
   return {
     patternType,
     question,
@@ -41,7 +47,7 @@ function normalizeCard(raw: unknown): VoteCardData | null {
     countB,
     commentCount,
     tags: tags?.length ? tags : undefined,
-    readMoreText: typeof o.readMoreText === "string" ? o.readMoreText : undefined,
+    readMoreText: readMoreTextRaw,
     creator:
       o.creator && typeof o.creator === "object" && typeof (o.creator as Record<string, unknown>).name === "string"
         ? (o.creator as { name: string; iconUrl?: string })

@@ -40,6 +40,7 @@ import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../.
 import { addHiddenUser } from "../../data/hiddenUsers";
 import { addHiddenCard } from "../../data/hiddenCards";
 import type { VoteCardData } from "../../data/voteCards";
+import { normalizeCardIdKey } from "../../lib/normalize";
 
 /** stableId (seed-N / created-xxx / 0,1,...) からカードを取得 */
 function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
@@ -69,6 +70,7 @@ export default function CommentsPage() {
   const params = useParams();
   const router = useRouter();
   const id = typeof params.id === "string" ? params.id : "0";
+  const stableId = useMemo(() => normalizeCardIdKey(id), [id]);
   const shared = useSharedData();
   const {
     createdVotesForTimeline,
@@ -77,7 +79,8 @@ export default function CommentsPage() {
     addComment: sharedAddComment,
     removeComment: sharedRemoveComment,
   } = shared;
-  const activity = sharedActivity[id] ?? emptyActivity;
+  const activity = sharedActivity[stableId] ?? sharedActivity[id] ?? emptyActivity;
+  const [sessionSelectedOption, setSessionSelectedOption] = useState<"A" | "B" | null>(null);
 
   const [card, setCard] = useState<VoteCardData | null>(() => {
     if (id.startsWith("created-")) return null;
@@ -91,7 +94,7 @@ export default function CommentsPage() {
   const [auth, setAuth] = useState(() => getAuth());
   const [commentSortOrder, setCommentSortOrder] = useState<"newest" | "oldest">("newest");
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
-  const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
+  const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(stableId));
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentMenuTarget, setCommentMenuTarget] = useState<VoteComment | null>(null);
   /**
@@ -102,15 +105,28 @@ export default function CommentsPage() {
   const commentsSectionRef = useRef<HTMLDivElement>(null);
   const isLoggedIn = auth.isLoggedIn;
   const commentsDisabled = card?.commentsDisabled === true;
-  const canPostByVote = activity.userSelectedOption != null;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const key = `vote_last_selection_${stableId}`;
+      const v = window.sessionStorage.getItem(key);
+      if (v === "A" || v === "B") setSessionSelectedOption(v);
+      window.sessionStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }, [stableId]);
+
+  const effectiveSelectedOption = activity.userSelectedOption ?? (sessionSelectedOption ?? undefined);
+  const canPostByVote = effectiveSelectedOption != null;
   const canOpenPostModal = !commentsDisabled && (!isLoggedIn || canPostByVote);
   const canUseReplyAction = !commentsDisabled && isLoggedIn && canPostByVote;
 
   useEffect(() => {
-    const handler = () => setLikedCommentIds(getCommentIdsLikedByCurrentUser(id));
+    const handler = () => setLikedCommentIds(getCommentIdsLikedByCurrentUser(stableId));
     window.addEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
     return () => window.removeEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
-  }, [id]);
+  }, [stableId]);
 
   useEffect(() => {
     const handler = () => setAuth(getAuth());
@@ -242,7 +258,7 @@ export default function CommentsPage() {
     : { type: "guest" as const };
 
   const handleVote = (side: "A" | "B") => {
-    void sharedAddVote(id, side);
+    void sharedAddVote(stableId, side);
   };
 
   const handleCommentSubmit = (
@@ -250,7 +266,7 @@ export default function CommentsPage() {
     payload: { user: { name: string; iconUrl?: string }; text: string },
     parentCommentId?: string
   ) => {
-    const commenterVote = activity.userSelectedOption;
+    const commenterVote = effectiveSelectedOption;
     void sharedAddComment(cardId, payload, parentCommentId, commenterVote).then(() =>
       setReplyingToCommentId(null)
     );
@@ -408,9 +424,9 @@ export default function CommentsPage() {
                     parent={c}
                     replies={replies}
                     likedCommentIds={likedCommentIds}
-                    onParentLike={() => addCommentLike(id, c.id, currentCard)}
+                    onParentLike={() => addCommentLike(stableId, c.id, currentCard)}
                     onParentReply={() => setReplyingToCommentId(c.id)}
-                    onReplyLike={(r) => addCommentLike(id, r.id, currentCard)}
+                    onReplyLike={(r) => addCommentLike(stableId, r.id, currentCard)}
                     canReply={canUseReplyAction}
                     parentReplyThreadHref={`/comments/${id}/reply/${c.id}`}
                     maxRepliesVisible={1}
@@ -465,7 +481,7 @@ export default function CommentsPage() {
         }}
         cardId={id}
         onCommentSubmit={(cardId, payload) => handleCommentSubmit(cardId, payload, replyingToCommentId ?? undefined)}
-        disabled={commentsDisabled || !isLoggedIn || activity.userSelectedOption == null}
+        disabled={commentsDisabled || !isLoggedIn || effectiveSelectedOption == null}
         disabledPlaceholder={!isLoggedIn ? "ログインするとコメントできます" : undefined}
         currentUser={currentUser.type === "sns" ? { name: currentUser.name ?? "自分", iconUrl: currentUser.iconUrl } : undefined}
         showLoginButton={!isLoggedIn}
@@ -545,7 +561,7 @@ export default function CommentsPage() {
           onDelete={() => {
             const t = commentMenuTarget;
             if (!t) return;
-            void sharedRemoveComment(id, t.id, {
+            void sharedRemoveComment(stableId, t.id, {
               countA: activity.countA ?? 0,
               countB: activity.countB ?? 0,
               comments: activity.comments ?? [],

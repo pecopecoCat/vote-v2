@@ -5,6 +5,7 @@
 
 import { getAuth, getCurrentActivityUserId } from "./auth";
 import type { CardActivity } from "./voteCardActivity";
+import { normalizeCardIdKey } from "../lib/normalize";
 
 const VOTES_API = (collectionId: string) =>
   `/api/collection/${encodeURIComponent(collectionId)}/votes`;
@@ -45,6 +46,18 @@ export type MemberCollectionVotesSnapshot = {
   participants: Record<string, Omit<CollectionScopedParticipant, "userId">>;
   joinProfiles: Record<string, MemberCollectionJoinProfile>;
 };
+
+function normalizeSnapshotKeys(snap: MemberCollectionVotesSnapshot): MemberCollectionVotesSnapshot {
+  const global: Record<string, GlobalRow> = {};
+  for (const [cid, row] of Object.entries(snap.global ?? {})) {
+    global[normalizeCardIdKey(cid)] = row;
+  }
+  const userSelections: Record<string, UserSelectionRow> = {};
+  for (const [cid, row] of Object.entries(snap.userSelections ?? {})) {
+    userSelections[normalizeCardIdKey(cid)] = row;
+  }
+  return { ...snap, global, userSelections };
+}
 
 function globalKey(collectionId: string): string {
   return GLOBAL_KEY_PREFIX + collectionId;
@@ -199,7 +212,8 @@ function saveParticipantsMap(collectionId: string, data: Record<string, Omit<Col
 
 /** API（GET votes / collection 同梱 memberVotes）の JSON を検証してスナップショット化 */
 export function parseMemberCollectionVotesPayload(raw: unknown): MemberCollectionVotesSnapshot | null {
-  return normalizeSnapshot(raw);
+  const snap = normalizeSnapshot(raw);
+  return snap ? normalizeSnapshotKeys(snap) : null;
 }
 
 function normalizeSnapshot(raw: unknown): MemberCollectionVotesSnapshot | null {
@@ -372,13 +386,14 @@ function mergeScopedUserSelectionsMaps(
 
 /** KV から取得した内容で localStorage を上書き（他ユーザー分の集計を反映） */
 export function hydrateCollectionScopedFromSnapshot(collectionId: string, snap: MemberCollectionVotesSnapshot): void {
-  const mergedGlobal = mergeScopedGlobalMaps(loadScopedGlobal(collectionId), snap.global);
+  const normalized = normalizeSnapshotKeys(snap);
+  const mergedGlobal = mergeScopedGlobalMaps(loadScopedGlobal(collectionId), normalized.global);
   saveScopedGlobal(collectionId, mergedGlobal);
-  const mergedUser = mergeScopedUserSelectionsMaps(loadScopedUserSelections(collectionId), snap.userSelections);
+  const mergedUser = mergeScopedUserSelectionsMaps(loadScopedUserSelections(collectionId), normalized.userSelections);
   saveScopedUserSelections(collectionId, mergedUser);
-  const mergedParticipants = mergeParticipantsMaps(loadParticipantsMap(collectionId), snap.participants);
+  const mergedParticipants = mergeParticipantsMaps(loadParticipantsMap(collectionId), normalized.participants);
   saveParticipantsMap(collectionId, mergedParticipants);
-  const mergedJoin = mergeJoinProfileMaps(loadJoinProfilesMap(collectionId), snap.joinProfiles ?? {});
+  const mergedJoin = mergeJoinProfileMaps(loadJoinProfilesMap(collectionId), normalized.joinProfiles ?? {});
   saveJoinProfilesMap(collectionId, mergedJoin);
   notifyCollectionScopedUpdated(collectionId);
 }
@@ -433,17 +448,18 @@ function buildParticipantPayload(): { name: string; iconUrl?: string } {
 }
 
 function applyLocalCollectionScopedVoteOnly(collectionId: string, cardId: string, option: "A" | "B"): void {
+  const normalizedCardId = normalizeCardIdKey(cardId);
   const globalMap = loadScopedGlobal(collectionId);
-  const current = globalMap[cardId] ?? { countA: 0, countB: 0 };
+  const current = globalMap[normalizedCardId] ?? globalMap[cardId] ?? { countA: 0, countB: 0 };
   const nextRow: GlobalRow = {
     countA: current.countA + (option === "A" ? 1 : 0),
     countB: current.countB + (option === "B" ? 1 : 0),
   };
-  saveScopedGlobal(collectionId, { ...globalMap, [cardId]: nextRow });
+  saveScopedGlobal(collectionId, { ...globalMap, [normalizedCardId]: nextRow });
 
   const user = loadScopedUserSelections(collectionId);
   const votedAt = new Date().toISOString();
-  saveScopedUserSelections(collectionId, { ...user, [cardId]: { userSelectedOption: option, votedAt } });
+  saveScopedUserSelections(collectionId, { ...user, [normalizedCardId]: { userSelectedOption: option, votedAt } });
   upsertParticipantFromCurrentAuth(collectionId);
   notifyCollectionScopedUpdated(collectionId);
 }

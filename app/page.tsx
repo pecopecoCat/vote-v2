@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, Suspense, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect, Suspense, useCallback, useRef, memo } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "./components/AppHeader";
 import VoteCard from "./components/VoteCard";
@@ -212,7 +212,7 @@ function ensureUser1User2CollectionsResetOnce(): void {
   window.localStorage.setItem(RESET_COLLECTIONS_FLAG, "1");
 }
 
-function HomeTimelineFeed({
+const HomeTimelineFeed = memo(function HomeTimelineFeed({
   timelineItems,
   activity,
   commentedCardIdSet,
@@ -339,7 +339,7 @@ function HomeTimelineFeed({
       ) : null}
     </>
   );
-}
+});
 
 function HomeContent() {
   const searchParams = useSearchParams();
@@ -438,21 +438,20 @@ function HomeContent() {
     [allCards, hiddenUserIdSet, hiddenCardIdSet]
   );
 
+  /** activity 側だけ走査（カード全件×コメントより軽い） */
   const commentedCardIdSet = useMemo(() => {
     const set = new Set<string>();
     const opts = {
       isLoggedIn: auth.isLoggedIn,
       displayName: auth.user?.name,
     };
-    for (const card of allCardsFiltered) {
-      const id = resolveStableVoteCardId(card);
-      const a = activity[id];
+    for (const [cardId, a] of Object.entries(activity)) {
       if ((a?.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
-        set.add(id);
+        set.add(cardId);
       }
     }
     return set;
-  }, [allCardsFiltered, activity, auth.isLoggedIn, auth.user?.name]);
+  }, [activity, auth.isLoggedIn, auth.user?.name]);
 
   const handleCardMoreClick = useCallback((cardId: string) => {
     setCardOptionsCardId(cardId);

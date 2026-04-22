@@ -86,20 +86,13 @@ export default function VoteCardCompact({
   hideFooterIconRow = false,
 }: VoteCardCompactProps) {
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
-  const [periodTick, setPeriodTick] = useState(0);
-  useEffect(() => {
-    if (!periodEnd) return;
-    const id = window.setInterval(() => setPeriodTick((n) => n + 1), 60_000);
-    return () => window.clearInterval(id);
-  }, [periodEnd]);
-
   const periodAllowsVote = useMemo(
     () => isVotingAllowedNow(periodStart, periodEnd),
-    [periodStart, periodEnd, periodTick]
+    [periodStart, periodEnd]
   );
   const periodStatusText = useMemo(
     () => getVotePeriodStatusText(periodStart, periodEnd),
-    [periodStart, periodEnd, periodTick]
+    [periodStart, periodEnd]
   );
 
   const useImage = Boolean(backgroundImageUrl);
