@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, Suspense, useDeferredValue, useCallback } from "react";
+import { useMemo, useState, useEffect, Suspense, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "./components/AppHeader";
 import VoteCard from "./components/VoteCard";
@@ -193,6 +193,10 @@ const RESET_VOTE_COUNTS_FLAG = "vote_counts_reset_v1";
 /** 一度だけ user1/user2 のコレクション・ブックマークを空にする。以降は登録を保持（二度とリセットしない） */
 const RESET_COLLECTIONS_FLAG = "vote_collections_reset_v3";
 
+/** 初回マウント負荷を抑え、近づいたら追加（長いタイムライン向け） */
+const TIMELINE_INITIAL_VISIBLE = 12;
+const TIMELINE_LOAD_MORE = 10;
+
 function ensureVoteCountsResetOnce(): void {
   if (typeof window === "undefined") return;
   if (window.localStorage.getItem(RESET_VOTE_COUNTS_FLAG)) return;
@@ -206,6 +210,135 @@ function ensureUser1User2CollectionsResetOnce(): void {
   resetUser1AndUser2Collections();
   resetUser1AndUser2Bookmarks();
   window.localStorage.setItem(RESET_COLLECTIONS_FLAG, "1");
+}
+
+function HomeTimelineFeed({
+  timelineItems,
+  activity,
+  commentedCardIdSet,
+  bookmarkedIds,
+  currentUser,
+  handleVote,
+  onBookmarkClick,
+  onMoreClick,
+}: {
+  timelineItems: TimelineItem[];
+  activity: Record<string, CardActivity>;
+  commentedCardIdSet: Set<string>;
+  bookmarkedIds: Set<string>;
+  currentUser: CurrentUser;
+  handleVote: (id: string, option: "A" | "B") => void;
+  onBookmarkClick: (cardId: string) => void;
+  onMoreClick: (cardId: string) => void;
+}) {
+  const [loadMoreSteps, setLoadMoreSteps] = useState(0);
+  const visibleCount = Math.min(
+    TIMELINE_INITIAL_VISIBLE + loadMoreSteps * TIMELINE_LOAD_MORE,
+    timelineItems.length
+  );
+  const visibleTimelineItems = useMemo(
+    () => timelineItems.slice(0, visibleCount),
+    [timelineItems, visibleCount]
+  );
+  const loadSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const root = loadSentinelRef.current;
+    if (!root || visibleCount >= timelineItems.length) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setLoadMoreSteps((s) => s + 1);
+        }
+      },
+      { root: null, rootMargin: "240px 0px", threshold: 0 }
+    );
+    obs.observe(root);
+    return () => obs.disconnect();
+  }, [visibleCount, timelineItems.length]);
+
+  return (
+    <>
+      {visibleTimelineItems.map((item, idx) => {
+        if (item.type === "vote") {
+          const card = item.card;
+          const cardId = resolveStableVoteCardId(card);
+          const act = activity[cardId];
+          const merged = getMergedCounts(
+            card.countA ?? 0,
+            card.countB ?? 0,
+            card.commentCount ?? 0,
+            act ?? { countA: 0, countB: 0, comments: [] }
+          );
+          return (
+            <div
+              key={`vote-${cardId}`}
+              className="[content-visibility:auto] [contain-intrinsic-size:auto_380px]"
+            >
+              <VoteCard
+                backgroundImageUrl={backgroundForCard(card)}
+                patternType={card.patternType}
+                question={card.question}
+                optionA={card.optionA}
+                optionB={card.optionB}
+                countA={merged.countA}
+                countB={merged.countB}
+                commentCount={merged.commentCount}
+                tags={card.tags}
+                readMoreText={card.readMoreText}
+                creator={card.creator}
+                currentUser={currentUser}
+                cardId={cardId}
+                bookmarked={bookmarkedIds.has(cardId)}
+                hasCommented={commentedCardIdSet.has(cardId)}
+                initialSelectedOption={act?.userSelectedOption ?? null}
+                onVote={handleVote}
+                onBookmarkClick={onBookmarkClick}
+                onMoreClick={onMoreClick}
+                visibility={card.visibility}
+                optionAImageUrl={card.optionAImageUrl}
+                optionBImageUrl={card.optionBImageUrl}
+                periodStart={card.periodStart}
+                periodEnd={card.periodEnd}
+                commentsDisabled={card.commentsDisabled === true}
+              />
+            </div>
+          );
+        }
+        if (item.type === "collection") {
+          const { id, title, gradient } = item.collection;
+          return (
+            <CollectionCard
+              key={`col-${id}-${idx}`}
+              id={id}
+              title={title}
+              gradient={gradient}
+              titleVariant="blackBlock"
+              href={`/collection/${id}`}
+              timelineBanner
+            />
+          );
+        }
+        if (item.type === "tags") {
+          return <RecommendedTags key={`tags-${idx}`} tags={homeTagList} />;
+        }
+        if (item.type === "pr") {
+          return (
+            <AdCard
+              key={`pr-${idx}`}
+              brandName={item.banner.brandName}
+              caption={item.banner.caption}
+              imageUrl={item.banner.imageUrl}
+            />
+          );
+        }
+        return null;
+      })}
+      {visibleCount < timelineItems.length ? (
+        <div ref={loadSentinelRef} className="h-1 w-full shrink-0" aria-hidden />
+      ) : null}
+    </>
+  );
 }
 
 function HomeContent() {
@@ -240,6 +373,8 @@ function HomeContent() {
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
+  const hiddenCardIdSet = useMemo(() => new Set(hiddenCardIds), [hiddenCardIds]);
+  const hiddenUserIdSet = useMemo(() => new Set(hiddenUserIds), [hiddenUserIds]);
   const [auth, setAuth] = useState(() => getAuth());
 
   useEffect(() => {
@@ -296,11 +431,11 @@ function HomeContent() {
     () =>
       allCards.filter((c) => {
         const cardId = resolveStableVoteCardId(c);
-        if (hiddenCardIds.includes(cardId)) return false;
-        if (c.createdByUserId && hiddenUserIds.includes(c.createdByUserId)) return false;
+        if (hiddenCardIdSet.has(cardId)) return false;
+        if (c.createdByUserId && hiddenUserIdSet.has(c.createdByUserId)) return false;
         return true;
       }),
-    [allCards, hiddenUserIds, hiddenCardIds]
+    [allCards, hiddenUserIdSet, hiddenCardIdSet]
   );
 
   const commentedCardIdSet = useMemo(() => {
@@ -408,7 +543,16 @@ function HomeContent() {
       default:
         return publicCards;
     }
-  }, [activeTab, bookmarkedIds, allCardsFiltered, cardsForFeed, activity, auth.isLoggedIn, auth.user?.name]);
+  }, [
+    activeTab,
+    bookmarkedIds,
+    allCardsFiltered,
+    cardsForFeed,
+    activity,
+    auth.isLoggedIn,
+    auth.user?.name,
+    publicCards,
+  ]);
 
   /** 実際にあるコレクションからランダム表示用プール */
   const timelineCollectionPool = useMemo(() => getTimelineCollectionPool(collections), [collections]);
@@ -418,7 +562,6 @@ function HomeContent() {
     () => buildTimelineItems(cardsForTab, timelineCollectionPool),
     [cardsForTab, timelineCollectionPool]
   );
-  const deferredTimelineItems = useDeferredValue(timelineItems);
 
   return (
     <div className="min-h-screen bg-[#F1F1F1]">
@@ -448,77 +591,17 @@ function HomeContent() {
             </div>
           ) : null}
 
-          {deferredTimelineItems.map((item, idx) => {
-            if (item.type === "vote") {
-              const card = item.card;
-              const cardId = resolveStableVoteCardId(card);
-              const act = activity[cardId];
-              const merged = getMergedCounts(
-                card.countA ?? 0,
-                card.countB ?? 0,
-                card.commentCount ?? 0,
-                act ?? { countA: 0, countB: 0, comments: [] }
-              );
-              return (
-                <VoteCard
-                  key={`vote-${cardId}`}
-                  backgroundImageUrl={backgroundForCard(card)}
-                  patternType={card.patternType}
-                  question={card.question}
-                  optionA={card.optionA}
-                  optionB={card.optionB}
-                  countA={merged.countA}
-                  countB={merged.countB}
-                  commentCount={merged.commentCount}
-                  tags={card.tags}
-                  readMoreText={card.readMoreText}
-                  creator={card.creator}
-                  currentUser={currentUser}
-                  cardId={cardId}
-                  bookmarked={bookmarkedIds.has(cardId)}
-                  hasCommented={commentedCardIdSet.has(cardId)}
-                  initialSelectedOption={act?.userSelectedOption ?? null}
-                  onVote={handleVote}
-                  onBookmarkClick={setModalCardId}
-                  onMoreClick={handleCardMoreClick}
-                  visibility={card.visibility}
-                  optionAImageUrl={card.optionAImageUrl}
-                  optionBImageUrl={card.optionBImageUrl}
-                  periodStart={card.periodStart}
-                  periodEnd={card.periodEnd}
-                  commentsDisabled={card.commentsDisabled === true}
-                />
-              );
-            }
-            if (item.type === "collection") {
-              const { id, title, gradient } = item.collection;
-              return (
-                <CollectionCard
-                  key={`col-${id}-${idx}`}
-                  id={id}
-                  title={title}
-                  gradient={gradient}
-                  titleVariant="blackBlock"
-                  href={`/collection/${id}`}
-                  timelineBanner
-                />
-              );
-            }
-            if (item.type === "tags") {
-              return <RecommendedTags key={`tags-${idx}`} tags={homeTagList} />;
-            }
-            if (item.type === "pr") {
-              return (
-                <AdCard
-                  key={`pr-${idx}`}
-                  brandName={item.banner.brandName}
-                  caption={item.banner.caption}
-                  imageUrl={item.banner.imageUrl}
-                />
-              );
-            }
-            return null;
-          })}
+          <HomeTimelineFeed
+            key={activeTab}
+            timelineItems={timelineItems}
+            activity={activity}
+            commentedCardIdSet={commentedCardIdSet}
+            bookmarkedIds={bookmarkedIds}
+            currentUser={currentUser}
+            handleVote={handleVote}
+            onBookmarkClick={setModalCardId}
+            onMoreClick={handleCardMoreClick}
+          />
         </div>
       </main>
 
