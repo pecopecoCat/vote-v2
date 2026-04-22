@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../lib/kv";
+import { httpResponseFromKvWriteError } from "../../lib/kvWriteErrors";
 
 const KV_KEY = "vote_created_votes";
 
@@ -9,7 +10,10 @@ export type CreatedVoteEntry = { userId: string; card: Record<string, unknown> }
 export async function GET(): Promise<NextResponse<CreatedVoteEntry[] | { error: string }>> {
   const kv = await getKV();
   if (!kv) {
-    return NextResponse.json({ error: "KV_NOT_CONFIGURED" }, { status: 503 });
+    return NextResponse.json(
+      { error: "サーバー連携が利用できません。", code: "KV_NOT_CONFIGURED" },
+      { status: 503 }
+    );
   }
   try {
     const raw = await kv.get<CreatedVoteEntry[]>(KV_KEY);
@@ -24,14 +28,20 @@ export async function GET(): Promise<NextResponse<CreatedVoteEntry[] | { error: 
 export async function POST(request: Request): Promise<NextResponse<{ ok: boolean } | { error: string }>> {
   const kv = await getKV();
   if (!kv) {
-    return NextResponse.json({ error: "KV_NOT_CONFIGURED" }, { status: 503 });
+    return NextResponse.json(
+      { error: "サーバー連携が利用できません。", code: "KV_NOT_CONFIGURED" },
+      { status: 503 }
+    );
   }
   try {
     const body = (await request.json()) as { userId?: string; card?: Record<string, unknown> };
     const userId = typeof body?.userId === "string" ? body.userId : "";
     const card = body?.card && typeof body.card === "object" ? body.card : null;
     if (!userId || !card) {
-      return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+      return NextResponse.json(
+        { error: "リクエストが不正です。", code: "BAD_REQUEST" },
+        { status: 400 }
+      );
     }
     const list = (await kv.get<CreatedVoteEntry[]>(KV_KEY)) ?? [];
     const entry: CreatedVoteEntry = {
@@ -47,6 +57,13 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/created-votes] POST error:", e);
-    return NextResponse.json({ error: "KV_ERROR" }, { status: 500 });
+    if (e instanceof SyntaxError) {
+      return NextResponse.json(
+        { error: "リクエストの形式が不正です。", code: "BAD_REQUEST" },
+        { status: 400 }
+      );
+    }
+    const r = httpResponseFromKvWriteError(e);
+    return NextResponse.json(r.body, { status: r.status });
   }
 }

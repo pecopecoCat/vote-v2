@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../lib/kv";
+import { httpResponseFromKvWriteError } from "../../lib/kvWriteErrors";
 
 const KV_KEY_PREFIX = "vote_user_owned_collections:";
 
@@ -53,7 +54,10 @@ function normalizeOne(raw: unknown): StoredCollection | null {
 export async function GET(request: Request): Promise<NextResponse<Record<string, unknown> | { error: string }>> {
   const kv = await getKV();
   if (!kv) {
-    return NextResponse.json({ error: "KV_NOT_CONFIGURED" }, { status: 503 });
+    return NextResponse.json(
+      { error: "サーバー連携が利用できません。", code: "KV_NOT_CONFIGURED" },
+      { status: 503 }
+    );
   }
   const userId = new URL(request.url).searchParams.get("userId") ?? "";
   if (!userId) {
@@ -88,6 +92,7 @@ export async function PUT(request: Request): Promise<NextResponse<{ ok: boolean 
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/user-collections] PUT error:", e);
-    return NextResponse.json({ error: "KV_ERROR" }, { status: 500 });
+    const r = httpResponseFromKvWriteError(e);
+    return NextResponse.json(r.body, { status: r.status });
   }
 }

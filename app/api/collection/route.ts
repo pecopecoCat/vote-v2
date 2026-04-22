@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../lib/kv";
+import { httpResponseFromKvWriteError } from "../../lib/kvWriteErrors";
 
 const KV_PREFIX = "vote_collection:";
 const INDEX_KEY = "vote_collections_index";
@@ -100,6 +101,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/collection] POST error:", e);
-    return NextResponse.json({ error: "KV_ERROR" }, { status: 500 });
+    const r = httpResponseFromKvWriteError(e);
+    return NextResponse.json(r.body, { status: r.status });
   }
 }

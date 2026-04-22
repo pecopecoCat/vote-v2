@@ -9,6 +9,7 @@
 import type { CollectionGradient } from "./search";
 import { getAuth, getCurrentActivityUserId } from "./auth";
 import { addBookmark, removeBookmark } from "./bookmarks";
+import { showAppToast } from "../lib/appToast";
 
 const STORAGE_KEY_PREFIX = "vote_collections_";
 const PINNED_STORAGE_KEY_PREFIX = "vote_pinned_collection_ids_";
@@ -108,13 +109,23 @@ async function pushUserOwnedCollectionsToRemoteIfLoggedIn(userId: string, allCol
   if (!auth.isLoggedIn || !auth.userId || auth.userId !== userId) return;
   const owned = allCollections.filter((c) => !c.joinedParticipation);
   try {
-    await fetch("/api/user-collections", {
+    const res = await fetch("/api/user-collections", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: auth.userId, collections: owned }),
     });
+    if (!res.ok) {
+      let message = "コレクションのサーバー同期に失敗しました。";
+      try {
+        const data = (await res.json()) as { error?: string };
+        if (typeof data?.error === "string" && data.error.length > 0) message = data.error;
+      } catch {
+        /* ignore */
+      }
+      showAppToast(message, "error");
+    }
   } catch {
-    // ignore
+    showAppToast("コレクションのサーバー同期に失敗しました。", "error");
   }
 }
 
@@ -334,23 +345,39 @@ function syncCollectionToApi(col: Collection): void {
   const ownerIcon =
     col.createdByIconUrl ||
     (auth.isLoggedIn && auth.user?.iconUrl?.length ? auth.user.iconUrl : undefined);
-  fetch("/api/collection", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      userId,
-      collection: {
-        id: col.id,
-        name: col.name,
-        color: col.color,
-        gradient: col.gradient,
-        visibility: col.visibility,
-        cardIds: col.cardIds,
-        ...(ownerName ? { createdByDisplayName: ownerName } : {}),
-        ...(ownerIcon ? { createdByIconUrl: ownerIcon } : {}),
-      },
-    }),
-  }).catch(() => {});
+  void (async () => {
+    try {
+      const res = await fetch("/api/collection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          collection: {
+            id: col.id,
+            name: col.name,
+            color: col.color,
+            gradient: col.gradient,
+            visibility: col.visibility,
+            cardIds: col.cardIds,
+            ...(ownerName ? { createdByDisplayName: ownerName } : {}),
+            ...(ownerIcon ? { createdByIconUrl: ownerIcon } : {}),
+          },
+        }),
+      });
+      if (!res.ok) {
+        let message = "コレクションの公開設定をサーバーに保存できませんでした。";
+        try {
+          const data = (await res.json()) as { error?: string };
+          if (typeof data?.error === "string" && data.error.length > 0) message = data.error;
+        } catch {
+          /* ignore */
+        }
+        showAppToast(message, "error");
+      }
+    } catch {
+      showAppToast("コレクションの公開設定をサーバーに保存できませんでした。", "error");
+    }
+  })();
 }
 
 /** コレクションをAPIから削除（非公開化・削除時） */

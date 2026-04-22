@@ -405,7 +405,16 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           if (!res.ok) {
             const id = cardWithMeta.id ?? "";
             setCreatedVotesForTimeline((prev) => prev.filter((c) => (c.id ?? "") !== id));
-            throw new Error("CREATE_VOTE_FAILED");
+            let message = "サーバーへの保存に失敗しました。";
+            try {
+              const data = (await res.json()) as { error?: string };
+              if (typeof data?.error === "string" && data.error.length > 0) {
+                message = data.error;
+              }
+            } catch {
+              /* ignore */
+            }
+            throw new Error(message);
           }
           void fetchCreatedVotes();
         } catch (e) {

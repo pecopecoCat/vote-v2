@@ -11,7 +11,7 @@ import { getAuth, getCurrentActivityUserId } from "../../data/auth";
 import { CARD_BACKGROUND_IMAGES, recommendedTagList } from "../../data/voteCards";
 import { useSharedData } from "../../context/SharedDataContext";
 import { addDraft } from "../../data/drafts";
-import { PENDING_VOTE_CREATED_TOAST_KEY } from "../../lib/appToast";
+import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "../../lib/appToast";
 
 const QUESTION_MAX = 80;
 const OPTION_MAX = 30; // A/Bの回答の文字数上限（画像の「00文字以内」はここで表示）
@@ -126,8 +126,9 @@ function CreateFormContent() {
         }
         router.push("/?tab=new");
       })
-      .catch(() => {
-        // 楽観的 UI は Context 側で巻き戻し。失敗時はモーダルを出さない
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : "サーバーへの保存に失敗しました。";
+        showAppToast(msg, "error");
       })
       .finally(() => setIsSubmitting(false));
   }, [
