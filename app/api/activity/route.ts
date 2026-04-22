@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../lib/kv";
+import { readMemberJoinOwnerEvents, type MemberJoinOwnerEvent } from "../../lib/memberJoinOwnerNotifications";
 
 const KV_GLOBAL = "vote_activity_global";
 const KV_USER_PREFIX = "vote_activity_user_";
@@ -25,6 +26,7 @@ export type GlobalCardData = {
 
 export type VoteEvent = { cardId: string; date: string; option?: "A" | "B" };
 export type BookmarkEvent = { cardId: string; date: string };
+export type { MemberJoinOwnerEvent };
 
 /** GET ?userId= → { global, userSelections, voteEvents, bookmarkEvents } */
 export async function GET(request: Request): Promise<NextResponse<Record<string, unknown> | { error: string }>> {
@@ -34,11 +36,12 @@ export async function GET(request: Request): Promise<NextResponse<Record<string,
   }
   const userId = new URL(request.url).searchParams.get("userId") ?? "";
   try {
-    const [global, userRaw, voteEvents, bookmarkEvents] = await Promise.all([
+    const [global, userRaw, voteEvents, bookmarkEvents, memberJoinEvents] = await Promise.all([
       kv.get<Record<string, GlobalCardData>>(KV_GLOBAL),
       userId ? kv.get<Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>>(KV_USER_PREFIX + userId) : null,
       kv.get<VoteEvent[]>(KV_VOTE_EVENTS),
       kv.get<BookmarkEvent[]>(KV_BOOKMARK_EVENTS),
+      userId ? readMemberJoinOwnerEvents(kv, userId) : Promise.resolve([] as MemberJoinOwnerEvent[]),
     ]);
     const globalData = global && typeof global === "object" ? global : {};
     const userSelections: Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }> = {};
@@ -60,6 +63,7 @@ export async function GET(request: Request): Promise<NextResponse<Record<string,
       userSelections,
       voteEvents: voteList,
       bookmarkEvents: bookmarkList,
+      memberJoinEvents: Array.isArray(memberJoinEvents) ? memberJoinEvents : [],
     });
   } catch (e) {
     console.error("[api/activity] GET error:", e);

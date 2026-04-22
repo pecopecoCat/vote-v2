@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../lib/kv";
+import { appendMemberJoinOwnerEvent } from "../../lib/memberJoinOwnerNotifications";
 import {
   type MemberJoinProfileRow,
   removeUserJoinProfile,
   upsertJoinProfileInKv,
 } from "../../lib/memberCollectionVotesKv";
 import type { CollectionPayload } from "../collection/[id]/route";
+
+const COLLECTION_KV_PREFIX = "vote_collection:";
 
 const KV_KEY_PREFIX = "vote_member_collections:";
 const KV_MEMBERS_INDEX_PREFIX = "vote_member_collection_members:";
@@ -91,13 +94,15 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
     // 削除時に参加者側の「参加中」を一括削除できるよう、逆引きインデックスを維持する
     const membersRaw = await kv.get<unknown>(membersKey(entry.id));
     const members = Array.isArray(membersRaw) ? membersRaw.filter((v): v is string => typeof v === "string" && v.length > 0) : [];
-    if (!members.includes(userId)) {
+    const wasNewMember = !members.includes(userId);
+    if (wasNewMember) {
       await kv.set(membersKey(entry.id), [...members, userId]);
     }
 
-    // 既に参加済みの再訪でもプロフィールを更新（参加アイコン表示用）
     const mp = body.memberProfile;
     const displayName = typeof mp?.name === "string" && mp.name.trim() ? mp.name.trim() : "";
+
+    // 既に参加済みの再訪でもプロフィールを更新（参加アイコン表示用）
     if (displayName) {
       const joinedAt = new Date().toISOString();
       const iconUrl =
@@ -106,6 +111,36 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
         ? { name: displayName, iconUrl, joinedAt }
         : { name: displayName, joinedAt };
       await upsertJoinProfileInKv(kv, entry.id, userId, row);
+    }
+
+    // 初参加のみ：コレ作成者にお知らせ（再訪の POST では送らない）
+    if (wasNewMember) {
+      try {
+        const colRaw = await kv.get<Record<string, unknown>>(COLLECTION_KV_PREFIX + entry.id);
+        const ownerId =
+          colRaw && typeof colRaw.createdByUserId === "string" && colRaw.createdByUserId.length > 0
+            ? colRaw.createdByUserId
+            : undefined;
+        const collectionName =
+          colRaw && typeof colRaw.name === "string" && colRaw.name.trim()
+            ? colRaw.name.trim()
+            : entry.name.trim() || "コレクション";
+        if (ownerId && ownerId !== userId) {
+          const actorName = displayName || "ゲスト";
+          const actorIconUrl =
+            typeof mp?.iconUrl === "string" && mp.iconUrl.length > 0 ? mp.iconUrl : undefined;
+          await appendMemberJoinOwnerEvent(kv, ownerId, {
+            at: new Date().toISOString(),
+            actorUserId: userId,
+            actorName,
+            ...(actorIconUrl ? { actorIconUrl } : {}),
+            collectionId: entry.id,
+            collectionName,
+          });
+        }
+      } catch {
+        // ignore
+      }
     }
 
     return NextResponse.json({ ok: true });

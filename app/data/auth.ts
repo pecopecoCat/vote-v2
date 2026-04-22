@@ -248,8 +248,38 @@ export function updateCurrentUserProfile(updates: Partial<LineAuthUser>): void {
   }
 }
 
-/** ログアウト（次の未ログインは別ゲストとして扱うためゲストIDを再発行） */
-export function logout(): void {
+/**
+ * 保存済みログイン状態から、active-user KV を解除する用のデモ userId を解決する。
+ * `userId` が無い旧データでは `user.name` が user1..user10 のときだけ一致させる。
+ */
+export function resolveStoredDemoUserId(state: AuthState): DemoUserId | undefined {
+  if (state.userId && DEMO_USER_IDS.includes(state.userId)) return state.userId;
+  const name = state.user?.name;
+  if (typeof name === "string" && DEMO_USER_IDS.includes(name as DemoUserId)) {
+    return name as DemoUserId;
+  }
+  return undefined;
+}
+
+/**
+ * ログアウト。先にサーバー側の「ログイン中」を外してからローカルを消す（再ログイン 409 防止）。
+ * 次の未ログインは別ゲストとして扱うためゲストIDを再発行する。
+ */
+export async function logout(): Promise<void> {
+  if (typeof window !== "undefined") {
+    const demoId = resolveStoredDemoUserId(load());
+    if (demoId) {
+      try {
+        await fetch("/api/active-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ logoutUserId: demoId }),
+        });
+      } catch {
+        // KV 未設定・オフライン時は無視
+      }
+    }
+  }
   regenerateGuestId();
   save({ isLoggedIn: false });
   clearLastLoggedInUserId();

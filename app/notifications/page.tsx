@@ -21,7 +21,7 @@ import {
 import { getBookmarkEvents } from "../data/bookmarks";
 import { voteCardsData } from "../data/voteCards";
 import { useSharedData } from "../context/SharedDataContext";
-import type { VoteEvent, BookmarkEvent } from "../context/SharedDataContext";
+import type { VoteEvent, BookmarkEvent, MemberJoinOwnerEvent } from "../context/SharedDataContext";
 import type { VoteCardData } from "../data/voteCards";
 
 const MY_COMMENT_USER_NAME = "自分";
@@ -69,6 +69,7 @@ function buildUserActivityItems(opts?: {
   activity?: Record<string, CardActivity>;
   voteEvents?: VoteEvent[];
   bookmarkEvents?: BookmarkEvent[];
+  memberJoinEvents?: MemberJoinOwnerEvent[];
 }): ActivityItem[] {
   if (typeof window === "undefined") return [];
   const auth = getAuth();
@@ -77,11 +78,27 @@ function buildUserActivityItems(opts?: {
   const activity = opts?.activity ?? getAllActivity();
   const voteEvents = opts?.voteEvents ?? getVoteEvents();
   const bookmarkEvents = opts?.bookmarkEvents ?? getBookmarkEvents();
+  const memberJoinEvents = opts?.memberJoinEvents ?? [];
   const myCreatedCardIds = new Set(created.map((c) => c.id ?? c.question));
 
   const items: ActivityItem[] = [];
 
   // 自分がしたこと（投票・コメント）は通知しない。自分の作成VOTE・自分のコメントへのアクションのみ表示
+
+  // メンバー限定コレクションに誰かが参加した（作成者向け・KV）
+  memberJoinEvents.forEach((ev) => {
+    const label = `${ev.actorName}さんが${ev.collectionName}コレクションに参加しました`;
+    items.push({
+      type: "member_joined_my_collection",
+      cardId: `member-join-${ev.collectionId}-${ev.at}-${ev.actorUserId}`,
+      label,
+      date: ev.at ? formatDate(ev.at) : "",
+      dateIso: ev.at,
+      actorName: ev.actorName,
+      actorIconUrl: ev.actorIconUrl,
+      linkHref: `/collection/${encodeURIComponent(ev.collectionId)}`,
+    });
+  });
 
   // 作成した2択に投票があった
   voteEvents.forEach((ev) => {
@@ -208,6 +225,7 @@ function buildUserActivityItems(opts?: {
       bookmark_on_mine: 6,
       period_ended: 7,
       liked_my_comment: 8,
+      member_joined_my_collection: 9,
     };
     return (order[a.type] ?? 8) - (order[b.type] ?? 8);
   });
@@ -231,6 +249,7 @@ export default function NotificationsPage() {
           activity: shared.activity,
           voteEvents: shared.voteEvents,
           bookmarkEvents: shared.bookmarkEvents,
+          memberJoinEvents: shared.memberJoinEvents,
         })
       );
     } else {
@@ -249,9 +268,23 @@ export default function NotificationsPage() {
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
+  /** アクティビティタブ表示時に KV の作成者向けイベント（コレ参加など）を取り直す（完了後は memberJoinEvents 依存の effect が再描画） */
+  useEffect(() => {
+    if (!shared.isRemote || !isLoggedIn || activeTab !== "activity") return;
+    void shared.refetchActivity();
+  }, [activeTab, isLoggedIn, shared.isRemote, shared.refetchActivity]);
+
   useEffect(() => {
     refreshActivityItems();
-  }, [activeTab, shared.isRemote, shared.createdVotesForTimeline, shared.activity, shared.voteEvents, shared.bookmarkEvents]);
+  }, [
+    activeTab,
+    shared.isRemote,
+    shared.createdVotesForTimeline,
+    shared.activity,
+    shared.voteEvents,
+    shared.bookmarkEvents,
+    shared.memberJoinEvents,
+  ]);
 
   /** 運営お知らせを画面に出したタイミングで既読化（下部ナビの赤バッジ用） */
   useEffect(() => {
@@ -276,6 +309,7 @@ export default function NotificationsPage() {
 }
 
 function getActivityLabel(item: ActivityItem): string {
+  if (item.type === "member_joined_my_collection") return item.label;
   if (item.actorName) {
     if (item.type === "comment_on_mine") return `${item.actorName}さんが、あなたのトピックにコメントしました`;
     if (item.type === "reply_to_my_comment") return `${item.actorName}さんが、あなたのコメントにコメントしました`;
@@ -328,6 +362,7 @@ function ActivityIcon({ item }: { item: ActivityItem }) {
       );
     case "comment_on_mine":
     case "reply_to_my_comment":
+    case "member_joined_my_collection":
       return (
         <span className="relative h-10 w-10 shrink-0 overflow-visible">
           <span className={`${iconClass} bg-gray-100`}>
@@ -387,7 +422,7 @@ function ActivityList({ items }: { items: ActivityItem[] }) {
             className="w-full border-b border-[#DADADA] bg-[#F1F1F1] last:border-b-0"
           >
             <Link
-              href={`/comments/${item.cardId}`}
+              href={item.linkHref ?? `/comments/${item.cardId}`}
               className="block py-4 transition-colors active:bg-black/[0.03]"
             >
               <div className={`flex gap-3 ${NOTIFICATION_CONTENT_WIDTH_CLASS}`}>

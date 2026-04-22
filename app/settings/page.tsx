@@ -10,19 +10,7 @@ export default function SettingsPage() {
   const auth = getAuth();
 
   const handleLogout = async () => {
-    try {
-      const userId = auth.userId;
-      if (userId) {
-        await fetch("/api/active-user", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ logoutUserId: userId }),
-        });
-      }
-    } catch {
-      // KV 未設定時は無視
-    }
-    logout();
+    await logout();
     router.replace("/profile");
   };
 

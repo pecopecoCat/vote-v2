@@ -32,6 +32,9 @@ import {
   hydrateUserOwnedCollectionsFromRemote,
 } from "../data/collections";
 import { hydrateBookmarksFromRemote } from "../data/bookmarks";
+import type { MemberJoinOwnerEvent } from "../lib/memberJoinOwnerNotifications";
+
+export type { MemberJoinOwnerEvent };
 
 function isCommentsDisabledOnCard(cardId: string, timeline: VoteCardData[]): boolean {
   if (!cardId.startsWith("created-")) return false;
@@ -149,6 +152,8 @@ export interface SharedDataContextValue {
   voteEvents: VoteEvent[];
   /** 作成者向け通知：誰かがブックマークしたカードのイベント一覧（API 時のみ） */
   bookmarkEvents: BookmarkEvent[];
+  /** 作成者向け：メンバー限定コレに誰かが初参加したイベント（API 時のみ） */
+  memberJoinEvents: MemberJoinOwnerEvent[];
   /** true = KV 経由で他ユーザーと共有中 */
   isRemote: boolean;
   /** 作成VOTEを追加（API 時は POST してから再取得） */
@@ -174,6 +179,8 @@ export interface SharedDataContextValue {
   removeCreatedVote: (cardId: string) => void;
   /** 初回の作成VOTE/活動取得が完了したか（HOMEの投票済みスナップショット用） */
   activityBootstrapDone: boolean;
+  /** KV 活動・作成者向けイベントを再取得（通知画面の最新化用） */
+  refetchActivity: () => Promise<boolean>;
 }
 
 const SharedDataContext = createContext<SharedDataContextValue | null>(null);
@@ -186,6 +193,7 @@ export function useSharedData(): SharedDataContextValue {
       activity: typeof window !== "undefined" ? getAllActivity() : {},
       voteEvents: [],
       bookmarkEvents: [],
+      memberJoinEvents: [],
       isRemote: false,
       addCreatedVote: async (card) => {
         if (typeof window === "undefined") return;
@@ -205,6 +213,7 @@ export function useSharedData(): SharedDataContextValue {
       recordBookmarkEvent: async () => {},
       removeCreatedVote: () => {},
       activityBootstrapDone: true,
+      refetchActivity: async () => false,
     };
   }
   return ctx;
@@ -221,6 +230,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   );
   const [voteEvents, setVoteEvents] = useState<VoteEvent[]>([]);
   const [bookmarkEvents, setBookmarkEvents] = useState<BookmarkEvent[]>([]);
+  const [memberJoinEvents, setMemberJoinEvents] = useState<MemberJoinOwnerEvent[]>([]);
   const [isRemote, setIsRemote] = useState(false);
   const [activityBootstrapDone, setActivityBootstrapDone] = useState(false);
 
@@ -252,6 +262,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         userSelections?: Record<string, unknown>;
         voteEvents?: VoteEvent[];
         bookmarkEvents?: BookmarkEvent[];
+        memberJoinEvents?: MemberJoinOwnerEvent[];
       };
       const global = data?.global && typeof data.global === "object" ? data.global : {};
       const userSelections: Record<string, unknown> =
@@ -267,6 +278,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       });
       setVoteEvents(Array.isArray(data?.voteEvents) ? data.voteEvents : []);
       setBookmarkEvents(Array.isArray(data?.bookmarkEvents) ? data.bookmarkEvents : []);
+      setMemberJoinEvents(Array.isArray(data?.memberJoinEvents) ? data.memberJoinEvents : []);
       return true;
     } catch {
       return false;
@@ -531,6 +543,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       activity,
       voteEvents,
       bookmarkEvents,
+      memberJoinEvents,
       isRemote,
       addCreatedVote,
       addVote,
@@ -539,12 +552,14 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       recordBookmarkEvent,
       removeCreatedVote,
       activityBootstrapDone,
+      refetchActivity: fetchActivity,
     }),
     [
       createdVotesForTimeline,
       activity,
       voteEvents,
       bookmarkEvents,
+      memberJoinEvents,
       isRemote,
       addCreatedVote,
       addVote,
@@ -553,6 +568,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       recordBookmarkEvent,
       removeCreatedVote,
       activityBootstrapDone,
+      fetchActivity,
     ]
   );
 

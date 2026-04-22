@@ -10,7 +10,8 @@ export type ActivityType =
   | "reply_to_my_comment"  // 〇〇があなたのコメントにコメントした
   | "bookmark_on_mine"     // 作成した2択がブックマークされた
   | "period_ended"         // 投票結果が決定しました
-  | "liked_my_comment";    // あなたのコメントにいいねされた
+  | "liked_my_comment"    // あなたのコメントにいいねされた
+  | "member_joined_my_collection"; // 〇〇があなたのメンバー限定コレに参加した
 
 export interface ActivityItem {
   type: ActivityType;
@@ -31,6 +32,8 @@ export interface ActivityItem {
   commentPreview?: string;
   /** アクションした人が選んだA or B（アイコン左上バッジ表示用） */
   actorVote?: "A" | "B";
+  /** 指定時はこのURLへ遷移（コレクション参加通知など。未指定時は /comments/[cardId]） */
+  linkHref?: string;
 }
 
 /** アクティビティ種別の表示ラベル（画像参考） */
@@ -44,6 +47,7 @@ export const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {
   period_ended: "投票結果が決定しました！",
   liked_my_comment: "あなたのコメントにいいねされました",
   reply_to_my_comment: "あなたのコメントにコメントしました", // 実際は actorName で「〇〇さんが、あなたのコメントにコメントしました」
+  member_joined_my_collection: "メンバー限定コレクションに参加されました",
 };
 
 /** デモ用：アクティビティ一覧（SNSログイン時表示用） */
