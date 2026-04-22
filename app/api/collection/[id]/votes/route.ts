@@ -4,6 +4,7 @@ import {
   loadMemberCollectionOrNull,
   memberGlobalKey,
   memberUserKey,
+  readJoinProfilesMap,
   readMemberVotesMaps,
   readParticipantsMerged,
   upsertParticipantInKv,
@@ -90,6 +91,7 @@ export async function POST(
     const partRow: MemberPartRow = { name, lastVotedAt, ...(iconUrl ? { iconUrl } : {}) };
     await upsertParticipantInKv(kv, collectionId, userId, partRow);
     const participantsOut = await readParticipantsMerged(kv, collectionId);
+    const joinProfilesOut = await readJoinProfilesMap(kv, collectionId);
 
     const userSelections = (await kv.get<typeof userData>(uK)) ?? {};
 
@@ -97,6 +99,7 @@ export async function POST(
       global: nextGlobal,
       userSelections,
       participants: participantsOut,
+      joinProfiles: joinProfilesOut,
     });
   } catch (e) {
     console.error("[api/collection/votes] POST error:", e);

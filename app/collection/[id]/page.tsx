@@ -32,7 +32,9 @@ import {
   COLLECTION_SCOPED_VOTES_UPDATED_EVENT,
   fetchMemberCollectionVotesRemote,
   getAllCollectionScopedActivity,
+  collectionMemberScopedHasAnyVote,
   getCollectionScopedParticipants,
+  getMemberJoinProfiles,
   hydrateCollectionScopedFromSnapshot,
   parseMemberCollectionVotesPayload,
   type CollectionScopedParticipant,
@@ -123,6 +125,33 @@ function buildMemberParticipantsForDisplay(
     (b.lastVotedAt || "").localeCompare(a.lastVotedAt || "")
   );
   return [creatorRow, ...sortedOthers];
+}
+
+/** コレ内に1票でもあれば、投票前に参加した人もアイコン一覧に載せる（作成者は base に含まれる） */
+function appendJoinOnlyParticipants(
+  base: CollectionScopedParticipant[],
+  joinProfiles: Record<string, { name: string; iconUrl?: string; joinedAt: string }>,
+  hasAnyVote: boolean,
+  creatorUserId?: string
+): CollectionScopedParticipant[] {
+  if (!hasAnyVote) return base;
+  const entries = Object.entries(joinProfiles);
+  if (entries.length === 0) return base;
+  const seen = new Set(base.map((p) => p.userId));
+  const extra: CollectionScopedParticipant[] = [];
+  for (const [uid, prof] of entries) {
+    if (seen.has(uid)) continue;
+    if (creatorUserId && uid === creatorUserId) continue;
+    seen.add(uid);
+    extra.push({
+      userId: uid,
+      name: prof.name,
+      iconUrl: prof.iconUrl,
+      lastVotedAt: prof.joinedAt,
+    });
+  }
+  extra.sort((a, b) => (b.lastVotedAt || "").localeCompare(a.lastVotedAt || ""));
+  return [...base, ...extra];
 }
 
 function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
@@ -405,15 +434,38 @@ export default function CollectionPage() {
       .filter((x): x is { card: VoteCardData; cardId: string } => x != null);
   }, [collection, createdVotesForTimeline]);
 
+  const hasAnyMemberScopedVote = useMemo(() => {
+    if (!collection?.id || collection.visibility !== "member") return false;
+    return collectionMemberScopedHasAnyVote(collection.id);
+  }, [collection?.id, collection?.visibility, scopedVotesVersion]);
+
+  const memberJoinProfiles = useMemo(() => {
+    if (!collection?.id || collection.visibility !== "member") return {};
+    return getMemberJoinProfiles(collection.id);
+  }, [collection?.id, collection?.visibility, scopedVotesVersion]);
+
   const memberParticipantsForDisplay = useMemo(() => {
     if (!collection || collection.visibility !== "member") return [];
-    return buildMemberParticipantsForDisplay(
+    const base = buildMemberParticipantsForDisplay(
       memberParticipants,
       collection,
       cardsInCollection,
       viewerAsOwnerProfile
     );
-  }, [collection, memberParticipants, cardsInCollection, viewerAsOwnerProfile]);
+    return appendJoinOnlyParticipants(
+      base,
+      memberJoinProfiles,
+      hasAnyMemberScopedVote,
+      collection.createdByUserId
+    );
+  }, [
+    collection,
+    memberParticipants,
+    cardsInCollection,
+    viewerAsOwnerProfile,
+    memberJoinProfiles,
+    hasAnyMemberScopedVote,
+  ]);
 
   /** メンバー限定を開いただけでもマイページのコレクション一覧に載せる（投票前でも可） */
   useEffect(() => {

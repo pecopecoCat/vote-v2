@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getKV } from "../../../lib/kv";
 import {
   memberGlobalKey,
+  memberJoinProfileKey,
   memberPartsHashKey,
   memberPartsKey,
   memberUserKey,
@@ -31,6 +32,8 @@ export type MemberVotesBundle = {
   global: Record<string, { countA: number; countB: number }>;
   userSelections: Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>;
   participants: Record<string, { name: string; iconUrl?: string; lastVotedAt: string }>;
+  /** 参加APIで保存したプロフィール（コレ内に1票あるときだけUIで一覧に混ぜる） */
+  joinProfiles: Record<string, { name: string; iconUrl?: string; joinedAt: string }>;
 };
 
 export async function GET(
@@ -116,6 +119,7 @@ export async function DELETE(
         kv.del(memberGlobalKey(id)),
         kv.del(memberPartsKey(id)),
         kv.del(memberPartsHashKey(id)),
+        kv.del(memberJoinProfileKey(id)),
       ]);
     }
     return NextResponse.json({ ok: true });

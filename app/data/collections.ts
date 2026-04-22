@@ -188,33 +188,45 @@ export function getCollections(): Collection[] {
 }
 
 /**
- * メンバー限定に投票したとき、マイページ用リストに追加（既に自分のコレクションにあれば何もしない）。
- * `createdByUserId` が現在ユーザーと一致する場合はオーナーなので追加しない。
+ * メンバー限定を開いた／投票したとき、マイページ用リストに追加（未登録時のみローカルに push）。
+ * ログイン時は参加インデックス・表示用プロフィールの同期のため、既に参加済みでも KV へ POST する。
+ * `createdByUserId` が現在ユーザーと一致する場合はオーナーなので何もしない。
  */
 export function addParticipatedMemberCollectionIfNeeded(col: Collection, opts?: { skipRemote?: boolean }): void {
   if (col.visibility !== "member") return;
   const uid = getCurrentActivityUserId();
   if (col.createdByUserId && col.createdByUserId === uid) return;
   const cols = load(uid);
-  if (cols.some((c) => c.id === col.id)) return;
-  cols.push({
-    id: col.id,
-    name: col.name,
-    color: col.color,
-    gradient: col.gradient,
-    visibility: "member",
-    cardIds: Array.isArray(col.cardIds) ? [...col.cardIds] : [],
-    joinedParticipation: true,
-    createdByUserId: col.createdByUserId,
-    createdByDisplayName: col.createdByDisplayName,
-    createdByIconUrl: col.createdByIconUrl,
-  });
-  save(uid, cols);
+  if (!cols.some((c) => c.id === col.id)) {
+    cols.push({
+      id: col.id,
+      name: col.name,
+      color: col.color,
+      gradient: col.gradient,
+      visibility: "member",
+      cardIds: Array.isArray(col.cardIds) ? [...col.cardIds] : [],
+      joinedParticipation: true,
+      createdByUserId: col.createdByUserId,
+      createdByDisplayName: col.createdByDisplayName,
+      createdByIconUrl: col.createdByIconUrl,
+    });
+    save(uid, cols);
+  }
 
   // ブラウザ/端末が変わっても維持できるよう、ログインユーザーはKVにも保存（KV未設定なら無視）
   if (opts?.skipRemote) return;
   const auth = getAuth();
   if (!auth.isLoggedIn || !auth.userId) return;
+  const memberProfile =
+    typeof auth.user?.name === "string" && auth.user.name.trim()
+      ? {
+          name: auth.user.name.trim(),
+          ...(typeof auth.user.iconUrl === "string" && auth.user.iconUrl.length > 0
+            ? { iconUrl: auth.user.iconUrl }
+            : {}),
+        }
+      : undefined;
+
   fetch(`/api/member-collections`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -231,6 +243,7 @@ export function addParticipatedMemberCollectionIfNeeded(col: Collection, opts?: 
         createdByDisplayName: col.createdByDisplayName,
         createdByIconUrl: col.createdByIconUrl,
       },
+      ...(memberProfile ? { memberProfile } : {}),
     }),
   }).catch(() => {});
 }

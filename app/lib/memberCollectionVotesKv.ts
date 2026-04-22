@@ -7,12 +7,16 @@ export const MEMBER_USER_PREFIX = "vote_coll_member_user:";
 export const MEMBER_PARTS_PREFIX = "vote_coll_member_parts:";
 /** 新: Redis Hash。field = userId, value = JSON（HSET はフィールド単位で原子的） */
 export const MEMBER_PARTS_HASH_PREFIX = "vote_coll_member_parts_h:";
+/** 参加時に保存する表示用プロフィール（投票前でも、コレ内に1票入ったら一覧に出す） */
+export const MEMBER_JOIN_PROFILE_PREFIX = "vote_coll_member_join_prof:";
 
 export type MemberGlobalMap = Record<string, { countA: number; countB: number }>;
 export type MemberUserRow = { userSelectedOption?: "A" | "B"; votedAt?: string };
 export type MemberUserMap = Record<string, MemberUserRow>;
 export type MemberPartRow = { name: string; iconUrl?: string; lastVotedAt: string };
 export type MemberPartsMap = Record<string, MemberPartRow>;
+
+export type MemberJoinProfileRow = { name: string; iconUrl?: string; joinedAt: string };
 
 type CollectionPayloadLite = { id: string; visibility?: string };
 
@@ -30,6 +34,65 @@ export function memberPartsKey(collectionId: string): string {
 
 export function memberPartsHashKey(collectionId: string): string {
   return MEMBER_PARTS_HASH_PREFIX + collectionId;
+}
+
+export function memberJoinProfileKey(collectionId: string): string {
+  return MEMBER_JOIN_PROFILE_PREFIX + collectionId;
+}
+
+export async function readJoinProfilesMap(
+  kv: KVClient,
+  collectionId: string
+): Promise<Record<string, MemberJoinProfileRow>> {
+  const raw = await kv.get<unknown>(memberJoinProfileKey(collectionId));
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, MemberJoinProfileRow> = {};
+  for (const [uid, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!v || typeof v !== "object") continue;
+    const o = v as Record<string, unknown>;
+    const name = typeof o.name === "string" && o.name.trim() ? o.name.trim() : "ゲスト";
+    const iconUrl = typeof o.iconUrl === "string" && o.iconUrl.length > 0 ? o.iconUrl : undefined;
+    const joinedAt =
+      typeof o.joinedAt === "string" && o.joinedAt.length > 0 ? o.joinedAt : new Date(0).toISOString();
+    out[uid] = iconUrl ? { name, iconUrl, joinedAt } : { name, joinedAt };
+  }
+  return out;
+}
+
+export async function upsertJoinProfileInKv(
+  kv: KVClient,
+  collectionId: string,
+  userId: string,
+  row: MemberJoinProfileRow
+): Promise<void> {
+  const key = memberJoinProfileKey(collectionId);
+  const cur = (await kv.get<Record<string, MemberJoinProfileRow>>(key)) ?? {};
+  const prev = cur[userId];
+  const joinedAt =
+    prev?.joinedAt &&
+    typeof prev.joinedAt === "string" &&
+    prev.joinedAt > "1970-01-02T00:00:00.000Z"
+      ? prev.joinedAt
+      : row.joinedAt;
+  const merged: MemberJoinProfileRow = {
+    name: row.name,
+    iconUrl: row.iconUrl ?? prev?.iconUrl,
+    joinedAt,
+  };
+  await kv.set(key, { ...cur, [userId]: merged });
+}
+
+export async function removeUserJoinProfile(kv: KVClient, collectionId: string, userId: string): Promise<void> {
+  const key = memberJoinProfileKey(collectionId);
+  const cur = await kv.get<Record<string, MemberJoinProfileRow>>(key);
+  if (!cur || typeof cur !== "object") return;
+  if (!(userId in cur)) return;
+  const { [userId]: _removed, ...rest } = cur;
+  if (Object.keys(rest).length === 0) {
+    await kv.del(key);
+    return;
+  }
+  await kv.set(key, rest);
 }
 
 export async function loadMemberCollectionOrNull(
@@ -131,13 +194,19 @@ export async function readMemberVotesMaps(
   kv: KVClient,
   collectionId: string,
   userId: string
-): Promise<{ global: MemberGlobalMap; userSelections: MemberUserMap; participants: MemberPartsMap }> {
-  const [gRaw, uRaw, participants] = await Promise.all([
+): Promise<{
+  global: MemberGlobalMap;
+  userSelections: MemberUserMap;
+  participants: MemberPartsMap;
+  joinProfiles: Record<string, MemberJoinProfileRow>;
+}> {
+  const [gRaw, uRaw, participants, joinProfiles] = await Promise.all([
     kv.get<MemberGlobalMap>(memberGlobalKey(collectionId)),
     userId ? kv.get<MemberUserMap>(memberUserKey(collectionId, userId)) : Promise.resolve(null),
     readParticipantsMerged(kv, collectionId),
+    readJoinProfilesMap(kv, collectionId),
   ]);
   const global = gRaw && typeof gRaw === "object" ? gRaw : {};
   const userSelections: MemberUserMap = uRaw && typeof uRaw === "object" ? uRaw : {};
-  return { global, userSelections, participants };
+  return { global, userSelections, participants, joinProfiles };
 }

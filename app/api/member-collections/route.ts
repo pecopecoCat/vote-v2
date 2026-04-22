@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../lib/kv";
+import {
+  type MemberJoinProfileRow,
+  removeUserJoinProfile,
+  upsertJoinProfileInKv,
+} from "../../lib/memberCollectionVotesKv";
 import type { CollectionPayload } from "../collection/[id]/route";
 
 const KV_KEY_PREFIX = "vote_member_collections:";
@@ -65,7 +70,11 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
   const kv = await getKV();
   if (!kv) return NextResponse.json({ error: "KV_NOT_CONFIGURED" }, { status: 503 });
   try {
-    const body = (await request.json()) as { userId?: string; collection?: unknown };
+    const body = (await request.json()) as {
+      userId?: string;
+      collection?: unknown;
+      memberProfile?: { name?: string; iconUrl?: string };
+    };
     const userId = typeof body?.userId === "string" ? body.userId : "";
     if (!userId) return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
     const entry = normalizeEntry(body.collection);
@@ -74,16 +83,29 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
     const existing = await kv.get<unknown>(key(userId));
     const list = Array.isArray(existing) ? existing : [];
     const normalized = list.map(normalizeEntry).filter((v): v is MemberCollectionEntry => v != null);
-    if (normalized.some((c) => c.id === entry.id)) {
-      return NextResponse.json({ ok: true });
+    const alreadyInMyList = normalized.some((c) => c.id === entry.id);
+    if (!alreadyInMyList) {
+      await kv.set(key(userId), [...normalized, entry]);
     }
-    await kv.set(key(userId), [...normalized, entry]);
 
     // 削除時に参加者側の「参加中」を一括削除できるよう、逆引きインデックスを維持する
     const membersRaw = await kv.get<unknown>(membersKey(entry.id));
     const members = Array.isArray(membersRaw) ? membersRaw.filter((v): v is string => typeof v === "string" && v.length > 0) : [];
     if (!members.includes(userId)) {
       await kv.set(membersKey(entry.id), [...members, userId]);
+    }
+
+    // 既に参加済みの再訪でもプロフィールを更新（参加アイコン表示用）
+    const mp = body.memberProfile;
+    const displayName = typeof mp?.name === "string" && mp.name.trim() ? mp.name.trim() : "";
+    if (displayName) {
+      const joinedAt = new Date().toISOString();
+      const iconUrl =
+        typeof mp?.iconUrl === "string" && mp.iconUrl.length > 0 ? mp.iconUrl : undefined;
+      const row: MemberJoinProfileRow = iconUrl
+        ? { name: displayName, iconUrl, joinedAt }
+        : { name: displayName, joinedAt };
+      await upsertJoinProfileInKv(kv, entry.id, userId, row);
     }
 
     return NextResponse.json({ ok: true });
@@ -119,6 +141,8 @@ export async function DELETE(
       : [];
     const nextMembers = members.filter((uid) => uid !== userId);
     await kv.set(membersKey(collectionId), nextMembers);
+
+    await removeUserJoinProfile(kv, collectionId, userId);
 
     return NextResponse.json({ ok: true });
   } catch (e) {

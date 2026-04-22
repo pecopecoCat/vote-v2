@@ -16,6 +16,7 @@ const COLLECTION_READ_API = (collectionId: string) =>
 const GLOBAL_KEY_PREFIX = "vote_collection_scoped_global_";
 const USER_KEY_PREFIX = "vote_collection_scoped_user_";
 const PARTICIPANTS_KEY_PREFIX = "vote_collection_scoped_participants_";
+const JOIN_PROFILES_KEY_PREFIX = "vote_collection_scoped_join_prof_";
 
 /** メンバー限定コレクション内で投票したユーザー（同一ブラウザで記録された分） */
 export interface CollectionScopedParticipant {
@@ -34,11 +35,15 @@ interface GlobalRow {
 
 export type UserSelectionRow = { userSelectedOption?: "A" | "B"; votedAt?: string };
 
+/** 参加APIでKVに保存したプロフィール（コレ内に1票入るまで一覧には混ぜない） */
+export type MemberCollectionJoinProfile = { name: string; iconUrl?: string; joinedAt: string };
+
 /** API GET/POST のレスポンスをそのまま保存できる形 */
 export type MemberCollectionVotesSnapshot = {
   global: Record<string, GlobalRow>;
   userSelections: Record<string, UserSelectionRow>;
   participants: Record<string, Omit<CollectionScopedParticipant, "userId">>;
+  joinProfiles: Record<string, MemberCollectionJoinProfile>;
 };
 
 function globalKey(collectionId: string): string {
@@ -125,6 +130,42 @@ function participantsKey(collectionId: string): string {
   return PARTICIPANTS_KEY_PREFIX + collectionId;
 }
 
+function joinProfilesKey(collectionId: string): string {
+  return JOIN_PROFILES_KEY_PREFIX + collectionId;
+}
+
+function loadJoinProfilesMap(collectionId: string): Record<string, MemberCollectionJoinProfile> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(joinProfilesKey(collectionId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof parsed !== "object" || parsed === null) return {};
+    const out: Record<string, MemberCollectionJoinProfile> = {};
+    for (const [uid, v] of Object.entries(parsed)) {
+      if (!v || typeof v !== "object") continue;
+      const o = v as Record<string, unknown>;
+      const name = typeof o.name === "string" && o.name.trim() ? o.name.trim() : "ゲスト";
+      const iconUrl = typeof o.iconUrl === "string" && o.iconUrl.length > 0 ? o.iconUrl : undefined;
+      const joinedAt =
+        typeof o.joinedAt === "string" && o.joinedAt.length > 0 ? o.joinedAt : new Date(0).toISOString();
+      out[uid] = iconUrl ? { name, iconUrl, joinedAt } : { name, joinedAt };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function saveJoinProfilesMap(collectionId: string, data: Record<string, MemberCollectionJoinProfile>): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(joinProfilesKey(collectionId), JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
 function loadParticipantsMap(collectionId: string): Record<string, Omit<CollectionScopedParticipant, "userId">> {
   if (typeof window === "undefined") return {};
   try {
@@ -203,7 +244,20 @@ function normalizeSnapshot(raw: unknown): MemberCollectionVotesSnapshot | null {
       participants[uid] = { name, iconUrl, lastVotedAt };
     }
   }
-  return { global, userSelections, participants };
+  const joinProfiles: Record<string, MemberCollectionJoinProfile> = {};
+  const joinIn = o.joinProfiles;
+  if (joinIn && typeof joinIn === "object") {
+    for (const [uid, v] of Object.entries(joinIn as Record<string, unknown>)) {
+      if (!v || typeof v !== "object") continue;
+      const p = v as Record<string, unknown>;
+      const name = typeof p.name === "string" && p.name.trim() ? p.name.trim() : "ゲスト";
+      const iconUrl = typeof p.iconUrl === "string" && p.iconUrl.length > 0 ? p.iconUrl : undefined;
+      const joinedAt =
+        typeof p.joinedAt === "string" && p.joinedAt.length > 0 ? p.joinedAt : new Date(0).toISOString();
+      joinProfiles[uid] = iconUrl ? { name, iconUrl, joinedAt } : { name, joinedAt };
+    }
+  }
+  return { global, userSelections, participants, joinProfiles };
 }
 
 type ParticipantRow = Omit<CollectionScopedParticipant, "userId">;
@@ -227,6 +281,31 @@ function mergeParticipantsMaps(
     const L = local[uid];
     const S = server[uid];
     if (L && S) out[uid] = mergeParticipantRows(L, S);
+    else if (S) out[uid] = S;
+    else if (L) out[uid] = L;
+  }
+  return out;
+}
+
+function mergeJoinProfileRows(a: MemberCollectionJoinProfile, b: MemberCollectionJoinProfile): MemberCollectionJoinProfile {
+  const aj = a.joinedAt ?? "";
+  const bj = b.joinedAt ?? "";
+  if (bj >= aj) {
+    return { name: b.name, iconUrl: b.iconUrl ?? a.iconUrl, joinedAt: b.joinedAt };
+  }
+  return { name: a.name, iconUrl: a.iconUrl ?? b.iconUrl, joinedAt: a.joinedAt };
+}
+
+function mergeJoinProfileMaps(
+  local: Record<string, MemberCollectionJoinProfile>,
+  server: Record<string, MemberCollectionJoinProfile>
+): Record<string, MemberCollectionJoinProfile> {
+  const ids = new Set([...Object.keys(local), ...Object.keys(server)]);
+  const out: Record<string, MemberCollectionJoinProfile> = {};
+  for (const uid of ids) {
+    const L = local[uid];
+    const S = server[uid];
+    if (L && S) out[uid] = mergeJoinProfileRows(L, S);
     else if (S) out[uid] = S;
     else if (L) out[uid] = L;
   }
@@ -299,6 +378,8 @@ export function hydrateCollectionScopedFromSnapshot(collectionId: string, snap: 
   saveScopedUserSelections(collectionId, mergedUser);
   const mergedParticipants = mergeParticipantsMaps(loadParticipantsMap(collectionId), snap.participants);
   saveParticipantsMap(collectionId, mergedParticipants);
+  const mergedJoin = mergeJoinProfileMaps(loadJoinProfilesMap(collectionId), snap.joinProfiles ?? {});
+  saveJoinProfilesMap(collectionId, mergedJoin);
   notifyCollectionScopedUpdated(collectionId);
 }
 
@@ -397,6 +478,20 @@ export function getCollectionScopedParticipants(collectionId: string): Collectio
   }));
   list.sort((a, b) => (b.lastVotedAt || "").localeCompare(a.lastVotedAt || ""));
   return list;
+}
+
+/** メンバー限定の「参加した人」の表示用プロフィール（KV 同期済みのローカルコピー） */
+export function getMemberJoinProfiles(collectionId: string): Record<string, MemberCollectionJoinProfile> {
+  return loadJoinProfilesMap(collectionId);
+}
+
+/** コレクション内スコープの集計に、どれか1カードでも票があれば true */
+export function collectionMemberScopedHasAnyVote(collectionId: string): boolean {
+  const g = loadScopedGlobal(collectionId);
+  for (const row of Object.values(g)) {
+    if ((row.countA ?? 0) + (row.countB ?? 0) > 0) return true;
+  }
+  return false;
 }
 
 /** コレクション内の票数＋現在ユーザーの選択（コメントは含めない。親でグローバルと合成する） */
