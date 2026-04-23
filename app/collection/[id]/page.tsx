@@ -781,14 +781,7 @@ export default function CollectionPage() {
           </div>
         )}
         {collection.visibility === "member" && (
-          <>
-            <p
-              className={`text-[11px] leading-snug text-gray-500 ${memberParticipantsForDisplay.length > 0 ? "mt-1.5" : "mt-1"}`}
-            >
-              リンクを知る方のみ閲覧・投票可。得票はこのコレクション内の票のみ集計です。
-            </p>
-            <div className="-mx-[5.333vw] mt-2 h-px bg-gray-300" aria-hidden />
-          </>
+          <div className="-mx-[5.333vw] mt-2 h-px bg-gray-300" aria-hidden />
         )}
 
         {/* 新着順・投票済み（検索のタグ一覧と同じコンポーネントで並び替え可能） */}
