@@ -11,6 +11,9 @@ import MemberCollectionShareSheet from "../../components/MemberCollectionShareSh
 import BottomNav from "../../components/BottomNav";
 import AppHeader from "../../components/AppHeader";
 import Checkbox from "../../components/Checkbox";
+import NewestOldestSortDropdown, {
+  type NewestOldestSortOrder,
+} from "../../components/NewestOldestSortDropdown";
 import {
   addParticipatedMemberCollectionIfNeeded,
   getCollectionById,
@@ -51,7 +54,8 @@ import { getCreatedVotesForTimeline } from "../../data/createdVotes";
 import { isVotingAllowedNow, resolveCardForVotePeriod } from "../../data/votePeriod";
 import type { CurrentUser } from "../../components/VoteCard";
 import type { CollectionGradient } from "../../data/search";
-import { normalizeCardIdKey, resolveAvatarSrc } from "../../lib/normalize";
+import { getAvatarProxySrc } from "../../lib/avatarProxy";
+import { isRemoteHttpUrl, normalizeCardIdKey, resolveAvatarSrc } from "../../lib/normalize";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   public: "公開",
@@ -192,6 +196,7 @@ export default function CollectionPage() {
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [cardSortOrder, setCardSortOrder] = useState<NewestOldestSortOrder>("newest");
   const [scopedVotesVersion, setScopedVotesVersion] = useState(0);
   const [auth, setAuth] = useState(() => getAuth());
   /** コレクションAPIの userId クエリ用（ログイン切替で再取得） */
@@ -215,6 +220,7 @@ export default function CollectionPage() {
     setCollections(getCollections());
     setPinnedIds(getPinnedCollectionIds());
     setShareSheetOpen(false);
+    setCardSortOrder("newest");
   }, [id]);
   useEffect(() => {
     const handler = () => {
@@ -456,6 +462,17 @@ export default function CollectionPage() {
       .filter((x): x is { card: VoteCardData; cardId: string } => x != null);
   }, [collection, createdVotesForTimeline]);
 
+  const sortedCardsInCollection = useMemo(() => {
+    const list = [...cardsInCollection];
+    list.sort((a, b) => {
+      const ta = a.card.createdAt ?? "0";
+      const tb = b.card.createdAt ?? "0";
+      if (cardSortOrder === "newest") return tb.localeCompare(ta);
+      return ta.localeCompare(tb);
+    });
+    return list;
+  }, [cardsInCollection, cardSortOrder]);
+
   /** コレ内カードだけ見る（全 activity を走査しない） */
   const commentedCardIdSet = useMemo(() => {
     const set = new Set<string>();
@@ -508,12 +525,12 @@ export default function CollectionPage() {
   ]);
 
   const cardsToShow = useMemo(() => {
-    if (showVoted) return cardsInCollection;
+    if (showVoted) return sortedCardsInCollection;
     if (isMemberCollection) {
-      return cardsInCollection.filter(({ cardId }) => !scopedActivityMap[cardId]?.userSelectedOption);
+      return sortedCardsInCollection.filter(({ cardId }) => !scopedActivityMap[cardId]?.userSelectedOption);
     }
-    return cardsInCollection.filter(({ cardId }) => !activity[cardId]?.userSelectedOption);
-  }, [cardsInCollection, showVoted, activity, isMemberCollection, scopedActivityMap]);
+    return sortedCardsInCollection.filter(({ cardId }) => !activity[cardId]?.userSelectedOption);
+  }, [sortedCardsInCollection, showVoted, activity, isMemberCollection, scopedActivityMap]);
 
   const handleCollectionVote = useCallback(
     (cid: string, option: "A" | "B") => {
@@ -647,24 +664,43 @@ export default function CollectionPage() {
             <div className="-mx-[5.333vw] h-px shrink-0 bg-gray-300" aria-hidden />
           </div>
         )}
+        {/* メンバー参加者アイコン＋名（メンバー限定のみ）。Safari では overflow 内の img が描画されない事例があるため縦スクロールは付けない */}
         {collection.visibility === "member" && memberParticipantsForDisplay.length > 0 && (
-          <div className="mt-2 max-h-52 overflow-y-auto overscroll-contain pr-0.5">
+          <div className="mt-2 pr-0.5">
             <ul className="flex flex-wrap gap-x-2.5 gap-y-1.5">
-              {memberParticipantsForDisplay.map((p) => (
+              {memberParticipantsForDisplay.map((p) => {
+                const rawAvatar = resolveAvatarSrc(p.iconUrl);
+                const proxied = getAvatarProxySrc(rawAvatar);
+                const avatarSrc = proxied ?? rawAvatar;
+                const useNoReferrer = proxied == null && isRemoteHttpUrl(rawAvatar);
+                return (
                 <li key={p.userId} className="flex max-w-[10rem] min-w-0 items-center gap-1.5">
-                  <img
-                    src={resolveAvatarSrc(p.iconUrl)}
-                    alt=""
-                    className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]"
-                    width={24}
-                    height={24}
-                    loading="lazy"
-                    decoding="async"
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = "/default-avatar.png";
-                    }}
-                  />
+                  <span className="relative inline-block h-6 w-6 shrink-0 rounded-full bg-gray-200 align-middle ring-1 ring-[rgba(0,0,0,0.06)] [transform:translateZ(0)]">
+                    <img
+                      src={avatarSrc}
+                      alt=""
+                      className="block h-6 w-6 rounded-full object-cover object-center"
+                      width={24}
+                      height={24}
+                      loading="eager"
+                      fetchPriority="high"
+                      referrerPolicy={useNoReferrer ? "no-referrer" : undefined}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        if (proxied != null && e.currentTarget.src.includes("/api/avatar")) {
+                          e.currentTarget.src = rawAvatar;
+                          if (isRemoteHttpUrl(rawAvatar)) {
+                            e.currentTarget.referrerPolicy = "no-referrer";
+                          } else {
+                            e.currentTarget.removeAttribute("referrerpolicy");
+                          }
+                          return;
+                        }
+                        e.currentTarget.src = "/default-avatar.png";
+                        e.currentTarget.removeAttribute("referrerpolicy");
+                      }}
+                    />
+                  </span>
                   <span className="min-w-0 truncate text-[11px] leading-tight text-gray-600">{p.name}</span>
                   {collection.createdByUserId === p.userId && (
                     <span className="shrink-0 rounded bg-gray-200 px-1 py-px text-[9px] font-medium text-gray-600">
@@ -672,7 +708,8 @@ export default function CollectionPage() {
                     </span>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </div>
         )}
@@ -687,23 +724,11 @@ export default function CollectionPage() {
           </>
         )}
 
-        {/* 新着順・投票済みを表示（並び替え UI と同じピル見た目） */}
-        <div className="mt-3 flex items-center justify-between">
-          <button
-            type="button"
-            className="flex min-h-[36px] min-w-[7.75rem] items-center justify-between gap-2 rounded-full border border-[#DADADA] bg-white py-1.5 pl-3.5 pr-1.5 text-left text-[12px] font-normal leading-none text-[#787878] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
-          >
-            <span className="min-w-0 flex-1 text-left tracking-tight">新着順</span>
-            <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[var(--color-brand-base)]">
-              <img
-                src="/icons/icon_b_arrow.svg"
-                alt=""
-                className="h-2.5 w-2.5 shrink-0"
-                width={10}
-                height={8}
-              />
-            </span>
-          </button>
+        {/* 新着順・投票済み（検索のタグ一覧と同じコンポーネントで並び替え可能） */}
+        <div className="relative z-10 mt-3 flex items-center justify-between gap-2 border-b border-gray-200 pb-3">
+          <div className="relative z-30 min-w-0 shrink-0">
+            <NewestOldestSortDropdown value={cardSortOrder} onChange={setCardSortOrder} />
+          </div>
           <Checkbox
             checked={showVoted}
             onChange={handleShowVotedChange}

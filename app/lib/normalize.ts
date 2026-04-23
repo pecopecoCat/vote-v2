@@ -18,6 +18,13 @@ export function resolveAvatarSrc(iconUrl: unknown): string {
   const v = iconUrl.trim();
   if (!v) return "/default-avatar.png";
   if (v === "undefined" || v === "null") return "/default-avatar.png";
+  // Safari 等で //host/... が相対パス扱いになり読み込めないことがある
+  if (v.startsWith("//")) return `https:${v}`;
   return v;
+}
+
+/** Google / X 等の CDN が Referrer 付き GET を拒否する場合がある（Safari で顕著になりやすい） */
+export function isRemoteHttpUrl(src: string): boolean {
+  return /^https?:\/\//i.test(src);
 }
 

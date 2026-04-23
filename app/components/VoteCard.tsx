@@ -8,6 +8,8 @@ import { showAppToast } from "../lib/appToast";
 import VoteCardShareSheet from "./VoteCardShareSheet";
 import VoteBeforeCommentModal from "./VoteBeforeCommentModal";
 import { getVotePeriodStatusText, isVotingAllowedNow } from "../data/votePeriod";
+import { getAvatarProxySrc } from "../lib/avatarProxy";
+import { isRemoteHttpUrl, resolveAvatarSrc } from "../lib/normalize";
 
 export type VoteCardPattern =
   | "geometric-stripes"
@@ -541,7 +543,11 @@ const DEFAULT_AVATAR_URL = "/default-avatar.png";
 
 function UserAvatar({ user }: { user?: CurrentUser | null }) {
   const isGuest = !user || user.type === "guest";
-  const src = !isGuest && user.iconUrl ? user.iconUrl : DEFAULT_AVATAR_URL;
+  const rawResolved = isGuest ? DEFAULT_AVATAR_URL : resolveAvatarSrc(user.iconUrl);
+  const proxied = !isGuest && rawResolved !== DEFAULT_AVATAR_URL ? getAvatarProxySrc(rawResolved) : null;
+  const src = isGuest ? DEFAULT_AVATAR_URL : (proxied ?? rawResolved);
+  const useNoReferrer =
+    !isGuest && proxied == null && rawResolved !== DEFAULT_AVATAR_URL && isRemoteHttpUrl(rawResolved);
   return (
     <span
       className="flex h-9 w-9 shrink-0 overflow-hidden rounded-full border-4 border-white bg-gray-200 shadow-[0_0_4px_rgba(0,0,0,0.1)]"
@@ -553,6 +559,21 @@ function UserAvatar({ user }: { user?: CurrentUser | null }) {
         className="h-full w-full object-cover object-top"
         loading="lazy"
         decoding="async"
+        referrerPolicy={useNoReferrer ? "no-referrer" : undefined}
+        onError={(e) => {
+          e.currentTarget.onerror = null;
+          if (proxied != null && e.currentTarget.src.includes("/api/avatar")) {
+            e.currentTarget.src = rawResolved;
+            if (isRemoteHttpUrl(rawResolved)) {
+              e.currentTarget.referrerPolicy = "no-referrer";
+            } else {
+              e.currentTarget.removeAttribute("referrerpolicy");
+            }
+            return;
+          }
+          e.currentTarget.src = DEFAULT_AVATAR_URL;
+          e.currentTarget.removeAttribute("referrerpolicy");
+        }}
       />
     </span>
   );
