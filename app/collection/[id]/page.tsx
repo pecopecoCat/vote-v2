@@ -254,6 +254,8 @@ export default function CollectionPage() {
   const [apiFetchFailed, setApiFetchFailed] = useState(false);
   /** メンバー限定を共有URLで開いたが未ログイン（本文は出さずログイン導線） */
   const [memberShareNeedsLogin, setMemberShareNeedsLogin] = useState(false);
+  /** API 取得が続くときだけ表示（一瞬で終わるときは出さない） */
+  const [showPatientLoadHint, setShowPatientLoadHint] = useState(false);
 
   /** 共有リンク等でローカルに無いときは paint 前に fetch を開始し、体感待ちを短くする */
   useLayoutEffect(() => {
@@ -354,6 +356,25 @@ export default function CollectionPage() {
   const collection = localCollection ?? collectionFromApi;
   const isFromApi = !!collectionFromApi && !localCollection;
   const isMemberCollection = collection?.visibility === "member";
+
+  const isWaitingCollectionFetch =
+    Boolean(id) &&
+    !localCollection &&
+    !collectionFromApi &&
+    !apiFetchFailed &&
+    !memberShareNeedsLogin;
+
+  useEffect(() => {
+    if (!isWaitingCollectionFetch) {
+      setShowPatientLoadHint(false);
+      return;
+    }
+    const t = window.setTimeout(() => setShowPatientLoadHint(true), 550);
+    return () => {
+      clearTimeout(t);
+      setShowPatientLoadHint(false);
+    };
+  }, [isWaitingCollectionFetch]);
 
   /** メンバー限定: KV にコレクションがあれば他ユーザーの票を GET で取り込み（定期・フォーカス時） */
   useEffect(() => {
@@ -533,8 +554,15 @@ export default function CollectionPage() {
     }
     if (!apiFetchFailed && !localCollection && id) {
       return (
-        <div className="flex min-h-screen items-center justify-center bg-[#F1F1F1]">
-          <p className="text-gray-600">読み込み中...</p>
+        <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#F1F1F1] px-6 text-center">
+          <p className="text-sm font-medium text-gray-700">読み込み中…</p>
+          {showPatientLoadHint ? (
+            <p className="max-w-[17rem] text-sm leading-relaxed text-gray-600">
+              メンバー限定コレクションは、表示に少し時間がかかることがあります。
+              <br />
+              <span className="font-medium text-gray-800">ちょっと待ってね🙏</span>
+            </p>
+          ) : null}
         </div>
       );
     }
