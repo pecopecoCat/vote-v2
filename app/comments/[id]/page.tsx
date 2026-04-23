@@ -486,6 +486,7 @@ export default function CommentsPage() {
               titleVariant="blackBlock"
               href={`/collection/${randomCollectionForComments.id}`}
               timelineBanner
+              label="コレクション"
             />
           </div>
         )}

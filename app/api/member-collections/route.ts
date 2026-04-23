@@ -3,6 +3,10 @@ import { getKV } from "../../lib/kv";
 import { appendMemberJoinOwnerEvent } from "../../lib/memberJoinOwnerNotifications";
 import {
   type MemberJoinProfileRow,
+  memberGlobalKey,
+  memberPartsHashKey,
+  memberPartsKey,
+  memberUserKey,
   removeUserJoinProfile,
   upsertJoinProfileInKv,
 } from "../../lib/memberCollectionVotesKv";
@@ -12,6 +16,7 @@ const COLLECTION_KV_PREFIX = "vote_collection:";
 
 const KV_KEY_PREFIX = "vote_member_collections:";
 const KV_MEMBERS_INDEX_PREFIX = "vote_member_collection_members:";
+const KV_ACTIVITY_GLOBAL = "vote_activity_global";
 
 type MemberCollectionEntry = Pick<
   CollectionPayload,
@@ -178,6 +183,82 @@ export async function DELETE(
     await kv.set(membersKey(collectionId), nextMembers);
 
     await removeUserJoinProfile(kv, collectionId, userId);
+
+    // 参加中解除 = そのユーザーのコレ内投票・参加者行も掃除し、全体集計を再計算（best-effort）
+    try {
+      await kv.del(memberUserKey(collectionId, userId));
+
+      // 参加者: 新 Hash があればそこから削除、無ければ旧 JSON マップから削除
+      const kvAny = kv as unknown as { hdel?: (key: string, fields: string[]) => Promise<unknown> };
+      if (typeof kvAny.hdel === "function") {
+        await kvAny.hdel(memberPartsHashKey(collectionId), [userId]);
+      } else {
+        const legacyKey = memberPartsKey(collectionId);
+        const legacyRaw = await kv.get<unknown>(legacyKey);
+        if (legacyRaw && typeof legacyRaw === "object" && !Array.isArray(legacyRaw)) {
+          const cur = legacyRaw as Record<string, unknown>;
+          if (userId in cur) {
+            const { [userId]: _removed, ...rest } = cur;
+            if (Object.keys(rest).length === 0) await kv.del(legacyKey);
+            else await kv.set(legacyKey, rest);
+          }
+        }
+      }
+
+      // 全体集計を、残っているメンバーの userSelections から再構築
+      const global: Record<string, { countA: number; countB: number }> = {};
+      for (const uid of nextMembers) {
+        const uRaw = await kv.get<unknown>(memberUserKey(collectionId, uid));
+        if (!uRaw || typeof uRaw !== "object" || Array.isArray(uRaw)) continue;
+        for (const [cardId, rowRaw] of Object.entries(uRaw as Record<string, unknown>)) {
+          if (!rowRaw || typeof rowRaw !== "object") continue;
+          const r = rowRaw as Record<string, unknown>;
+          const opt = r.userSelectedOption === "A" || r.userSelectedOption === "B" ? r.userSelectedOption : null;
+          if (!opt) continue;
+          const cur = global[cardId] ?? { countA: 0, countB: 0 };
+          global[cardId] =
+            opt === "A" ? { countA: cur.countA + 1, countB: cur.countB } : { countA: cur.countA, countB: cur.countB + 1 };
+        }
+      }
+      if (Object.keys(global).length === 0) {
+        await kv.del(memberGlobalKey(collectionId));
+      } else {
+        await kv.set(memberGlobalKey(collectionId), global);
+      }
+    } catch {
+      // ignore
+    }
+
+    // 参加中解除 = そのユーザーのコレ内コメントも掃除（コメントに userId が保存されている分のみ）
+    try {
+      const colRaw = await kv.get<unknown>(COLLECTION_KV_PREFIX + collectionId);
+      const cardIds =
+        colRaw && typeof colRaw === "object" && Array.isArray((colRaw as { cardIds?: unknown }).cardIds)
+          ? ((colRaw as { cardIds?: unknown }).cardIds as unknown[]).filter((v): v is string => typeof v === "string")
+          : [];
+      if (cardIds.length > 0) {
+        const activity = (await kv.get<Record<string, { countA: number; countB: number; comments?: unknown }>>(KV_ACTIVITY_GLOBAL)) ?? {};
+        let changed = false;
+        const next = { ...activity };
+        for (const cardId of cardIds) {
+          const row = activity[cardId];
+          const comments = Array.isArray(row?.comments) ? (row!.comments as unknown[]) : [];
+          const filtered = comments.filter((c) => {
+            if (!c || typeof c !== "object") return true;
+            const o = c as Record<string, unknown>;
+            if (o.collectionId !== collectionId) return true;
+            return o.userId !== userId;
+          });
+          if (filtered.length !== comments.length) {
+            changed = true;
+            next[cardId] = { ...(row ?? { countA: 0, countB: 0, comments: [] }), comments: filtered as any };
+          }
+        }
+        if (changed) await kv.set(KV_ACTIVITY_GLOBAL, next);
+      }
+    } catch {
+      // ignore
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e) {

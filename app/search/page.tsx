@@ -836,6 +836,7 @@ function SearchContent() {
                   titleVariant="blackBlock"
                   href={`/collection/${randomCollectionForTimeline.id}`}
                   timelineBanner
+                  label="コレクション"
                 />
               )}
             </div>

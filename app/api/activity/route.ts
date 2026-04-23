@@ -14,6 +14,7 @@ export type GlobalCardData = {
   countB: number;
   comments: Array<{
     id: string;
+    userId?: string;
     user: { name: string; iconUrl?: string };
     collectionId?: string;
     date: string;
@@ -115,6 +116,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
     if (type === "comment") {
       const cardId = body.cardId as string;
       const comment = body.comment as { user?: { name: string; iconUrl?: string }; text?: string };
+      const authorUserId = typeof body.userId === "string" && body.userId.length > 0 ? body.userId : undefined;
       const parentCommentId = body.parentCommentId as string | undefined;
       const commenterVoteOption = body.commenterVoteOption as "A" | "B" | undefined;
       const collectionId = typeof body.collectionId === "string" ? body.collectionId : undefined;
@@ -128,6 +130,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
         ...comments,
         {
           id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          ...(authorUserId ? { userId: authorUserId } : {}),
           user: comment.user,
           ...(collectionId && collectionId.length > 0 ? { collectionId } : {}),
           date: new Date().toISOString(),

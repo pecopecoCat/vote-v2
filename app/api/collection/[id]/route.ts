@@ -13,6 +13,7 @@ const KV_PREFIX = "vote_collection:";
 const INDEX_KEY = "vote_collections_index";
 const MEMBER_COLLECTIONS_PREFIX = "vote_member_collections:";
 const MEMBER_COLLECTION_MEMBERS_PREFIX = "vote_member_collection_members:";
+const KV_ACTIVITY_GLOBAL = "vote_activity_global";
 
 /** 公開・メンバー限定コレクションのみKVに保存。GETでリンクを知っている人（未ログイン含む）が閲覧可能 */
 export type CollectionPayload = {
@@ -121,6 +122,35 @@ export async function DELETE(
         kv.del(memberPartsHashKey(id)),
         kv.del(memberJoinProfileKey(id)),
       ]);
+    }
+
+    // コレ削除: コレ内コメント（collectionId一致）も活動KVから削除（best-effort）
+    try {
+      const cardIds = Array.isArray((raw as { cardIds?: unknown }).cardIds)
+        ? ((raw as { cardIds?: unknown }).cardIds as unknown[]).filter((v): v is string => typeof v === "string")
+        : [];
+      if (cardIds.length > 0) {
+        const activity =
+          (await kv.get<Record<string, { countA: number; countB: number; comments?: unknown }>>(KV_ACTIVITY_GLOBAL)) ?? {};
+        let changed = false;
+        const next = { ...activity };
+        for (const cardId of cardIds) {
+          const row = activity[cardId];
+          const comments = Array.isArray(row?.comments) ? (row!.comments as unknown[]) : [];
+          const filtered = comments.filter((c) => {
+            if (!c || typeof c !== "object") return true;
+            const o = c as Record<string, unknown>;
+            return o.collectionId !== id;
+          });
+          if (filtered.length !== comments.length) {
+            changed = true;
+            next[cardId] = { ...(row ?? { countA: 0, countB: 0, comments: [] }), comments: filtered as any };
+          }
+        }
+        if (changed) await kv.set(KV_ACTIVITY_GLOBAL, next);
+      }
+    } catch {
+      // ignore
     }
     return NextResponse.json({ ok: true });
   } catch (e) {

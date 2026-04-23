@@ -29,6 +29,20 @@ export interface CollectionScopedParticipant {
 
 export const COLLECTION_SCOPED_VOTES_UPDATED_EVENT = "vote_collection_scoped_votes_updated";
 
+/** ローカルに保存したメンバー限定コレクションの投票/参加者/参加プロフィールを全削除（参加解除・削除時用） */
+export function clearCollectionScopedLocalData(collectionId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(globalKey(collectionId));
+    window.localStorage.removeItem(userKey(collectionId));
+    window.localStorage.removeItem(PARTICIPANTS_KEY_PREFIX + collectionId);
+    window.localStorage.removeItem(JOIN_PROFILES_KEY_PREFIX + collectionId);
+  } catch {
+    // ignore
+  }
+  notifyCollectionScopedUpdated(collectionId);
+}
+
 interface GlobalRow {
   countA: number;
   countB: number;

@@ -11,6 +11,8 @@ import { getAuth, getCurrentActivityUserId } from "./auth";
 /** コメント1件：コメントしたユーザー・日付・テキスト・いいね数・返信先 */
 export interface VoteComment {
   id: string;
+  /** コメントしたユーザーID（後から参加解除/削除で掃除する用途。旧データには無い） */
+  userId?: string;
   /** コメントしたユーザー */
   user: { name: string; iconUrl?: string };
   /** メンバー限定コレクション内コメントの場合のみ collectionId を持つ（通常コメントは undefined） */
@@ -82,6 +84,31 @@ function saveGlobal(data: Record<string, GlobalCardData>): void {
   } catch {
     // ignore
   }
+}
+
+/** メンバー限定コレクション内コメントをローカルから削除（参加解除・コレ削除時） */
+export function removeLocalCommentsForCollection(collectionId: string, opts?: { onlyUserId?: string }): void {
+  if (!collectionId) return;
+  const onlyUserId = opts?.onlyUserId;
+  const global = loadGlobal();
+  let changed = false;
+  const next: Record<string, GlobalCardData> = { ...global };
+  for (const [cardId, row] of Object.entries(global)) {
+    const comments = Array.isArray(row?.comments) ? row.comments : [];
+    const filtered = comments.filter((c) => {
+      if ((c as { collectionId?: unknown }).collectionId !== collectionId) return true;
+      if (onlyUserId) {
+        const cid = (c as { userId?: unknown }).userId;
+        return typeof cid === "string" && cid.length > 0 ? cid !== onlyUserId : false;
+      }
+      return false;
+    });
+    if (filtered.length !== comments.length) {
+      changed = true;
+      next[cardId] = { ...row, comments: filtered };
+    }
+  }
+  if (changed) saveGlobal(next);
 }
 
 export type UserVoteSelectionRow = { userSelectedOption?: "A" | "B"; votedAt?: string };

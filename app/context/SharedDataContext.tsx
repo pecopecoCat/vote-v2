@@ -575,6 +575,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (isRemote) {
+        const authorUserId = getCurrentActivityUserId();
         // 体感改善：送信後に即表示（POST/再取得待ちの遅延をなくす）
         const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const now = new Date().toISOString();
@@ -589,6 +590,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
                 ...nextComments,
                 {
                   id: optimisticId,
+                  userId: authorUserId,
                   user: comment.user,
                   text: comment.text,
                   date: now,
@@ -605,6 +607,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             type: "comment",
+            userId: authorUserId,
             cardId,
             comment,
             parentCommentId,

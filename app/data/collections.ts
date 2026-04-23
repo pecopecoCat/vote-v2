@@ -8,6 +8,8 @@
 
 import type { CollectionGradient } from "./search";
 import { getAuth, getCurrentActivityUserId } from "./auth";
+import { clearCollectionScopedLocalData } from "./collectionVoteActivity";
+import { removeLocalCommentsForCollection } from "./voteCardActivity";
 import { addBookmark, removeBookmark } from "./bookmarks";
 import { showAppToast } from "../lib/appToast";
 
@@ -306,9 +308,17 @@ export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<
 
     // KV側から消えた参加中コレクションはローカルからも掃除（作成者削除の反映）
     const current = getCollections();
+    const removedIds = current
+      .filter((c) => c.joinedParticipation && !remoteIds.has(c.id))
+      .map((c) => c.id);
     const next = current.filter((c) => !c.joinedParticipation || remoteIds.has(c.id));
     if (next.length !== current.length) {
       save(uid, next);
+    }
+    // 参加中リストから消えた = その端末に残っているコレ内データも掃除（投票/参加者/コメント）
+    for (const rid of removedIds) {
+      clearCollectionScopedLocalData(rid);
+      removeLocalCommentsForCollection(rid);
     }
   } catch {
     // ignore
@@ -515,6 +525,9 @@ export function deleteCollection(id: string): void {
     }
   }
   if (target?.joinedParticipation) {
+    // 参加解除: この端末のコレ内投票/参加者/コメントも消す（表示・集計を残さない）
+    clearCollectionScopedLocalData(id);
+    removeLocalCommentsForCollection(id);
     const auth = getAuth();
     if (auth.isLoggedIn && auth.userId) {
       fetch("/api/member-collections", {
@@ -525,6 +538,9 @@ export function deleteCollection(id: string): void {
     }
     return;
   }
+  // 作成者削除: ローカルのコレ内キャッシュも掃除
+  clearCollectionScopedLocalData(id);
+  removeLocalCommentsForCollection(id);
   deleteCollectionFromApi(id);
 }
 
