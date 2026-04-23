@@ -387,8 +387,7 @@ function syncCollectionToApi(col: Collection): void {
           const data = (await res.json()) as { error?: string; code?: string };
           if (typeof data?.error === "string" && data.error.length > 0) message = data.error;
           if (data?.code === "STORAGE_LIMIT" || res.status === 507) {
-            // 端末内の保存は成功しているため、エラー扱いにせず「共有だけ不可」を伝える
-            showAppToast("この端末には保存しました（サーバー容量上限のため共有できません）。");
+            // サーバー容量上限は通知しない（ローカル保存は成功していても、共有できないなら黙ってスキップ）
             return;
           }
         } catch {
