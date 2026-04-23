@@ -608,6 +608,8 @@ export default function CollectionPage() {
       if (collection?.visibility === "member") {
         addCollectionScopedVote(collection.id, cid, option, { useKv: true });
         addParticipatedMemberCollectionIfNeeded(collection);
+        // イベント取りこぼし/描画タイミング差でも参加者・投票数を確実に反映
+        setScopedVotesVersion((v) => v + 1);
         return;
       }
       void sharedAddVote(cid, option);
