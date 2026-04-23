@@ -384,8 +384,13 @@ function syncCollectionToApi(col: Collection): void {
       if (!res.ok) {
         let message = "コレクションの公開設定をサーバーに保存できませんでした。";
         try {
-          const data = (await res.json()) as { error?: string };
+          const data = (await res.json()) as { error?: string; code?: string };
           if (typeof data?.error === "string" && data.error.length > 0) message = data.error;
+          if (data?.code === "STORAGE_LIMIT" || res.status === 507) {
+            // 端末内の保存は成功しているため、エラー扱いにせず「共有だけ不可」を伝える
+            showAppToast("この端末には保存しました（サーバー容量上限のため共有できません）。");
+            return;
+          }
         } catch {
           /* ignore */
         }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useLayoutEffect } from "react";
 import { memo } from "react";
 import Link from "next/link";
 import { removeBookmarkFully } from "../data/bookmarkRemove";
@@ -138,6 +138,8 @@ function VoteCard({
   const [displayPercentA, setDisplayPercentA] = useState(0);
   const [displayPercentB, setDisplayPercentB] = useState(0);
   const [readMoreExpanded, setReadMoreExpanded] = useState(false);
+  const readMoreRef = useRef<HTMLParagraphElement | null>(null);
+  const [readMoreOverflows, setReadMoreOverflows] = useState(false);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [voteBeforeCommentOpen, setVoteBeforeCommentOpen] = useState(false);
 
@@ -172,6 +174,45 @@ function VoteCard({
     });
     return () => cancelAnimationFrame(t);
   }, [selectedOption, percentA, percentB]);
+
+  // 「2行を超えるなら続きを読むを出す」をDOMの高さ差で判定（line-clamp適用時）
+  useLayoutEffect(() => {
+    if (!readMoreText) {
+      setReadMoreOverflows(false);
+      setReadMoreExpanded(false);
+      return;
+    }
+    const el = readMoreRef.current;
+    if (!el) return;
+
+    let raf = 0;
+    const measure = () => {
+      // clamp あり（未展開）状態で overflow を確認
+      if (!readMoreRef.current) return;
+      const node = readMoreRef.current;
+      const over = node.scrollHeight - node.clientHeight > 1;
+      setReadMoreOverflows(over);
+      if (!over) setReadMoreExpanded(false);
+    };
+
+    const schedule = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(measure);
+    };
+
+    // 初回と、レイアウト確定後にもう一度
+    schedule();
+    const t = window.setTimeout(schedule, 80);
+
+    const onResize = () => schedule();
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.clearTimeout(t);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [readMoreText]);
 
   const handleSelectA = () => {
     if (!periodAllowsVote) return;
@@ -511,21 +552,24 @@ function VoteCard({
       {readMoreText && (
         <div className="px-5 pt-[0.8em]">
           <p
+            ref={readMoreRef}
             className={`text-[14px] text-gray-600 ${!readMoreExpanded ? "line-clamp-2" : ""}`}
           >
             {readMoreExpanded ? readMoreText : readMoreText}
           </p>
-          <div className="mt-[15px] border-t border-[#E5E7EB] pt-[15px] pb-[15px] -mx-5">
-            <div className="px-5 text-center">
-              <button
-                type="button"
-                className="text-[14px] font-medium text-gray-600 hover:underline"
-                onClick={() => setReadMoreExpanded((e) => !e)}
-              >
-                {readMoreExpanded ? "閉じる" : "続きを読む"}
-              </button>
+          {readMoreOverflows ? (
+            <div className="mt-[15px] border-t border-[#E5E7EB] pt-[15px] pb-[15px] -mx-5">
+              <div className="px-5 text-center">
+                <button
+                  type="button"
+                  className="text-[14px] font-medium text-gray-600 hover:underline"
+                  onClick={() => setReadMoreExpanded((e) => !e)}
+                >
+                  {readMoreExpanded ? "閉じる" : "続きを読む"}
+                </button>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       )}
       {/* タグなしの場合の下マージン */}
