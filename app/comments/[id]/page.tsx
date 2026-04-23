@@ -23,8 +23,14 @@ import {
   CARD_BACKGROUND_IMAGES,
   getRelatedVoteCardsByTagPriority,
   getNewestVoteCards,
+  recommendedTagList,
 } from "../../data/voteCards";
-import { getTagsSimilarTo, popularCollections, trendingTags, type CollectionGradient } from "../../data/search";
+import {
+  getTagsSimilarTo,
+  getTrendingTagsFromCards,
+  popularCollections,
+  type CollectionGradient,
+} from "../../data/search";
 import { getCollections, getOtherUsersCollections } from "../../data/collections";
 import {
   getMergedCounts,
@@ -209,9 +215,13 @@ export default function CommentsPage() {
     return { relatedBottomCards: relatedSliced, newestBottomCards: [] as VoteCardData[] };
   }, [card, allCards, id, sharedActivity, relatedKeepVotedVisibleIds]);
 
-  /** みんなのコメントページ：カードにタグあり→1個目に似たタグ10件、なし→注目のタグ10件 */
+  /** みんなのコメントページ：カードにタグあり→1個目に似たタグ10件、なし→カード由来の注目タグ or 固定おすすめ */
   const commentsPageTagList = useMemo(() => {
-    if (!card?.tags?.length) return trendingTags.map((t) => t.tag).slice(0, 10);
+    if (!card?.tags?.length) {
+      const fromCards = getTrendingTagsFromCards(allCards).map((t) => t.tag).slice(0, 10);
+      if (fromCards.length > 0) return fromCards;
+      return [...recommendedTagList].slice(0, 10);
+    }
     return getTagsSimilarTo(card.tags[0], allCards, 10);
   }, [card?.tags, allCards]);
 

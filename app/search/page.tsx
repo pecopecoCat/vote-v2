@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, Suspense, useDeferredValue, startTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  Suspense,
+  useDeferredValue,
+  startTransition,
+} from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "../components/AppHeader";
@@ -17,7 +26,12 @@ import EmptyStatePanel from "../components/EmptyStatePanel";
 import BottomNav from "../components/BottomNav";
 import type { CurrentUser } from "../components/VoteCard";
 import type { VoteCardData } from "../data/voteCards";
-import { voteCardsData, CARD_BACKGROUND_IMAGES, resolveStableVoteCardId } from "../data/voteCards";
+import {
+  voteCardsData,
+  CARD_BACKGROUND_IMAGES,
+  resolveStableVoteCardId,
+  recommendedTagList,
+} from "../data/voteCards";
 import { getMergedCounts, isCommentAuthoredByCurrentUser, type CardActivity } from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
 import {
@@ -44,10 +58,10 @@ import {
 } from "../data/hiddenUsers";
 import {
   getTrendingTagsByScore,
+  getTrendingTagsFromCards,
   popularCollections,
   searchCollections,
   searchVoteCardsByKeyword,
-  trendingTags,
   type CollectionGradient,
   type PopularCollection,
 } from "../data/search";
@@ -155,7 +169,7 @@ function SearchContent() {
     if (tagFromUrl.length > 0) return "";
     return voteResultsFromUrl ? qFromUrl : "";
   });
-  const [activeTab, setActiveTab] = useState<"trending" | "favorite">("trending");
+  const [activeTab, setActiveTab] = useState<"trending" | "collections" | "favorite">("trending");
   const [showVoted, setShowVotedState] = useState(() => getShowVoted());
   /** ハッシュタグ一覧の並び（マイページ等と同じプルダウン） */
   const [tagListSortOrder, setTagListSortOrder] = useState<"newest" | "oldest">("newest");
@@ -173,10 +187,15 @@ function SearchContent() {
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [tagMenu, setTagMenu] = useState<{ tag: string; variant: TagMenuVariant } | null>(null);
   const [hiddenTagsVersion, setHiddenTagsVersion] = useState(0);
-  /** 注目タグの表示件数（初期5件、もっと表示するで10件ずつ追加） */
+  /** 注目タグの表示件数（スクロールで段階的に追加） */
   const [trendingTagsVisibleCount, setTrendingTagsVisibleCount] = useState(5);
-  /** 人気コレクション：初回レンダ負荷を抑える（多い環境での体感改善） */
+  /** コレクションタブ：初回件数＋スクロールで追加 */
   const [popularCollectionsVisibleCount, setPopularCollectionsVisibleCount] = useState(8);
+  /** VOTE 検索結果の段階表示 */
+  const [voteSearchVisibleCount, setVoteSearchVisibleCount] = useState(8);
+  const trendingLoadSentinelRef = useRef<HTMLDivElement | null>(null);
+  const collectionsLoadSentinelRef = useRef<HTMLDivElement | null>(null);
+  const voteSearchLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
   const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
   const [remotePopularCollections, setRemotePopularCollections] = useState<
@@ -332,9 +351,10 @@ function SearchContent() {
     setTagListSortOrder("newest");
   }, [tagFromUrl]);
   useEffect(() => {
-    // 検索条件が変わったら件数をリセット（初回レンダ負荷を一定に）
     setPopularCollectionsVisibleCount(8);
-  }, [tagFromUrl, qFromUrl, activeTab]);
+    setTrendingTagsVisibleCount(5);
+    setVoteSearchVisibleCount(8);
+  }, [tagFromUrl, qFromUrl, activeTab, committedVoteQuery]);
 
   /**
    * 「投票済みを表示」OFF のとき、投票直後はカードをタイムラインに残す（結果表示のまま）。
@@ -451,10 +471,14 @@ function SearchContent() {
   /** activity の高頻度更新で注目タグ計算が主スレッドを占有しないよう遅延反映 */
   const deferredActivityForTags = useDeferredValue(activity);
 
-  /** 質問・選択肢・タグなど本文のキーワード一致（Enter 確定後の語のみ） */
-  const matchedVoteCards = useMemo(
-    () => searchVoteCardsByKeyword(committedVoteQuery, allCardsForTagsFiltered, 15),
+  /** 質問・選択肢・タグなど本文のキーワード一致（Enter 確定後の語のみ。件数はスクロールで増やす） */
+  const matchedVoteCardsFull = useMemo(
+    () => searchVoteCardsByKeyword(committedVoteQuery, allCardsForTagsFiltered, 80),
     [committedVoteQuery, allCardsForTagsFiltered]
+  );
+  const matchedVoteCards = useMemo(
+    () => matchedVoteCardsFull.slice(0, voteSearchVisibleCount),
+    [matchedVoteCardsFull, voteSearchVisibleCount]
   );
 
   /** 注目タグ（スコア順：投票+1, コメント+3, bookmark+5, 新着+2, お気に入り+3） */
@@ -551,6 +575,12 @@ function SearchContent() {
     return pool[Math.abs(h) % pool.length];
   }, [collections, remotePopularCollections]);
 
+  const tagFilterRecommendedTags = useMemo(() => {
+    const fromCards = getTrendingTagsFromCards(allCardsForTagFilterFiltered).map((t) => t.tag).slice(0, 10);
+    if (fromCards.length > 0) return fromCards;
+    return [...recommendedTagList].slice(0, 10);
+  }, [allCardsForTagFilterFiltered]);
+
   /** ON: 全カード表示（投票済み含む） / OFF: ユーザーが投票していないカードのみ */
   const cardsToShow = useMemo(() => {
     if (showVoted) return filteredCards;
@@ -573,11 +603,62 @@ function SearchContent() {
   const handleTagFilterCardMoreClick = useCallback(
     (cardId: string) => {
       setCardOptionsCardId(cardId);
-      const card = allCardsForTagFilterFiltered.find((c) => (c.id ?? c.question) === cardId);
+      const card = allCardsForTagFilterFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
       setCardOptionsIsOwnCard(card?.createdByUserId === getCurrentActivityUserId());
     },
     [allCardsForTagFilterFiltered]
   );
+
+  useEffect(() => {
+    if (activeTab !== "trending") return;
+    const root = trendingLoadSentinelRef.current;
+    if (!root) return;
+    if (displayedTrendingTags.length <= trendingTagsVisibleCount) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setTrendingTagsVisibleCount((prev) => Math.min(prev + 10, displayedTrendingTags.length));
+        }
+      },
+      { root: null, rootMargin: "280px 0px", threshold: 0 }
+    );
+    obs.observe(root);
+    return () => obs.disconnect();
+  }, [activeTab, displayedTrendingTags.length, trendingTagsVisibleCount]);
+
+  useEffect(() => {
+    if (activeTab !== "collections") return;
+    const root = collectionsLoadSentinelRef.current;
+    if (!root) return;
+    if (collectionsForSection.length <= popularCollectionsVisibleCount) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setPopularCollectionsVisibleCount((prev) => Math.min(prev + 8, collectionsForSection.length));
+        }
+      },
+      { root: null, rootMargin: "280px 0px", threshold: 0 }
+    );
+    obs.observe(root);
+    return () => obs.disconnect();
+  }, [activeTab, collectionsForSection.length, popularCollectionsVisibleCount]);
+
+  useEffect(() => {
+    if (committedVoteQuery.length === 0) return;
+    const root = voteSearchLoadSentinelRef.current;
+    if (!root) return;
+    if (matchedVoteCardsFull.length <= voteSearchVisibleCount) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVoteSearchVisibleCount((prev) => Math.min(prev + 8, matchedVoteCardsFull.length));
+        }
+      },
+      { root: null, rootMargin: "280px 0px", threshold: 0 }
+    );
+    obs.observe(root);
+    return () => obs.disconnect();
+  }, [committedVoteQuery, matchedVoteCardsFull.length, voteSearchVisibleCount]);
 
   return (
     <div
@@ -669,7 +750,7 @@ function SearchContent() {
                   );
                 })
               )}
-              <RecommendedTags tags={trendingTags.map((t) => t.tag).slice(0, 10)} />
+              <RecommendedTags tags={tagFilterRecommendedTags} />
               {randomCollectionForTimeline && (
                 <CollectionCard
                   key={randomCollectionForTimeline.id}
@@ -687,10 +768,10 @@ function SearchContent() {
         </>
       )}
 
-      {/* 虫眼鏡タップで開いたとき：新しい検索画面（注目タグ・人気コレクション・VOTEを作成） */}
+      {/* 虫眼鏡タップで開いたとき：新しい検索画面（注目タグ / コレクション / お気に入りタグ） */}
       {!isTagFilterView && (
         <>
-          {/* タブ：注目タグ / お気に入りタグ（お知らせページと同じデザイン・黄バー下50pxでグレーライン） */}
+          {/* タブ：注目タグ / コレクション / お気に入りタグ */}
           {!isSearching && (
             <>
               <div className="w-full min-w-0">
@@ -708,6 +789,25 @@ function SearchContent() {
                       注目タグ
                     </span>
                     {activeTab === "trending" && (
+                      <span
+                        className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
+                        aria-hidden
+                      />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("collections")}
+                    className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
+                      activeTab === "collections" ? "text-gray-900" : "text-gray-500"
+                    }`}
+                  >
+                    <span className="flex-1" aria-hidden />
+                    <span className="inline-flex items-center justify-center gap-1">
+                      <img src="/icons/bookmark.svg" alt="" className="h-4 w-4 shrink-0" width={16} height={16} />
+                      コレクション
+                    </span>
+                    {activeTab === "collections" && (
                       <span
                         className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
                         aria-hidden
@@ -741,7 +841,6 @@ function SearchContent() {
                   </button>
                 </nav>
               </div>
-              {/* 黄バーのすぐ下にグレーライン（余白なし） */}
               <div className="h-px bg-[#E5E7EB]" aria-hidden />
             </>
           )}
@@ -749,7 +848,6 @@ function SearchContent() {
           <main className="mx-auto max-w-lg bg-white pb-[50px]">
         {!isSearching ? (
           <>
-            {/* 注目タグ（見出しなし・もっと表示すると黄バー間に10px） */}
             {activeTab === "trending" && (
               <section className="border-b border-gray-200 pt-2.5">
                 <div className="px-[5.333vw]">
@@ -766,21 +864,42 @@ function SearchContent() {
                           onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
                         />
                       ))}
-                      {displayedTrendingTags.length > trendingTagsVisibleCount && (
-                        <div className="mb-[50px] flex justify-center pb-3 pt-6">
-                          <button
-                            type="button"
-                            className="inline-block text-center"
-                            onClick={() => setTrendingTagsVisibleCount((prev) => prev + 10)}
-                          >
-                            <span className="text-sm font-medium text-gray-600">もっと表示する</span>
-                            <span
-                              className="mt-2.5 block h-0.5 w-full bg-[#FFE100]"
-                              aria-hidden
-                            />
-                          </button>
+                      {displayedTrendingTags.length > trendingTagsVisibleCount ? (
+                        <div ref={trendingLoadSentinelRef} className="h-8 w-full shrink-0" aria-hidden />
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {activeTab === "collections" && (
+              <section className="border-b border-gray-200 pt-2.5">
+                <div className="flex flex-col gap-3 px-[5.333vw] pb-5 pt-1">
+                  {collectionsForSection.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-gray-500">
+                      {isLoggedIn ? "コレクションがありません。マイページで作成しよう。" : "コレクションはありません。"}
+                    </p>
+                  ) : (
+                    <>
+                      {displayedCollectionsForSection.map((col, i) => (
+                        <div
+                          key={col.id}
+                          className="[content-visibility:auto] [contain-intrinsic-size:auto_88px]"
+                        >
+                          <CollectionCard
+                            id={col.id}
+                            title={col.name}
+                            gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
+                            showPin={pinnedCollectionIds.includes(col.id)}
+                            popularBanner
+                            href={`/collection/${col.id}`}
+                          />
                         </div>
-                      )}
+                      ))}
+                      {collectionsForSection.length > displayedCollectionsForSection.length ? (
+                        <div ref={collectionsLoadSentinelRef} className="h-8 w-full shrink-0" aria-hidden />
+                      ) : null}
                     </>
                   )}
                 </div>
@@ -825,52 +944,6 @@ function SearchContent() {
                 </div>
               </section>
             )}
-
-            {/* コレクション（他ユーザー登録分＋自分のコレクション・ピン留めを上に表示） */}
-            <section>
-              <div className="border-t border-gray-200 px-[5.333vw] pt-6">
-                <h2 className="search-popular-collections-title text-left font-black text-gray-900">
-                  人気コレクション
-                </h2>
-              </div>
-              <div className="flex flex-col gap-3 px-[5.333vw] pt-4 pb-5">
-                {collectionsForSection.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-gray-500">
-                    {isLoggedIn ? "コレクションがありません。マイページで作成しよう。" : "コレクションはありません。"}
-                  </p>
-                ) : (
-                  <>
-                    {displayedCollectionsForSection.map((col, i) => (
-                      <div
-                        key={col.id}
-                        className="[content-visibility:auto] [contain-intrinsic-size:auto_88px]"
-                      >
-                        <CollectionCard
-                          id={col.id}
-                          title={col.name}
-                          gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
-                          showPin={pinnedCollectionIds.includes(col.id)}
-                          popularBanner
-                          href={`/collection/${col.id}`}
-                        />
-                      </div>
-                    ))}
-                    {collectionsForSection.length > displayedCollectionsForSection.length ? (
-                      <div className="flex justify-center py-2">
-                        <button
-                          type="button"
-                          className="inline-block text-center"
-                          onClick={() => setPopularCollectionsVisibleCount((prev) => prev + 8)}
-                        >
-                          <span className="text-sm font-medium text-gray-600">もっと表示する</span>
-                          <span className="mt-2.5 block h-0.5 w-full bg-[#FFE100]" aria-hidden />
-                        </button>
-                      </div>
-                    ) : null}
-                  </>
-                )}
-              </div>
-            </section>
           </>
         ) : (
           <>
@@ -922,49 +995,58 @@ function SearchContent() {
               <section className="border-b border-gray-200">
                 <SectionHeader>「{committedVoteQuery}」に一致するVOTE</SectionHeader>
                 <div className="flex flex-col gap-[5.333vw] px-[5.333vw] py-4">
-                  {matchedVoteCards.length === 0 ? (
+                  {matchedVoteCardsFull.length === 0 ? (
                     <p className="py-6 text-center text-sm text-gray-500">一致するVOTEはありません。</p>
                   ) : (
-                    matchedVoteCards.map((card) => {
-                      const cardId = resolveStableVoteCardId(card);
-                      const act = activity[cardId];
-                      const merged = getMergedCounts(
-                        card.countA ?? 0,
-                        card.countB ?? 0,
-                        card.commentCount ?? 0,
-                        act ?? { countA: 0, countB: 0, comments: [] }
-                      );
-                      return (
-                        <VoteCard
-                          key={cardId}
-                          backgroundImageUrl={backgroundForSearchCard(card, cardId)}
-                          patternType={card.patternType}
-                          question={card.question}
-                          optionA={card.optionA}
-                          optionB={card.optionB}
-                          countA={merged.countA}
-                          countB={merged.countB}
-                          commentCount={merged.commentCount}
-                          tags={card.tags}
-                          readMoreText={card.readMoreText}
-                          creator={card.creator}
-                          currentUser={currentUser}
-                          cardId={cardId}
-                          bookmarked={isCardBookmarked(cardId)}
-                          hasCommented={commentedCardIdSet.has(cardId)}
-                          initialSelectedOption={act?.userSelectedOption ?? null}
-                          onVote={handleVote}
-                          onBookmarkClick={setModalCardId}
-                          onMoreClick={handleTagFilterCardMoreClick}
-                          visibility={card.visibility}
-                          optionAImageUrl={card.optionAImageUrl}
-                          optionBImageUrl={card.optionBImageUrl}
-                          periodStart={card.periodStart}
-                          periodEnd={card.periodEnd}
-                          commentsDisabled={card.commentsDisabled === true}
-                        />
-                      );
-                    })
+                    <>
+                      {matchedVoteCards.map((card) => {
+                        const cardId = resolveStableVoteCardId(card);
+                        const act = activity[cardId];
+                        const merged = getMergedCounts(
+                          card.countA ?? 0,
+                          card.countB ?? 0,
+                          card.commentCount ?? 0,
+                          act ?? { countA: 0, countB: 0, comments: [] }
+                        );
+                        return (
+                          <div
+                            key={cardId}
+                            className="[content-visibility:auto] [contain-intrinsic-size:auto_380px]"
+                          >
+                            <VoteCard
+                              backgroundImageUrl={backgroundForSearchCard(card, cardId)}
+                              patternType={card.patternType}
+                              question={card.question}
+                              optionA={card.optionA}
+                              optionB={card.optionB}
+                              countA={merged.countA}
+                              countB={merged.countB}
+                              commentCount={merged.commentCount}
+                              tags={card.tags}
+                              readMoreText={card.readMoreText}
+                              creator={card.creator}
+                              currentUser={currentUser}
+                              cardId={cardId}
+                              bookmarked={isCardBookmarked(cardId)}
+                              hasCommented={commentedCardIdSet.has(cardId)}
+                              initialSelectedOption={act?.userSelectedOption ?? null}
+                              onVote={handleVote}
+                              onBookmarkClick={setModalCardId}
+                              onMoreClick={handleTagFilterCardMoreClick}
+                              visibility={card.visibility}
+                              optionAImageUrl={card.optionAImageUrl}
+                              optionBImageUrl={card.optionBImageUrl}
+                              periodStart={card.periodStart}
+                              periodEnd={card.periodEnd}
+                              commentsDisabled={card.commentsDisabled === true}
+                            />
+                          </div>
+                        );
+                      })}
+                      {matchedVoteCardsFull.length > voteSearchVisibleCount ? (
+                        <div ref={voteSearchLoadSentinelRef} className="h-8 w-full shrink-0" aria-hidden />
+                      ) : null}
+                    </>
                   )}
                 </div>
               </section>
@@ -983,9 +1065,7 @@ function SearchContent() {
           isOwnCard={cardOptionsIsOwnCard}
           onClose={() => setCardOptionsCardId(null)}
           onHide={(cardId) => {
-            const card = allCardsForTagFilter.find(
-              (c) => (c.id ?? c.question) === cardId
-            );
+            const card = allCardsForTagFilter.find((c) => resolveStableVoteCardId(c) === cardId);
             if (card?.createdByUserId) {
               addHiddenUser(card.createdByUserId);
               setHiddenUserIds(getHiddenUserIds());

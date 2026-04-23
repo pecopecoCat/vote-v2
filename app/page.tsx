@@ -24,7 +24,12 @@ import ReportViolationModal from "./components/ReportViolationModal";
 import type { CurrentUser } from "./components/VoteCard";
 import type { FeedTabId } from "./components/FeedTabs";
 import type { VoteCardData } from "./data/voteCards";
-import { voteCardsData, CARD_BACKGROUND_IMAGES, resolveStableVoteCardId } from "./data/voteCards";
+import {
+  voteCardsData,
+  CARD_BACKGROUND_IMAGES,
+  resolveStableVoteCardId,
+  recommendedTagList,
+} from "./data/voteCards";
 import {
   getMergedCounts,
   isCommentAuthoredByCurrentUser,
@@ -46,10 +51,7 @@ import {
   addHiddenCard,
   getHiddenCardsUpdatedEventName,
 } from "./data/hiddenCards";
-import { popularCollections, trendingTags, type CollectionGradient } from "./data/search";
-
-/** HOMEタイムライン：注目のタグ（最大10件） */
-const homeTagList = trendingTags.map((t) => t.tag).slice(0, 10);
+import { popularCollections, getTrendingTagsFromCards, type CollectionGradient } from "./data/search";
 
 /** 急上昇中：1週間のポイント制（投票+1, コメント+3, ブックマーク+3, 新規作成+5）でポイント多い順 */
 const TRENDING_POINTS = { vote: 1, comment: 3, bookmark: 3, newCreation: 5 } as const;
@@ -223,6 +225,7 @@ function ensureUser1User2CollectionsResetOnce(): void {
 
 const HomeTimelineFeed = memo(function HomeTimelineFeed({
   timelineItems,
+  timelineTagList,
   activity,
   commentedCardIdSet,
   bookmarkedIds,
@@ -232,6 +235,7 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
   onMoreClick,
 }: {
   timelineItems: TimelineItem[];
+  timelineTagList: string[];
   activity: Record<string, CardActivity>;
   commentedCardIdSet: Set<string>;
   bookmarkedIds: Set<string>;
@@ -329,7 +333,7 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
           );
         }
         if (item.type === "tags") {
-          return <RecommendedTags key={`tags-${idx}`} tags={homeTagList} />;
+          return <RecommendedTags key={`tags-${idx}`} tags={timelineTagList} />;
         }
         if (item.type === "pr") {
           return (
@@ -649,6 +653,13 @@ function HomeContent() {
     [cardsForTab, timelineCollectionPool]
   );
 
+  /** シードVOTE廃止後も、カードが無いときは固定おすすめタグで埋める */
+  const homeTagList = useMemo(() => {
+    const fromCards = getTrendingTagsFromCards(allCardsFiltered).map((t) => t.tag).slice(0, 10);
+    if (fromCards.length > 0) return fromCards;
+    return [...recommendedTagList].slice(0, 10);
+  }, [allCardsFiltered]);
+
   return (
     <div className="min-h-screen bg-[#F1F1F1]">
       <AppHeader type="logo" />
@@ -680,6 +691,7 @@ function HomeContent() {
           <HomeTimelineFeed
             key={activeTab}
             timelineItems={timelineItems}
+            timelineTagList={homeTagList}
             activity={activity}
             commentedCardIdSet={commentedCardIdSet}
             bookmarkedIds={bookmarkedIds}
