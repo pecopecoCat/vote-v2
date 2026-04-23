@@ -68,10 +68,16 @@ import {
 
 function backgroundForSearchCard(card: VoteCardData, cardId: string): string {
   if (card.backgroundImageUrl) return card.backgroundImageUrl;
+  const cached = backgroundCache.get(cardId);
+  if (cached) return cached;
   let h = 0;
   for (let i = 0; i < cardId.length; i++) h = ((h << 5) - h + cardId.charCodeAt(i)) | 0;
-  return CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
+  const url = CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
+  backgroundCache.set(cardId, url);
+  return url;
 }
+
+const backgroundCache = new Map<string, string>();
 
 /** ピン留めコレクション用グラデーションのローテーション（検索画面はグラデーション表示に統一） */
 const PINNED_GRADIENTS: CollectionGradient[] = [
@@ -530,7 +536,8 @@ function SearchContent() {
       isLoggedIn: auth.isLoggedIn,
       displayName: auth.user?.name,
     };
-    for (const card of allCardsForTagFilterFiltered) {
+    // タグ一覧の候補カードだけ（全カード走査を避けて表示を軽くする）
+    for (const card of filteredCards) {
       const cid = resolveStableVoteCardId(card);
       const a = activity[cid];
       if ((a?.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
@@ -538,7 +545,7 @@ function SearchContent() {
       }
     }
     return set;
-  }, [allCardsForTagFilterFiltered, activity, auth.isLoggedIn, auth.user?.name]);
+  }, [filteredCards, activity, auth.isLoggedIn, auth.user?.name]);
 
   /** 検索結果タイムライン用：実際にあるコレクションから1件（プール内容から決定的に選択し再レイアウトを抑制） */
   const randomCollectionForTimeline = useMemo(() => {
@@ -590,6 +597,22 @@ function SearchContent() {
       return !activity[cardId]?.userSelectedOption;
     });
   }, [filteredCards, showVoted, activity, keepVotedCardVisible]);
+
+  const voteCardViewModels = useMemo(() => {
+    // 表示用に必要なものをまとめて前計算し、render 中の work を減らす
+    return cardsToShow.map((card) => {
+      const cardId = resolveStableVoteCardId(card);
+      const act = activity[cardId];
+      const merged = getMergedCounts(
+        card.countA ?? 0,
+        card.countB ?? 0,
+        card.commentCount ?? 0,
+        act ?? { countA: 0, countB: 0, comments: [] }
+      );
+      const bgUrl = card.backgroundImageUrl ?? backgroundForSearchCard(card, cardId);
+      return { card, cardId, act, merged, bgUrl };
+    });
+  }, [cardsToShow, activity]);
   const handleVote = useCallback(
     (cardId: string, option: "A" | "B") => {
       if (!showVoted) {
@@ -708,16 +731,7 @@ function SearchContent() {
                   </p>
                 </EmptyStatePanel>
               ) : (
-                cardsToShow.map((card) => {
-                  const cardId = resolveStableVoteCardId(card);
-                  const act = activity[cardId];
-                  const merged = getMergedCounts(
-                    card.countA ?? 0,
-                    card.countB ?? 0,
-                    card.commentCount ?? 0,
-                    act ?? { countA: 0, countB: 0, comments: [] }
-                  );
-                  const bgUrl = card.backgroundImageUrl ?? backgroundForSearchCard(card, cardId);
+                voteCardViewModels.map(({ card, cardId, act, merged, bgUrl }) => {
                   return (
                     <VoteCard
                       key={cardId}

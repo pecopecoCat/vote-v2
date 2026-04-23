@@ -97,7 +97,25 @@ function buildMemberParticipantsForDisplay(
   viewerAsOwner: { name: string; iconUrl?: string } | null
 ): CollectionScopedParticipant[] {
   const oid = collection.createdByUserId;
-  if (!oid) return participants;
+  // 旧データ等で createdByUserId が無い場合でも、表示名/アイコンがあれば先頭に出す
+  if (!oid) {
+    const sorted = [...participants].sort((a, b) => (b.lastVotedAt || "").localeCompare(a.lastVotedAt || ""));
+    const displayName = collection.createdByDisplayName?.trim() || viewerAsOwner?.name;
+    const displayIconRaw = collection.createdByIconUrl || viewerAsOwner?.iconUrl;
+    const displayIcon = typeof displayIconRaw === "string" && displayIconRaw.length > 0 ? displayIconRaw : undefined;
+    if (displayName || displayIcon) {
+      return [
+        {
+          userId: "__owner__",
+          name: displayName?.trim() || "作成",
+          iconUrl: displayIcon,
+          lastVotedAt: "",
+        },
+        ...sorted,
+      ];
+    }
+    return sorted;
+  }
 
   let fromCard: { name?: string; iconUrl?: string } | undefined;
   for (const { card } of cards) {
@@ -174,10 +192,16 @@ function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]):
 
 function backgroundForCard(card: VoteCardData, cardId: string): string {
   if (card.backgroundImageUrl) return card.backgroundImageUrl;
+  const cached = backgroundCache.get(cardId);
+  if (cached) return cached;
   let h = 0;
   for (let i = 0; i < cardId.length; i++) h = ((h << 5) - h + cardId.charCodeAt(i)) | 0;
-  return CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
+  const url = CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
+  backgroundCache.set(cardId, url);
+  return url;
 }
+
+const backgroundCache = new Map<string, string>();
 
 export default function CollectionPage() {
   const params = useParams();
@@ -532,6 +556,37 @@ export default function CollectionPage() {
     return sortedCardsInCollection.filter(({ cardId }) => !activity[cardId]?.userSelectedOption);
   }, [sortedCardsInCollection, showVoted, activity, isMemberCollection, scopedActivityMap]);
 
+  const voteCardViewModels = useMemo(() => {
+    return cardsToShow.map(({ card, cardId }) => {
+      const act = activity[cardId];
+      const scopedAct = scopedActivityMap[cardId];
+      const voteActivity: CardActivity = isMemberCollection
+        ? {
+            countA: scopedAct?.countA ?? 0,
+            countB: scopedAct?.countB ?? 0,
+            comments: act?.comments ?? [],
+            userSelectedOption: scopedAct?.userSelectedOption,
+            userVotedAt: scopedAct?.userVotedAt,
+          }
+        : (act ?? { countA: 0, countB: 0, comments: [] });
+      const merged = getMergedCounts(
+        isMemberCollection ? 0 : (card.countA ?? 0),
+        isMemberCollection ? 0 : (card.countB ?? 0),
+        card.commentCount ?? 0,
+        voteActivity
+      );
+      return {
+        card,
+        cardId,
+        merged,
+        initialSelectedOption: isMemberCollection
+          ? (scopedAct?.userSelectedOption ?? null)
+          : (act?.userSelectedOption ?? null),
+        backgroundImageUrl: backgroundForCard(card, cardId),
+      };
+    });
+  }, [cardsToShow, activity, scopedActivityMap, isMemberCollection]);
+
   const handleCollectionVote = useCallback(
     (cid: string, option: "A" | "B") => {
       const entry = cardsInCollection.find((x) => x.cardId === cid);
@@ -665,52 +720,56 @@ export default function CollectionPage() {
           </div>
         )}
         {/* メンバー参加者アイコン＋名（メンバー限定のみ）。Safari では overflow 内の img が描画されない事例があるため縦スクロールは付けない */}
-        {collection.visibility === "member" && memberParticipantsForDisplay.length > 0 && (
+        {collection.visibility === "member" && (
           <div className="mt-2 pr-0.5">
-            <ul className="flex flex-wrap gap-x-2.5 gap-y-1.5">
-              {memberParticipantsForDisplay.map((p) => {
-                const rawAvatar = resolveAvatarSrc(p.iconUrl);
-                const proxied = getAvatarProxySrc(rawAvatar);
-                const avatarSrc = proxied ?? rawAvatar;
-                const useNoReferrer = proxied == null && isRemoteHttpUrl(rawAvatar);
-                return (
-                <li key={p.userId} className="flex max-w-[10rem] min-w-0 items-center gap-1.5">
-                  <span className="relative inline-block h-6 w-6 shrink-0 rounded-full bg-gray-200 align-middle ring-1 ring-[rgba(0,0,0,0.06)] [transform:translateZ(0)]">
-                    <img
-                      src={avatarSrc}
-                      alt=""
-                      className="block h-6 w-6 rounded-full object-cover object-center"
-                      width={24}
-                      height={24}
-                      loading="eager"
-                      fetchPriority="high"
-                      referrerPolicy={useNoReferrer ? "no-referrer" : undefined}
-                      onError={(e) => {
-                        e.currentTarget.onerror = null;
-                        if (proxied != null && e.currentTarget.src.includes("/api/avatar")) {
-                          e.currentTarget.src = rawAvatar;
-                          if (isRemoteHttpUrl(rawAvatar)) {
-                            e.currentTarget.referrerPolicy = "no-referrer";
-                          } else {
-                            e.currentTarget.removeAttribute("referrerpolicy");
+            {memberParticipantsForDisplay.length === 0 ? (
+              <p className="text-[11px] leading-tight text-gray-500">参加者を読み込み中…</p>
+            ) : (
+              <ul className="flex flex-wrap gap-x-2.5 gap-y-1.5">
+                {memberParticipantsForDisplay.map((p) => {
+                  const rawAvatar = resolveAvatarSrc(p.iconUrl);
+                  const proxied = getAvatarProxySrc(rawAvatar);
+                  const avatarSrc = proxied ?? rawAvatar;
+                  const useNoReferrer = proxied == null && isRemoteHttpUrl(rawAvatar);
+                  return (
+                  <li key={p.userId} className="flex max-w-[10rem] min-w-0 items-center gap-1.5">
+                    <span className="relative inline-block h-6 w-6 shrink-0 rounded-full bg-gray-200 align-middle ring-1 ring-[rgba(0,0,0,0.06)] [transform:translateZ(0)]">
+                      <img
+                        src={avatarSrc}
+                        alt=""
+                        className="block h-6 w-6 rounded-full object-cover object-center"
+                        width={24}
+                        height={24}
+                        loading="eager"
+                        fetchPriority="high"
+                        referrerPolicy={useNoReferrer ? "no-referrer" : undefined}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          if (proxied != null && e.currentTarget.src.includes("/api/avatar")) {
+                            e.currentTarget.src = rawAvatar;
+                            if (isRemoteHttpUrl(rawAvatar)) {
+                              e.currentTarget.referrerPolicy = "no-referrer";
+                            } else {
+                              e.currentTarget.removeAttribute("referrerpolicy");
+                            }
+                            return;
                           }
-                          return;
-                        }
-                        e.currentTarget.src = "/default-avatar.png";
-                        e.currentTarget.removeAttribute("referrerpolicy");
-                      }}
-                    />
-                  </span>
-                  <span className="min-w-0 truncate text-[11px] leading-tight text-gray-600">{p.name}</span>
-                  {collection.createdByUserId === p.userId && (
-                    <span className="shrink-0 rounded bg-gray-200 px-1 py-px text-[9px] font-medium text-gray-600">
-                      作成
+                          e.currentTarget.src = "/default-avatar.png";
+                          e.currentTarget.removeAttribute("referrerpolicy");
+                        }}
+                      />
                     </span>
-                  )}
-                </li>
-                );
-              })}
-            </ul>
+                    <span className="min-w-0 truncate text-[11px] leading-tight text-gray-600">{p.name}</span>
+                    {(collection.createdByUserId === p.userId || p.userId === "__owner__") && (
+                      <span className="shrink-0 rounded bg-gray-200 px-1 py-px text-[9px] font-medium text-gray-600">
+                        作成
+                      </span>
+                    )}
+                  </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         )}
         {collection.visibility === "member" && (
@@ -747,31 +806,14 @@ export default function CollectionPage() {
           </div>
         ) : (
           <div className="mt-4 flex flex-col gap-[5.333vw]">
-            {cardsToShow.map(({ card, cardId }) => {
-              const act = activity[cardId];
-              const scopedAct = scopedActivityMap[cardId];
-              const voteActivity: CardActivity = isMemberCollection
-                ? {
-                    countA: scopedAct?.countA ?? 0,
-                    countB: scopedAct?.countB ?? 0,
-                    comments: act?.comments ?? [],
-                    userSelectedOption: scopedAct?.userSelectedOption,
-                    userVotedAt: scopedAct?.userVotedAt,
-                  }
-                : (act ?? { countA: 0, countB: 0, comments: [] });
-              const merged = getMergedCounts(
-                isMemberCollection ? 0 : (card.countA ?? 0),
-                isMemberCollection ? 0 : (card.countB ?? 0),
-                card.commentCount ?? 0,
-                voteActivity
-              );
+            {voteCardViewModels.map(({ card, cardId, merged, initialSelectedOption, backgroundImageUrl }) => {
               return (
                 <div
                   key={cardId}
                   className="[content-visibility:auto] [contain-intrinsic-size:auto_380px]"
                 >
                 <VoteCard
-                  backgroundImageUrl={backgroundForCard(card, cardId)}
+                  backgroundImageUrl={backgroundImageUrl}
                   patternType={card.patternType ?? "yellow-loops"}
                   question={card.question}
                   optionA={card.optionA}
@@ -786,9 +828,7 @@ export default function CollectionPage() {
                   cardId={cardId}
                   bookmarked={isCardBookmarked(cardId)}
                   hasCommented={commentedCardIdSet.has(cardId)}
-                  initialSelectedOption={
-                    isMemberCollection ? (scopedAct?.userSelectedOption ?? null) : (act?.userSelectedOption ?? null)
-                  }
+                  initialSelectedOption={initialSelectedOption}
                   onVote={handleCollectionVote}
                   onBookmarkClick={setModalCardId}
                   onMoreClick={handleCollectionCardMoreClick}
