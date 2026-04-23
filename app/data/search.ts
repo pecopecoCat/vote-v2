@@ -173,7 +173,7 @@ export function getCollectionGradientClass(g: CollectionGradient): string {
 export function getCollectionGradientStyle(
   gradient?: CollectionGradient | null,
   fallbackColor?: string
-): { background: string } {
+): { background?: string; backgroundColor?: string } {
   if (gradient) {
     const opt = COLLECTION_GRADIENT_OPTIONS.find((o) => o.id === gradient);
     if (opt) {
@@ -181,7 +181,8 @@ export function getCollectionGradientStyle(
     }
   }
   const color = fallbackColor ?? "#E5E7EB";
-  return { background: `linear-gradient(135deg, ${color} 0%, ${color}99 100%)` };
+  // グラデ無しは単色（#RRGGBBAA の連結は Safari / 色形式によって壊れやすい）
+  return { backgroundColor: color };
 }
 
 /** 検索語に一致するタグ（部分一致） */

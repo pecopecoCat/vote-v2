@@ -389,14 +389,15 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchActivity]);
 
-  // ログイン後: コレクション（作成・参加）とブックマークを KV から並列で取り込み（直列より待ち時間を短縮）
+  // ログイン後: コレクション作成分と参加分はどちらも localStorage を読み書きするため直列にする。
+  // 並列だと Safari 等で完了順がずれ、古い load() 結果で save が上書きし一覧が空になる競合が起き得る。
   useEffect(() => {
     const hydrateAllFromRemote = () => {
-      void Promise.all([
-        hydrateUserOwnedCollectionsFromRemote(),
-        hydrateParticipatedMemberCollectionsFromRemote(),
-        hydrateBookmarksFromRemote(),
-      ]);
+      void (async () => {
+        await hydrateUserOwnedCollectionsFromRemote();
+        await hydrateParticipatedMemberCollectionsFromRemote();
+        await hydrateBookmarksFromRemote();
+      })();
     };
     hydrateAllFromRemote();
     window.addEventListener(getAuthUpdatedEventName(), hydrateAllFromRemote);

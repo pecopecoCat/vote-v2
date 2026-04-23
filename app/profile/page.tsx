@@ -242,9 +242,16 @@ function ProfileContent() {
   }, []);
 
   useEffect(() => {
+    if (auth.isLoggedIn && auth.userId) {
+      setCollections(getCollections());
+    }
+  }, [auth.isLoggedIn, auth.userId]);
+
+  useEffect(() => {
     const handler = () => {
       setAuth(getAuth());
       setFavoriteTags(getFavoriteTags());
+      setCollections(getCollections());
     };
     window.addEventListener(getAuthUpdatedEventName(), handler);
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);

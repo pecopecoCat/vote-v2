@@ -106,7 +106,10 @@ function save(userId: string, collections: Collection[], opts?: { skipRemotePush
 /** 作成したコレのみ（参加中のメンバー限定は除外）を KV に同期 */
 async function pushUserOwnedCollectionsToRemoteIfLoggedIn(userId: string, allCollections: Collection[]): Promise<void> {
   const auth = getAuth();
-  if (!auth.isLoggedIn || !auth.userId || auth.userId !== userId) return;
+  if (!auth.isLoggedIn) return;
+  // LINEログイン（デモ userId 無し）は getCurrentActivityUserId() が "line" を返すため、それを userId として扱う
+  const authKey = auth.userId ?? getCurrentActivityUserId();
+  if (authKey !== userId) return;
   const owned = allCollections.filter((c) => !c.joinedParticipation);
   try {
     const res = await fetch("/api/user-collections", {
@@ -136,8 +139,9 @@ async function pushUserOwnedCollectionsToRemoteIfLoggedIn(userId: string, allCol
 export async function hydrateUserOwnedCollectionsFromRemote(): Promise<void> {
   if (typeof window === "undefined") return;
   const auth = getAuth();
-  if (!auth.isLoggedIn || !auth.userId) return;
-  const uid = auth.userId;
+  if (!auth.isLoggedIn) return;
+  const uid = getCurrentActivityUserId();
+  if (!uid || uid.startsWith("guest_")) return;
   try {
     const res = await fetch(`/api/user-collections?userId=${encodeURIComponent(uid)}`);
     if (res.status === 503) return;
@@ -227,7 +231,9 @@ export function addParticipatedMemberCollectionIfNeeded(col: Collection, opts?: 
   // ブラウザ/端末が変わっても維持できるよう、ログインユーザーはKVにも保存（KV未設定なら無視）
   if (opts?.skipRemote) return;
   const auth = getAuth();
-  if (!auth.isLoggedIn || !auth.userId) return;
+  if (!auth.isLoggedIn) return;
+  const remoteUserId = auth.userId ?? uid;
+  if (!remoteUserId || remoteUserId.startsWith("guest_")) return;
   const memberProfile =
     typeof auth.user?.name === "string" && auth.user.name.trim()
       ? {
@@ -242,7 +248,7 @@ export function addParticipatedMemberCollectionIfNeeded(col: Collection, opts?: 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      userId: auth.userId,
+      userId: remoteUserId,
       collection: {
         id: col.id,
         name: col.name,
@@ -263,9 +269,11 @@ export function addParticipatedMemberCollectionIfNeeded(col: Collection, opts?: 
 export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<void> {
   if (typeof window === "undefined") return;
   const auth = getAuth();
-  if (!auth.isLoggedIn || !auth.userId) return;
+  if (!auth.isLoggedIn) return;
+  const uid = getCurrentActivityUserId();
+  if (!uid || uid.startsWith("guest_")) return;
   try {
-    const res = await fetch(`/api/member-collections?userId=${encodeURIComponent(auth.userId)}`);
+    const res = await fetch(`/api/member-collections?userId=${encodeURIComponent(uid)}`);
     if (!res.ok) return;
     const data = (await res.json()) as { collections?: unknown };
     const list = Array.isArray(data?.collections) ? data.collections : [];
@@ -297,7 +305,6 @@ export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<
     }
 
     // KV側から消えた参加中コレクションはローカルからも掃除（作成者削除の反映）
-    const uid = getCurrentActivityUserId();
     const current = getCollections();
     const next = current.filter((c) => !c.joinedParticipation || remoteIds.has(c.id));
     if (next.length !== current.length) {
