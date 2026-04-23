@@ -411,8 +411,18 @@ export default function CollectionPage() {
     if (!collection?.id || collection.visibility !== "member") return;
     const colId = collection.id;
     let cancelled = false;
+    // focus/interval 等で多重に叩かない
+    let inFlight = false;
+    let lastPullAt = 0;
     const pullOnce = async () => {
+      const now = Date.now();
+      if (inFlight) return;
+      // 直近で叩いた直後（同一フレームでの重複など）を避ける
+      if (now - lastPullAt < 800) return;
+      inFlight = true;
+      lastPullAt = now;
       const r = await fetchMemberCollectionVotesRemote(colId);
+      inFlight = false;
       if (cancelled) return;
       if (r.ok) {
         hydrateCollectionScopedFromSnapshot(colId, r.snapshot);
@@ -433,8 +443,16 @@ export default function CollectionPage() {
   useEffect(() => {
     if (!collection?.id || collection.visibility !== "member") return;
     const colId = collection.id;
+    let inFlight = false;
+    let lastPullAt = 0;
     const pull = async () => {
+      const now = Date.now();
+      if (inFlight) return;
+      if (now - lastPullAt < 800) return;
+      inFlight = true;
+      lastPullAt = now;
       const r = await fetchMemberCollectionVotesRemote(colId);
+      inFlight = false;
       if (r.ok) {
         hydrateCollectionScopedFromSnapshot(colId, r.snapshot);
         setScopedVotesVersion((v) => v + 1);

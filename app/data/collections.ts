@@ -313,8 +313,27 @@ export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<
     const current = getCollections();
     const candidates = current.filter((c) => c.joinedParticipation && !remoteIds.has(c.id));
     if (candidates.length > 0) {
+      // まず一覧API（index）で存在確認し、無いものだけ個別に 404 確認（不要なリクエスト削減）
+      let indexIds: Set<string> | null = null;
+      try {
+        const idxRes = await fetch("/api/collections");
+        if (idxRes.ok) {
+          const idx = (await idxRes.json()) as { collections?: unknown };
+          const rows = Array.isArray(idx?.collections) ? idx.collections : [];
+          const ids = new Set<string>();
+          for (const r of rows) {
+            if (!r || typeof r !== "object") continue;
+            const id = (r as { id?: unknown }).id;
+            if (typeof id === "string" && id.length > 0) ids.add(id);
+          }
+          indexIds = ids;
+        }
+      } catch {
+        // ignore
+      }
       const toRemove = new Set<string>();
       for (const c of candidates) {
+        if (indexIds && indexIds.has(c.id)) continue;
         try {
           const r = await fetch(`/api/collection/${encodeURIComponent(c.id)}?userId=${encodeURIComponent(uid)}`);
           if (r.status === 404) toRemove.add(c.id);
