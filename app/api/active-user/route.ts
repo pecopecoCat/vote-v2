@@ -3,6 +3,8 @@ import { getKV } from "../../lib/kv";
 import { DEMO_USER_IDS, type DemoUserId } from "../../data/auth";
 
 const KV_KEY_PREFIX = "vote_active_user:";
+/** ログアウト取りこぼし対策：一定時間で自動解放（秒） */
+const ACTIVE_USER_TTL_SEC = 60 * 60 * 12; // 12h
 
 const VALID_IDS = new Set<string>(DEMO_USER_IDS);
 
@@ -62,6 +64,31 @@ export async function POST(
     }
     if (!isValidUserId(userId)) {
       return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+    }
+
+    /**
+     * 可能なら Redis の `SET key value NX EX <ttl>` を使って、
+     * - 原子的に重複ログインを防ぎつつ
+     * - ログアウト取りこぼし時も TTL で自然回復
+     * を実現する。
+     */
+    const kvAny = kv as unknown as {
+      set?: (key: string, value: string, opts?: { nx?: boolean; ex?: number }) => Promise<unknown>;
+    };
+    if (typeof kvAny.set === "function") {
+      try {
+        const r = await kvAny.set(activeKey(userId), "1", { nx: true, ex: ACTIVE_USER_TTL_SEC });
+        // Upstash/Redis: 成功すると "OK"、既に存在すると null が返る
+        if (r === null) {
+          return NextResponse.json(
+            { error: "このアカウントは別の端末でログイン中です。", code: "ALREADY_LOGGED_IN" },
+            { status: 409 }
+          );
+        }
+        return NextResponse.json({ ok: true });
+      } catch {
+        // fall through to legacy handling
+      }
     }
 
     // 原子的に「いなければセット」。既に存在すれば 0 が返り二重ログインとみなす
