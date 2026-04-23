@@ -1,7 +1,16 @@
 "use client";
 
-import { useMemo, useState, useEffect, Suspense, useCallback, useRef, memo } from "react";
-import { useSearchParams } from "next/navigation";
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  Suspense,
+  useCallback,
+  useRef,
+  memo,
+} from "react";
+import { useSearchParams, usePathname } from "next/navigation";
 import AppHeader from "./components/AppHeader";
 import VoteCard from "./components/VoteCard";
 import AdCard from "./components/AdCard";
@@ -522,10 +531,87 @@ function HomeContent() {
     [publicCards, activity, feedKeepVotedCardVisibleIds]
   );
 
+  /** 急上昇中：並びはタブ復帰・別ページから戻る・ブラウザタブ復帰・リロード時だけ更新（投票のたびにガクッと動かない） */
+  const cardsForFeedRef = useRef(cardsForFeed);
+  const activityRef = useRef(activity);
+  cardsForFeedRef.current = cardsForFeed;
+  activityRef.current = activity;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const [trendingOrderTick, setTrendingOrderTick] = useState(0);
+  const [trendingFrozenIds, setTrendingFrozenIds] = useState<string[] | null>(null);
+  const bumpTrendingOrder = useCallback(() => {
+    setTrendingOrderTick((t) => t + 1);
+  }, []);
+  const pathname = usePathname();
+  const prevPathnameRef = useRef(pathname);
+
+  useLayoutEffect(() => {
+    if (activeTab !== "trending") {
+      setTrendingFrozenIds(null);
+      return;
+    }
+    const cf = cardsForFeedRef.current;
+    const act = activityRef.current;
+    setTrendingFrozenIds(sortByTrending(cf, act).map((c) => resolveStableVoteCardId(c)));
+  }, [activeTab, trendingOrderTick]);
+
+  useEffect(() => {
+    const prev = prevPathnameRef.current;
+    prevPathnameRef.current = pathname;
+    if (pathname === "/" && prev !== "/" && activeTabRef.current === "trending") {
+      bumpTrendingOrder();
+    }
+  }, [pathname, bumpTrendingOrder]);
+
+  useEffect(() => {
+    let wasHidden = document.visibilityState === "hidden";
+    const onVis = () => {
+      if (document.visibilityState === "hidden") {
+        wasHidden = true;
+        return;
+      }
+      if (wasHidden && activeTabRef.current === "trending") {
+        wasHidden = false;
+        bumpTrendingOrder();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [bumpTrendingOrder]);
+
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted && activeTabRef.current === "trending") bumpTrendingOrder();
+    };
+    window.addEventListener("pageshow", onPageShow as EventListener);
+    return () => window.removeEventListener("pageshow", onPageShow as EventListener);
+  }, [bumpTrendingOrder]);
+
   const cardsForTab = useMemo(() => {
     switch (activeTab) {
-      case "trending":
-        return sortByTrending(cardsForFeed, activity);
+      case "trending": {
+        const sortedNow = sortByTrending(cardsForFeed, activity);
+        if (trendingFrozenIds == null || trendingFrozenIds.length === 0) return sortedNow;
+        const byId = new Map(sortedNow.map((c) => [resolveStableVoteCardId(c), c]));
+        const out: VoteCardData[] = [];
+        const used = new Set<string>();
+        for (const id of trendingFrozenIds) {
+          const c = byId.get(id);
+          if (c) {
+            out.push(c);
+            used.add(id);
+          }
+        }
+        for (const c of sortedNow) {
+          const id = resolveStableVoteCardId(c);
+          if (!used.has(id)) {
+            out.push(c);
+            used.add(id);
+          }
+        }
+        return out;
+      }
       case "new":
         return sortByNewest(cardsForFeed);
       case "myTimeline": {
@@ -551,6 +637,7 @@ function HomeContent() {
     auth.isLoggedIn,
     auth.user?.name,
     publicCards,
+    trendingFrozenIds,
   ]);
 
   /** 実際にあるコレクションからランダム表示用プール */
@@ -622,9 +709,7 @@ function HomeContent() {
           isOwnCard={cardOptionsIsOwnCard}
           onClose={() => setCardOptionsCardId(null)}
           onHide={(cardId) => {
-            const card = allCards.find(
-              (c) => (c.id ?? c.question) === cardId
-            );
+            const card = allCards.find((c) => resolveStableVoteCardId(c) === cardId);
             if (card?.createdByUserId) addHiddenUser(card.createdByUserId);
             addHiddenCard(cardId);
             setHiddenUserIds(getHiddenUserIds());

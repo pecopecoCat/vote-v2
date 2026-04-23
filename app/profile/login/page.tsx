@@ -120,12 +120,24 @@ function ProfileLoginContent() {
             body: JSON.stringify({ logoutUserId: userId }),
           });
         }
-        const res = await fetch("/api/active-user", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
-        });
-        const data = (await res.json()) as { error?: string; code?: string };
+        const register = () =>
+          fetch("/api/active-user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId }),
+          });
+        let res = await register();
+        let data = (await res.json()) as { error?: string; code?: string };
+        if (res.status === 409) {
+          // ログアウト直後など KV の反映が遅いと同一端末でも 409 になることがあるため、一度 del して再試行する
+          await fetch("/api/active-user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ logoutUserId: userId }),
+          });
+          res = await register();
+          data = (await res.json()) as { error?: string; code?: string };
+        }
         if (res.status === 409) {
           setLoginError(data.error ?? "このアカウントは別の端末でログイン中です。");
           return;

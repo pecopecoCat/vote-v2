@@ -11,7 +11,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { VoteCardData } from "../data/voteCards";
+import { resolveStableVoteCardId, type VoteCardData } from "../data/voteCards";
 import { isVotingAllowedNow, resolveCardForVotePeriod } from "../data/votePeriod";
 import type { CardActivity } from "../data/voteCardActivity";
 import {
@@ -639,7 +639,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   const removeCreatedVote = useCallback((cardId: string) => {
     setCreatedVotesForTimeline((prev) =>
-      prev.filter((c) => (c.id ?? c.question) !== cardId)
+      prev.filter((c) => resolveStableVoteCardId(c) !== cardId)
     );
   }, []);
 

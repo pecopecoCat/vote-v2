@@ -1,4 +1,4 @@
-import type { VoteCardData } from "./voteCards";
+import { resolveStableVoteCardId, type VoteCardData } from "./voteCards";
 import type { VoteCardPattern } from "../components/VoteCard";
 import { getCurrentActivityUserId, DEMO_USER_IDS } from "./auth";
 
@@ -157,9 +157,9 @@ export function addCreatedVote(card: VoteCardData): void {
   saveForUser(userId, list);
 }
 
-/** 作ったVOTEを削除（現在ユーザー分のみ。cardId = card.id ?? card.question） */
+/** 作ったVOTEを削除（現在ユーザー分のみ。cardId は一覧と同じ resolveStableVoteCardId） */
 export function deleteCreatedVote(cardId: string): void {
   const userId = getCurrentActivityUserId();
-  const list = loadForUser(userId).filter((c) => (c.id ?? c.question) !== cardId);
+  const list = loadForUser(userId).filter((c) => resolveStableVoteCardId(c) !== cardId);
   saveForUser(userId, list);
 }

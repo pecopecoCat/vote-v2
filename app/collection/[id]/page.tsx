@@ -375,7 +375,7 @@ export default function CollectionPage() {
     } else {
       void pull();
     }
-    const interval = window.setInterval(() => void pull(), 8000);
+    const interval = window.setInterval(() => void pull(), 20_000);
     const onFocus = () => void pull();
     const onVis = () => {
       if (document.visibilityState === "visible") void pull();
@@ -411,19 +411,6 @@ export default function CollectionPage() {
   }, [collection, activityUserId, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
 
   const isPinned = pinnedIds.includes(id);
-  const commentedCardIdSet = useMemo(() => {
-    const set = new Set<string>();
-    const opts = {
-      isLoggedIn: auth.isLoggedIn,
-      displayName: auth.user?.name,
-    };
-    for (const [cid, a] of Object.entries(activity)) {
-      if ((a.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
-        set.add(cid);
-      }
-    }
-    return set;
-  }, [activity, auth.isLoggedIn, auth.user?.name]);
 
   const cardsInCollection = useMemo(() => {
     if (!collection) return [];
@@ -435,6 +422,22 @@ export default function CollectionPage() {
       })
       .filter((x): x is { card: VoteCardData; cardId: string } => x != null);
   }, [collection, createdVotesForTimeline]);
+
+  /** コレ内カードだけ見る（全 activity を走査しない） */
+  const commentedCardIdSet = useMemo(() => {
+    const set = new Set<string>();
+    const opts = {
+      isLoggedIn: auth.isLoggedIn,
+      displayName: auth.user?.name,
+    };
+    for (const { cardId } of cardsInCollection) {
+      const a = activity[cardId];
+      if ((a?.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
+        set.add(cardId);
+      }
+    }
+    return set;
+  }, [activity, auth.isLoggedIn, auth.user?.name, cardsInCollection]);
 
   const hasAnyMemberScopedVote = useMemo(() => {
     if (!collection?.id || collection.visibility !== "member") return false;
@@ -713,8 +716,11 @@ export default function CollectionPage() {
                 voteActivity
               );
               return (
-                <VoteCard
+                <div
                   key={cardId}
+                  className="[content-visibility:auto] [contain-intrinsic-size:auto_380px]"
+                >
+                <VoteCard
                   backgroundImageUrl={backgroundForCard(card, cardId)}
                   patternType={card.patternType ?? "yellow-loops"}
                   question={card.question}
@@ -743,6 +749,7 @@ export default function CollectionPage() {
                   periodEnd={card.periodEnd}
                   commentsDisabled={card.commentsDisabled === true}
                 />
+                </div>
               );
             })}
           </div>
