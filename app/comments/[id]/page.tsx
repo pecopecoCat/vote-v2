@@ -81,6 +81,7 @@ export default function CommentsPage() {
   const {
     createdVotesForTimeline,
     activity: sharedActivity,
+    activityBootstrapDone,
     addVote: sharedAddVote,
     addComment: sharedAddComment,
     removeComment: sharedRemoveComment,
@@ -88,11 +89,10 @@ export default function CommentsPage() {
   const activity = sharedActivity[stableId] ?? sharedActivity[id] ?? emptyActivity;
   const [sessionSelectedOption, setSessionSelectedOption] = useState<"A" | "B" | null>(null);
 
-  const [card, setCard] = useState<VoteCardData | null>(() => {
-    if (id.startsWith("created-")) return null;
-    return getCardByStableId(id, createdVotesForTimeline);
-  });
-  const [resolved, setResolved] = useState(!id.startsWith("created-"));
+  const card = useMemo(
+    () => getCardByStableId(id, createdVotesForTimeline),
+    [id, createdVotesForTimeline]
+  );
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
@@ -154,15 +154,8 @@ export default function CommentsPage() {
     return () => document.removeEventListener("visibilitychange", handler);
   }, []);
 
-  useEffect(() => {
-    if (!id.startsWith("created-")) return;
-    const c = getCardByStableId(id, createdVotesForTimeline);
-    setCard(c);
-    setResolved(true);
-  }, [id, createdVotesForTimeline]);
-
   useLayoutEffect(() => {
-    if (!resolved || !card) return;
+    if (!card) return;
     const el = commentsSectionRef.current;
     if (!el) return;
     requestAnimationFrame(() => {
@@ -170,7 +163,7 @@ export default function CommentsPage() {
         el.scrollIntoView({ behavior: "auto", block: "start" });
       });
     });
-  }, [id, resolved, card?.id]);
+  }, [id, card?.id]);
 
   const allCards = useMemo(() => {
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
@@ -334,10 +327,19 @@ export default function CommentsPage() {
       );
     });
 
-  if (!resolved) {
+  const waitingForCreatedCard =
+    id.startsWith("created-") && !card && !activityBootstrapDone;
+
+  if (waitingForCreatedCard) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F1F1F1]">
-        <p className="text-gray-500">読み込み中...</p>
+      <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
+        <AppHeader type="title" title="みんなのコメント" backHref="/" />
+        <main className="mx-auto max-w-lg px-[5.333vw] pt-12 text-center">
+          <p className="text-base leading-relaxed text-[#191919]">
+            準備中です。もう少し待ってね🙏
+          </p>
+        </main>
+        <BottomNav activeId="home" />
       </div>
     );
   }

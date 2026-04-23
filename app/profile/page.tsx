@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import BottomNav from "../components/BottomNav";
@@ -225,6 +225,11 @@ function ProfileContent() {
   const [isFavoriteTagsEditMode, setIsFavoriteTagsEditMode] = useState(false);
   /** 作ったVOTE一覧の再取得用 */
   const [createdVotesRefreshKey, setCreatedVotesRefreshKey] = useState(0);
+  /** myVOTE リモート削除中（API 待ち） */
+  const [myVoteDeleteInProgress, setMyVoteDeleteInProgress] = useState(false);
+  /** 体感：すぐ終わるときは出さず、少し遅れてから表示 */
+  const [showMyVoteDeletingDialog, setShowMyVoteDeletingDialog] = useState(false);
+  const myVoteDeleteDelayTimerRef = useRef<number | null>(null);
   /** myVOTE 並び順 */
   const [myVoteSortOrder, setMyVoteSortOrder] = useState<"newest" | "oldest">("newest");
   /** 投票タブ 並び順 */
@@ -281,6 +286,63 @@ function ProfileContent() {
     window.addEventListener(eventName, handler);
     return () => window.removeEventListener(eventName, handler);
   }, []);
+
+  useEffect(() => {
+    if (!myVoteDeleteInProgress) {
+      if (myVoteDeleteDelayTimerRef.current != null) {
+        clearTimeout(myVoteDeleteDelayTimerRef.current);
+        myVoteDeleteDelayTimerRef.current = null;
+      }
+      setShowMyVoteDeletingDialog(false);
+      return;
+    }
+    myVoteDeleteDelayTimerRef.current = window.setTimeout(() => {
+      myVoteDeleteDelayTimerRef.current = null;
+      setShowMyVoteDeletingDialog(true);
+    }, 320);
+    return () => {
+      if (myVoteDeleteDelayTimerRef.current != null) {
+        clearTimeout(myVoteDeleteDelayTimerRef.current);
+        myVoteDeleteDelayTimerRef.current = null;
+      }
+    };
+  }, [myVoteDeleteInProgress]);
+
+  const handleDeleteMyVote = useCallback(
+    async (cardId: string) => {
+      if (shared.isRemote) {
+        setMyVoteDeleteInProgress(true);
+        try {
+          const uid = getCurrentActivityUserId();
+          const res = await fetch("/api/created-votes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              delete: true,
+              userId: uid,
+              cardId,
+            }),
+          });
+          if (res.ok) {
+            deleteCreatedVote(cardId);
+            sharedRemoveCreatedVote(cardId);
+          } else {
+            await refetchCreatedVotes();
+          }
+        } catch {
+          await refetchCreatedVotes();
+        } finally {
+          setCreatedVotesRefreshKey((k) => k + 1);
+          setMyVoteDeleteInProgress(false);
+        }
+        return;
+      }
+      deleteCreatedVote(cardId);
+      sharedRemoveCreatedVote(cardId);
+      setCreatedVotesRefreshKey((k) => k + 1);
+    },
+    [shared.isRemote, sharedRemoveCreatedVote, refetchCreatedVotes]
+  );
 
   useEffect(() => {
     const handler = () => setHiddenUserIds(getHiddenUserIds());
@@ -655,35 +717,7 @@ function ProfileContent() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            void (async () => {
-                              if (shared.isRemote) {
-                                const uid = getCurrentActivityUserId();
-                                try {
-                                  const res = await fetch("/api/created-votes", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                      delete: true,
-                                      userId: uid,
-                                      cardId,
-                                    }),
-                                  });
-                                  if (res.ok) {
-                                    deleteCreatedVote(cardId);
-                                    await refetchCreatedVotes();
-                                  } else {
-                                    await refetchCreatedVotes();
-                                  }
-                                } catch {
-                                  await refetchCreatedVotes();
-                                }
-                                setCreatedVotesRefreshKey((k) => k + 1);
-                                return;
-                              }
-                              deleteCreatedVote(cardId);
-                              sharedRemoveCreatedVote(cardId);
-                              setCreatedVotesRefreshKey((k) => k + 1);
-                            })();
+                            void handleDeleteMyVote(cardId);
                           }}
                         >
                           ×
@@ -1017,6 +1051,19 @@ function ProfileContent() {
           </>
         )}
       </main>
+
+      {showMyVoteDeletingDialog ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-6"
+          role="alertdialog"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <div className="max-w-sm rounded-2xl bg-white px-8 py-7 text-center shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+            <p className="text-base font-bold leading-relaxed text-[#191919]">削除中・・・👷</p>
+          </div>
+        </div>
+      ) : null}
 
       <BottomNav activeId="profile" />
 

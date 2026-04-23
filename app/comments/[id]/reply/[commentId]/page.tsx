@@ -46,16 +46,16 @@ export default function CommentReplyThreadPage() {
   const {
     createdVotesForTimeline,
     activity: sharedActivity,
+    activityBootstrapDone,
     addComment: sharedAddComment,
     removeComment: sharedRemoveComment,
   } = shared;
   const activity = sharedActivity[id] ?? emptyActivity;
 
-  const [card, setCard] = useState<VoteCardData | null>(() => {
-    if (id.startsWith("created-")) return null;
-    return getCardByStableId(id, createdVotesForTimeline);
-  });
-  const [resolved, setResolved] = useState(!id.startsWith("created-"));
+  const card = useMemo(
+    () => getCardByStableId(id, createdVotesForTimeline),
+    [id, createdVotesForTimeline]
+  );
   const [auth, setAuth] = useState(() => getAuth());
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
@@ -78,13 +78,6 @@ export default function CommentReplyThreadPage() {
     window.addEventListener(getAuthUpdatedEventName(), handler);
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
-
-  useEffect(() => {
-    if (!id.startsWith("created-")) return;
-    const c = getCardByStableId(id, createdVotesForTimeline);
-    setCard(c);
-    setResolved(true);
-  }, [id, createdVotesForTimeline]);
 
   const parent = useMemo(
     () => activity.comments.find((c) => c.id === commentId) ?? null,
@@ -117,10 +110,18 @@ export default function CommentReplyThreadPage() {
     void sharedAddComment(cardId, payload, parentCommentId, commenterVote).then(() => setReplyingToCommentId(null));
   };
 
-  if (!resolved) {
+  const waitingForCreatedCard =
+    id.startsWith("created-") && !card && !activityBootstrapDone;
+
+  if (waitingForCreatedCard) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F1F1F1]">
-        <p className="text-gray-500">読み込み中...</p>
+      <div className="min-h-screen bg-[#F1F1F1] pb-[120px]">
+        <AppHeader type="title" title="リプライ" backHref={`/comments/${id}`} />
+        <main className="mx-auto max-w-lg px-[5.333vw] pt-12 text-center">
+          <p className="text-base leading-relaxed text-[#191919]">
+            準備中です。もう少し待ってね🙏
+          </p>
+        </main>
       </div>
     );
   }

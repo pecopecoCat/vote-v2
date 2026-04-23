@@ -379,7 +379,16 @@ function HomeContent() {
   }, [activeTab]);
   const [collections, setCollections] = useState(() => getCollections());
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
+  const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
+  const [showFeedPreparingNotice, setShowFeedPreparingNotice] = useState(false);
+  useEffect(() => {
+    if (activityBootstrapDone) {
+      setShowFeedPreparingNotice(false);
+      return;
+    }
+    const t = window.setTimeout(() => setShowFeedPreparingNotice(true), 400);
+    return () => window.clearTimeout(t);
+  }, [activityBootstrapDone]);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
@@ -670,6 +679,14 @@ function HomeContent() {
         onSelect={setActiveTab}
         isLoggedIn={currentUser.type === "sns"}
       />
+
+      {showFeedPreparingNotice ? (
+        <div className="mx-auto max-w-lg px-[5.333vw] pt-3">
+          <p className="rounded-2xl bg-white/90 px-4 py-3 text-center text-sm leading-relaxed text-[#191919] shadow-[0_2px_1px_0_rgba(51,51,51,0.08)]">
+            準備中です。もう少し待ってね🙏
+          </p>
+        </div>
+      ) : null}
 
       {/* メインコンテンツ（下ナビ分の余白を確保） */}
       <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
