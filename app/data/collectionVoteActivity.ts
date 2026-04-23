@@ -36,7 +36,7 @@ interface GlobalRow {
 
 export type UserSelectionRow = { userSelectedOption?: "A" | "B"; votedAt?: string };
 
-/** 参加APIでKVに保存したプロフィール（コレ内に1票入るまで一覧には混ぜない） */
+/** 参加APIでKVに保存したプロフィール（メンバー一覧に表示する） */
 export type MemberCollectionJoinProfile = { name: string; iconUrl?: string; joinedAt: string };
 
 /** API GET/POST のレスポンスをそのまま保存できる形 */

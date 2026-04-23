@@ -32,7 +32,7 @@ export type MemberVotesBundle = {
   global: Record<string, { countA: number; countB: number }>;
   userSelections: Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>;
   participants: Record<string, { name: string; iconUrl?: string; lastVotedAt: string }>;
-  /** 参加APIで保存したプロフィール（コレ内に1票あるときだけUIで一覧に混ぜる） */
+  /** 参加APIで保存したプロフィール（投票前でも参加者一覧に反映） */
   joinProfiles: Record<string, { name: string; iconUrl?: string; joinedAt: string }>;
 };
 

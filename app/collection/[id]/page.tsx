@@ -32,7 +32,6 @@ import {
   COLLECTION_SCOPED_VOTES_UPDATED_EVENT,
   fetchMemberCollectionVotesRemote,
   getAllCollectionScopedActivity,
-  collectionMemberScopedHasAnyVote,
   getCollectionScopedParticipants,
   getMemberJoinProfiles,
   hydrateCollectionScopedFromSnapshot,
@@ -128,14 +127,12 @@ function buildMemberParticipantsForDisplay(
   return [creatorRow, ...sortedOthers];
 }
 
-/** コレ内に1票でもあれば、投票前に参加した人もアイコン一覧に載せる（作成者は base に含まれる） */
+/** 参加APIでKVに載った人を一覧に混ぜる（まだ誰も投票していなくても表示する） */
 function appendJoinOnlyParticipants(
   base: CollectionScopedParticipant[],
   joinProfiles: Record<string, { name: string; iconUrl?: string; joinedAt: string }>,
-  hasAnyVote: boolean,
   creatorUserId?: string
 ): CollectionScopedParticipant[] {
-  if (!hasAnyVote) return base;
   const entries = Object.entries(joinProfiles);
   if (entries.length === 0) return base;
   const seen = new Set(base.map((p) => p.userId));
@@ -318,6 +315,8 @@ export default function CollectionPage() {
             if (snap) {
               hydrateCollectionScopedFromSnapshot(data.id, snap);
               skipNextMemberPullRef.current = true;
+              // localStorage 更新だけでは useMemo が再実行されない場合があるため明示更新
+              setScopedVotesVersion((v) => v + 1);
             }
           }
           setCollectionFromApi({
@@ -376,13 +375,12 @@ export default function CollectionPage() {
     };
   }, [isWaitingCollectionFetch]);
 
-  /** メンバー限定: KV にコレクションがあれば他ユーザーの票を GET で取り込み（定期・フォーカス時） */
-  useEffect(() => {
+  /** メンバー限定: 初回は paint 前に GET を開始（体感遅延を抑える） */
+  useLayoutEffect(() => {
     if (!collection?.id || collection.visibility !== "member") return;
     const colId = collection.id;
     let cancelled = false;
-
-    const pull = async () => {
+    const pullOnce = async () => {
       const r = await fetchMemberCollectionVotesRemote(colId);
       if (cancelled) return;
       if (r.ok) {
@@ -390,12 +388,27 @@ export default function CollectionPage() {
         setScopedVotesVersion((v) => v + 1);
       }
     };
-
     if (skipNextMemberPullRef.current) {
       skipNextMemberPullRef.current = false;
     } else {
-      void pull();
+      void pullOnce();
     }
+    return () => {
+      cancelled = true;
+    };
+  }, [collection?.id, collection?.visibility, activityUserId]);
+
+  /** メンバー限定: 定期・フォーカス・タブ復帰で再取得 */
+  useEffect(() => {
+    if (!collection?.id || collection.visibility !== "member") return;
+    const colId = collection.id;
+    const pull = async () => {
+      const r = await fetchMemberCollectionVotesRemote(colId);
+      if (r.ok) {
+        hydrateCollectionScopedFromSnapshot(colId, r.snapshot);
+        setScopedVotesVersion((v) => v + 1);
+      }
+    };
     const interval = window.setInterval(() => void pull(), 20_000);
     const onFocus = () => void pull();
     const onVis = () => {
@@ -404,7 +417,6 @@ export default function CollectionPage() {
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVis);
     return () => {
-      cancelled = true;
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
@@ -460,11 +472,6 @@ export default function CollectionPage() {
     return set;
   }, [activity, auth.isLoggedIn, auth.user?.name, cardsInCollection]);
 
-  const hasAnyMemberScopedVote = useMemo(() => {
-    if (!collection?.id || collection.visibility !== "member") return false;
-    return collectionMemberScopedHasAnyVote(collection.id);
-  }, [collection?.id, collection?.visibility, scopedVotesVersion]);
-
   const memberJoinProfiles = useMemo(() => {
     if (!collection?.id || collection.visibility !== "member") return {};
     return getMemberJoinProfiles(collection.id);
@@ -478,20 +485,8 @@ export default function CollectionPage() {
       cardsInCollection,
       viewerAsOwnerProfile
     );
-    return appendJoinOnlyParticipants(
-      base,
-      memberJoinProfiles,
-      hasAnyMemberScopedVote,
-      collection.createdByUserId
-    );
-  }, [
-    collection,
-    memberParticipants,
-    cardsInCollection,
-    viewerAsOwnerProfile,
-    memberJoinProfiles,
-    hasAnyMemberScopedVote,
-  ]);
+    return appendJoinOnlyParticipants(base, memberJoinProfiles, collection.createdByUserId);
+  }, [collection, memberParticipants, cardsInCollection, viewerAsOwnerProfile, memberJoinProfiles]);
 
   /** メンバー限定を開いただけでもマイページのコレクション一覧に載せる（投票前でも可） */
   useEffect(() => {
