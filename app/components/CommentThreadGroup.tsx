@@ -35,7 +35,13 @@ export function CommentAvatar({ comment }: { comment: VoteComment }) {
   return (
     <div className="relative h-10 w-10 shrink-0">
       <span className="flex h-10 w-10 overflow-hidden rounded-full bg-[#E8E8E8]">
-        <img src={comment.user.iconUrl ?? "/default-avatar.png"} alt="" className="h-full w-full object-cover" />
+        <img
+          src={comment.user.iconUrl ?? "/default-avatar.png"}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+        />
       </span>
       {voteOpt === "A" && (
         <span

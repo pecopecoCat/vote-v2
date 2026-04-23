@@ -206,7 +206,13 @@ export default function VoteCardCompact({
                   {selectedSide === "A" && (
                     <span className="absolute -top-2 right-0 z-20 translate-x-1/2">
                       <span className="flex h-7 w-7 overflow-hidden rounded-full border-2 border-white shadow-[0_0_4px_rgba(0,0,0,0.1)]">
-                        <img src={userIconUrl} alt="" className="h-full w-full object-cover" />
+                        <img
+                          src={userIconUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
                       </span>
                     </span>
                   )}
@@ -241,7 +247,13 @@ export default function VoteCardCompact({
                   {selectedSide === "B" && (
                     <span className="absolute -top-2 right-0 z-20 translate-x-1/2">
                       <span className="flex h-7 w-7 overflow-hidden rounded-full border-2 border-white shadow-[0_0_4px_rgba(0,0,0,0.1)]">
-                        <img src={userIconUrl} alt="" className="h-full w-full object-cover" />
+                        <img
+                          src={userIconUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
                       </span>
                     </span>
                   )}

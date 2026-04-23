@@ -532,8 +532,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({ type: "vote", userId, cardId, option }),
         });
         if (res.ok) {
-          // カウント/コメントを最新化（遅れてきてもOK）
-          await fetchActivity();
+          // カウント/コメントを最新化（楽観表示済みのためブロックしない）
+          void fetchActivity();
         } else {
           // 失敗時は楽観更新を戻す（投票済みの誤表示を避ける）
           setActivity((prev) => {
@@ -608,7 +608,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           }),
         });
         if (res.ok) {
-          await fetchActivity();
+          void fetchActivity();
         } else {
           // 失敗時は追加した分だけ取り消し（楽観コメントの残存を避ける）
           setActivity((prev) => {
@@ -666,7 +666,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "bookmark", cardId }),
         });
-        if (res.ok) await fetchActivity();
+        if (res.ok) void fetchActivity();
       } catch {
         // ignore
       }

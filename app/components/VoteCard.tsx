@@ -437,6 +437,8 @@ function VoteCard({
                 src={optionAImageUrl}
                 alt={optionA}
                 className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
               <span
                 className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-[#E63E48] text-sm font-bold text-white"
@@ -459,6 +461,8 @@ function VoteCard({
                 src={optionBImageUrl}
                 alt={optionB}
                 className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
               <span
                 className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-[#3273E3] text-sm font-bold text-white"
@@ -547,6 +551,8 @@ function UserAvatar({ user }: { user?: CurrentUser | null }) {
         src={src}
         alt=""
         className="h-full w-full object-cover object-top"
+        loading="lazy"
+        decoding="async"
       />
     </span>
   );
