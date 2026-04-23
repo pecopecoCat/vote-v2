@@ -271,6 +271,10 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const isRemoteRef = useRef(false);
   isRemoteRef.current = isRemote;
 
+  /** 認証イベントが短時間に複数飛ぶとき activity GET を1回にまとめる（同一ユーザー時のみ） */
+  const authActivityTimerRef = useRef<number | null>(null);
+  const lastAuthActivityUserIdRef = useRef<string | null>(null);
+
   /** addVote / addComment の依存から外し、タイムライン更新のたびに子の onVote が変わらないようにする */
   const createdVotesForTimelineRef = useRef(createdVotesForTimeline);
   createdVotesForTimelineRef.current = createdVotesForTimeline;
@@ -348,33 +352,55 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   }, [fetchCreatedVotes, fetchActivity]);
 
   useEffect(() => {
-    const handler = () => fetchActivity();
-    window.addEventListener(getAuthUpdatedEventName(), handler);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
+    const DEBOUNCE_MS = 280;
+    lastAuthActivityUserIdRef.current = getCurrentActivityUserId();
+
+    const scheduleDebouncedFetch = () => {
+      if (authActivityTimerRef.current != null) {
+        clearTimeout(authActivityTimerRef.current);
+      }
+      authActivityTimerRef.current = window.setTimeout(() => {
+        authActivityTimerRef.current = null;
+        void fetchActivity();
+      }, DEBOUNCE_MS);
+    };
+
+    const onAuthUpdated = () => {
+      const uid = getCurrentActivityUserId();
+      if (lastAuthActivityUserIdRef.current !== uid) {
+        lastAuthActivityUserIdRef.current = uid;
+        if (authActivityTimerRef.current != null) {
+          clearTimeout(authActivityTimerRef.current);
+          authActivityTimerRef.current = null;
+        }
+        void fetchActivity();
+        return;
+      }
+      scheduleDebouncedFetch();
+    };
+
+    window.addEventListener(getAuthUpdatedEventName(), onAuthUpdated);
+    return () => {
+      window.removeEventListener(getAuthUpdatedEventName(), onAuthUpdated);
+      if (authActivityTimerRef.current != null) {
+        clearTimeout(authActivityTimerRef.current);
+        authActivityTimerRef.current = null;
+      }
+    };
   }, [fetchActivity]);
 
-  // ログインしたユーザーのコレクションをKVから取り込み（作成分は非公開含む・参加中は別キー）
+  // ログイン後: コレクション（作成・参加）とブックマークを KV から並列で取り込み（直列より待ち時間を短縮）
   useEffect(() => {
-    const handler = async () => {
-      await hydrateUserOwnedCollectionsFromRemote();
-      await hydrateParticipatedMemberCollectionsFromRemote();
+    const hydrateAllFromRemote = () => {
+      void Promise.all([
+        hydrateUserOwnedCollectionsFromRemote(),
+        hydrateParticipatedMemberCollectionsFromRemote(),
+        hydrateBookmarksFromRemote(),
+      ]);
     };
-    void handler();
-    const onAuth = () => {
-      void handler();
-    };
-    window.addEventListener(getAuthUpdatedEventName(), onAuth);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), onAuth);
-  }, []);
-
-  // ブックマーク（カード）も別ブラウザで維持（ログインユーザーのみ）
-  useEffect(() => {
-    const handler = () => {
-      void hydrateBookmarksFromRemote();
-    };
-    handler();
-    window.addEventListener(getAuthUpdatedEventName(), handler);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
+    hydrateAllFromRemote();
+    window.addEventListener(getAuthUpdatedEventName(), hydrateAllFromRemote);
+    return () => window.removeEventListener(getAuthUpdatedEventName(), hydrateAllFromRemote);
   }, []);
 
   // いいねなどで global だけ更新されたとき、既存の activity を上書きせずマージする（API取得分が消えないように）
