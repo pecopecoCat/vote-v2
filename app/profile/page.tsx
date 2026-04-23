@@ -196,7 +196,13 @@ function ProfileContent() {
   const [activeTab, setActiveTab] = useState<ProfileTabId>("vote");
   const [collections, setCollections] = useState<Collection[]>([]);
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity, addVote: sharedAddVote, removeCreatedVote: sharedRemoveCreatedVote } = shared;
+  const {
+    createdVotesForTimeline,
+    activity,
+    addVote: sharedAddVote,
+    removeCreatedVote: sharedRemoveCreatedVote,
+    refetchCreatedVotes,
+  } = shared;
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
   /** Bookmark タブでコレクション or ALL を選択中。null = TOP（リスト表示） */
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<null | "all" | string>(null);
@@ -649,9 +655,35 @@ function ProfileContent() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            deleteCreatedVote(cardId);
-                            sharedRemoveCreatedVote(cardId);
-                            setCreatedVotesRefreshKey((k) => k + 1);
+                            void (async () => {
+                              if (shared.isRemote) {
+                                const uid = getCurrentActivityUserId();
+                                try {
+                                  const res = await fetch("/api/created-votes", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      delete: true,
+                                      userId: uid,
+                                      cardId,
+                                    }),
+                                  });
+                                  if (res.ok) {
+                                    deleteCreatedVote(cardId);
+                                    await refetchCreatedVotes();
+                                  } else {
+                                    await refetchCreatedVotes();
+                                  }
+                                } catch {
+                                  await refetchCreatedVotes();
+                                }
+                                setCreatedVotesRefreshKey((k) => k + 1);
+                                return;
+                              }
+                              deleteCreatedVote(cardId);
+                              sharedRemoveCreatedVote(cardId);
+                              setCreatedVotesRefreshKey((k) => k + 1);
+                            })();
                           }}
                         >
                           ×

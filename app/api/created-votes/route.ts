@@ -1,11 +1,25 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../lib/kv";
 import { httpResponseFromKvWriteError } from "../../lib/kvWriteErrors";
+import { resolveStableVoteCardId, type VoteCardData } from "../../data/voteCards";
 
 const KV_KEY = "vote_created_votes";
 
 /** 保存形式: { userId: string, card: VoteCardData }[] */
 export type CreatedVoteEntry = { userId: string; card: Record<string, unknown> };
+
+function stableIdFromStoredCard(card: Record<string, unknown>): string {
+  return resolveStableVoteCardId({
+    patternType: "yellow-loops",
+    question: typeof card.question === "string" ? card.question : "",
+    optionA: typeof card.optionA === "string" ? card.optionA : "",
+    optionB: typeof card.optionB === "string" ? card.optionB : "",
+    countA: 0,
+    countB: 0,
+    commentCount: 0,
+    id: typeof card.id === "string" ? card.id : undefined,
+  } as VoteCardData);
+}
 
 export async function GET(): Promise<NextResponse<CreatedVoteEntry[] | { error: string }>> {
   const kv = await getKV();
@@ -34,7 +48,30 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
     );
   }
   try {
-    const body = (await request.json()) as { userId?: string; card?: Record<string, unknown> };
+    const body = (await request.json()) as {
+      delete?: boolean;
+      userId?: string;
+      cardId?: string;
+      card?: Record<string, unknown>;
+    };
+
+    if (body?.delete === true) {
+      const userId = typeof body.userId === "string" ? body.userId : "";
+      const cardId = typeof body.cardId === "string" ? body.cardId : "";
+      if (!userId || !cardId) {
+        return NextResponse.json(
+          { error: "リクエストが不正です。", code: "BAD_REQUEST" },
+          { status: 400 }
+        );
+      }
+      const list = (await kv.get<CreatedVoteEntry[]>(KV_KEY)) ?? [];
+      const next = list.filter(
+        (e) => !(e.userId === userId && stableIdFromStoredCard(e.card) === cardId)
+      );
+      await kv.set(KV_KEY, next);
+      return NextResponse.json({ ok: true });
+    }
+
     const userId = typeof body?.userId === "string" ? body.userId : "";
     const card = body?.card && typeof body.card === "object" ? body.card : null;
     if (!userId || !card) {

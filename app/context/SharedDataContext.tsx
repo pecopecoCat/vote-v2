@@ -213,6 +213,8 @@ export interface SharedDataContextValue {
   activityBootstrapDone: boolean;
   /** KV 活動・作成者向けイベントを再取得（通知画面の最新化用） */
   refetchActivity: () => Promise<boolean>;
+  /** 作成VOTE一覧を KV から再取得（マイページ削除後の同期用） */
+  refetchCreatedVotes: () => Promise<boolean>;
 }
 
 const SharedDataContext = createContext<SharedDataContextValue | null>(null);
@@ -246,6 +248,7 @@ export function useSharedData(): SharedDataContextValue {
       removeCreatedVote: () => {},
       activityBootstrapDone: true,
       refetchActivity: async () => false,
+      refetchCreatedVotes: async () => false,
     };
   }
   return ctx;
@@ -265,6 +268,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [memberJoinEvents, setMemberJoinEvents] = useState<MemberJoinOwnerEvent[]>([]);
   const [isRemote, setIsRemote] = useState(false);
   const [activityBootstrapDone, setActivityBootstrapDone] = useState(false);
+  const isRemoteRef = useRef(false);
+  isRemoteRef.current = isRemote;
 
   /** addVote / addComment の依存から外し、タイムライン更新のたびに子の onVote が変わらないようにする */
   const createdVotesForTimelineRef = useRef(createdVotesForTimeline);
@@ -416,10 +421,16 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const name = getCreatedVotesUpdatedEventName();
-    const handler = () => setCreatedVotesForTimeline(getCreatedVotesForTimeline());
+    const handler = () => {
+      if (isRemoteRef.current) {
+        void fetchCreatedVotes();
+      } else {
+        setCreatedVotesForTimeline(getCreatedVotesForTimeline());
+      }
+    };
     window.addEventListener(name, handler);
     return () => window.removeEventListener(name, handler);
-  }, []);
+  }, [fetchCreatedVotes]);
 
   const addCreatedVote = useCallback(
     async (card: VoteCardData) => {
@@ -659,6 +670,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       removeCreatedVote,
       activityBootstrapDone,
       refetchActivity: fetchActivity,
+      refetchCreatedVotes: fetchCreatedVotes,
     }),
     [
       createdVotesForTimeline,
@@ -675,6 +687,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       removeCreatedVote,
       activityBootstrapDone,
       fetchActivity,
+      fetchCreatedVotes,
     ]
   );
 
