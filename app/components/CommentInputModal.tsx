@@ -190,7 +190,13 @@ export default function CommentInputModal({
             <div className="mb-3 flex items-center justify-between gap-3 text-[12px] text-[#191919]">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="flex h-7 w-7 overflow-hidden rounded-full bg-[#E8E8E8]">
-                  <img src={replyToUserIconUrl ?? "/default-avatar.png"} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={replyToUserIconUrl ?? "/default-avatar.png"}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </span>
                 <span className="min-w-0 truncate font-semibold">{replyToUserName}</span>
                 <span className="shrink-0 text-[#191919]/35">さんに返信</span>

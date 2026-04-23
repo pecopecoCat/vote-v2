@@ -663,6 +663,8 @@ export default function CollectionPage() {
                     className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]"
                     width={24}
                     height={24}
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => {
                       e.currentTarget.onerror = null;
                       e.currentTarget.src = "/default-avatar.png";

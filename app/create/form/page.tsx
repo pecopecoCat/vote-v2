@@ -252,7 +252,13 @@ function CreateFormContent() {
               {optionAImageUrl ? (
                 <span className="relative flex h-10 w-10 overflow-hidden rounded-[10px] pointer-events-none">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={optionAImageUrl} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={optionAImageUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </span>
               ) : (
                 <span
@@ -298,7 +304,13 @@ function CreateFormContent() {
               {optionBImageUrl ? (
                 <span className="relative flex h-10 w-10 overflow-hidden rounded-[10px] pointer-events-none">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={optionBImageUrl} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={optionBImageUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </span>
               ) : (
                 <span
@@ -440,6 +452,8 @@ function CreateFormContent() {
                   src={url}
                   alt=""
                   className="h-full w-full rounded-full object-contain"
+                  loading="lazy"
+                  decoding="async"
                 />
                 {selectedBackgroundUrl === url && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black shadow-[0_2px_2px_0_rgba(0,0,0,0.08)]">

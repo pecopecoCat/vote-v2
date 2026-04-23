@@ -553,6 +553,8 @@ function ProfileContent() {
                 className="h-full w-full object-cover"
                 width={56}
                 height={56}
+                decoding="async"
+                fetchPriority="high"
               />
             </div>
             <div>

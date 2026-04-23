@@ -370,6 +370,8 @@ function ActivityIcon({ item }: { item: ActivityItem }) {
               src={item.actorIconUrl ?? "/default-avatar.png"}
               alt=""
               className="h-full w-full object-cover"
+              loading="lazy"
+              decoding="async"
             />
           </span>
           {actorVote === "A" || actorVote === "B" ? <ABBadge option={actorVote} /> : null}

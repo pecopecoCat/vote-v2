@@ -87,6 +87,8 @@ export default function AccountSettingsPage() {
                 src={iconUrl}
                 alt=""
                 className="h-full w-full object-cover"
+                decoding="async"
+                fetchPriority="high"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "/default-avatar.png";
                 }}
