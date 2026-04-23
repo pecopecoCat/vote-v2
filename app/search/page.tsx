@@ -65,6 +65,7 @@ import {
   type CollectionGradient,
   type PopularCollection,
 } from "../data/search";
+import { perfMeasure } from "../lib/perf";
 
 function backgroundForSearchCard(card: VoteCardData, cardId: string): string {
   if (card.backgroundImageUrl) return card.backgroundImageUrl;
@@ -670,18 +671,20 @@ function SearchContent() {
   }, [filteredCards, showVoted, activity, keepVotedCardVisible]);
 
   const voteCardViewModels = useMemo(() => {
-    // 表示用に必要なものをまとめて前計算し、render 中の work を減らす
-    return cardsToShow.map((card) => {
-      const cardId = resolveStableVoteCardId(card);
-      const act = activity[cardId];
-      const merged = getMergedCounts(
-        card.countA ?? 0,
-        card.countB ?? 0,
-        card.commentCount ?? 0,
-        act ?? { countA: 0, countB: 0, comments: [] }
-      );
-      const bgUrl = card.backgroundImageUrl ?? backgroundForSearchCard(card, cardId);
-      return { card, cardId, act, merged, bgUrl };
+    return perfMeasure("search.voteCardViewModels", () => {
+      // 表示用に必要なものをまとめて前計算し、render 中の work を減らす
+      return cardsToShow.map((card) => {
+        const cardId = resolveStableVoteCardId(card);
+        const act = activity[cardId];
+        const merged = getMergedCounts(
+          card.countA ?? 0,
+          card.countB ?? 0,
+          card.commentCount ?? 0,
+          act ?? { countA: 0, countB: 0, comments: [] }
+        );
+        const bgUrl = card.backgroundImageUrl ?? backgroundForSearchCard(card, cardId);
+        return { card, cardId, act, merged, bgUrl };
+      });
     });
   }, [cardsToShow, activity]);
   const handleVote = useCallback(

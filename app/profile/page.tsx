@@ -31,6 +31,7 @@ import {
 import { getBookmarkIds, isCardBookmarked, getBookmarksUpdatedEventName } from "../data/bookmarks";
 import { getCollectionGradientStyle } from "../data/search";
 import { getAuth, getAuthUpdatedEventName } from "../data/auth";
+import { perfMeasure } from "../lib/perf";
 import {
   getHiddenUserIds,
   addHiddenUser,
@@ -432,10 +433,55 @@ function ProfileContent() {
     }
     return Array.from(ids);
   }, [collections, bookmarkRefreshKey, auth]);
+  const allBookmarkedIdSet = useMemo(() => new Set(allBookmarkedIds), [allBookmarkedIds]);
   const bookmarkedCards = useMemo(
-    () => allCardsFiltered.filter((c) => allBookmarkedIds.includes(resolveStableVoteCardId(c))),
-    [allCardsFiltered, allBookmarkedIds]
+    () => allCardsFiltered.filter((c) => allBookmarkedIdSet.has(resolveStableVoteCardId(c))),
+    [allCardsFiltered, allBookmarkedIdSet]
   );
+
+  const bookmarkedCardsMap = useMemo(() => {
+    const map = new Map<string, VoteCardData>();
+    for (const c of bookmarkedCards) {
+      map.set(resolveStableVoteCardId(c), c);
+    }
+    return map;
+  }, [bookmarkedCards]);
+
+  const bookmarkListViewModels = useMemo(() => {
+    return perfMeasure("profile.bookmarkListViewModels", () => {
+      if (selectedBookmarkId == null) return [];
+      const ids =
+        selectedBookmarkId === "all"
+          ? allBookmarkedIds
+          : (collections.find((c) => c.id === selectedBookmarkId)?.cardIds ?? []);
+      const out: Array<{
+        card: VoteCardData;
+        cardId: string;
+        merged: ReturnType<typeof getMergedCounts>;
+        bgUrl: string;
+        initialSelectedOption: "A" | "B" | null;
+      }> = [];
+      for (const cardId of ids) {
+        const card = bookmarkedCardsMap.get(cardId);
+        if (!card) continue;
+        const act = activity[cardId];
+        const merged = getMergedCounts(
+          card.countA ?? 0,
+          card.countB ?? 0,
+          card.commentCount ?? 0,
+          act ?? { countA: 0, countB: 0, comments: [] }
+        );
+        out.push({
+          card,
+          cardId,
+          merged,
+          bgUrl: backgroundForCard(card, cardId),
+          initialSelectedOption: (act?.userSelectedOption ?? null) as "A" | "B" | null,
+        });
+      }
+      return out;
+    });
+  }, [selectedBookmarkId, allBookmarkedIds, collections, bookmarkedCardsMap, activity]);
 
   const commentedCardIds = useMemo(
     () =>
@@ -912,11 +958,7 @@ function ProfileContent() {
                   </span>
                 </div>
                 {(() => {
-                  const ids = selectedBookmarkId === "all"
-                    ? allBookmarkedIds
-                    : (collections.find((c) => c.id === selectedBookmarkId)?.cardIds ?? []);
-                  const cardsToShow = allCardsFiltered.filter((c) => ids.includes(resolveStableVoteCardId(c)));
-                  if (cardsToShow.length === 0) {
+                  if (bookmarkListViewModels.length === 0) {
                     return (
                       <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
                         <p className="text-sm text-gray-500">
@@ -927,19 +969,11 @@ function ProfileContent() {
                   }
                   return (
                     <div className="flex flex-col gap-[5.333vw]">
-                      {cardsToShow.map((card) => {
-                        const cardId = resolveStableVoteCardId(card);
-                        const act = activity[cardId];
-                        const merged = getMergedCounts(
-                          card.countA ?? 0,
-                          card.countB ?? 0,
-                          card.commentCount ?? 0,
-                          act ?? { countA: 0, countB: 0, comments: [] }
-                        );
+                      {bookmarkListViewModels.map(({ card, cardId, merged, bgUrl, initialSelectedOption }) => {
                         return (
                           <VoteCard
                             key={cardId}
-                            backgroundImageUrl={backgroundForCard(card, cardId)}
+                            backgroundImageUrl={bgUrl}
                             patternType={card.patternType ?? "yellow-loops"}
                             question={card.question}
                             optionA={card.optionA}
@@ -954,7 +988,7 @@ function ProfileContent() {
                             cardId={cardId}
                             bookmarked={isCardBookmarked(cardId)}
                             hasCommented={commentedCardIdSet.has(cardId)}
-                            initialSelectedOption={act?.userSelectedOption ?? null}
+                            initialSelectedOption={initialSelectedOption}
                             onVote={handleBookmarkListVote}
                             onBookmarkClick={setModalCardId}
                             onMoreClick={handleProfileCardMoreClick}

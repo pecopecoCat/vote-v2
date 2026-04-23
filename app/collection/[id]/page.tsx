@@ -55,6 +55,7 @@ import { isVotingAllowedNow, resolveCardForVotePeriod } from "../../data/votePer
 import type { CurrentUser } from "../../components/VoteCard";
 import type { CollectionGradient } from "../../data/search";
 import { getAvatarProxySrc } from "../../lib/avatarProxy";
+import { perfMeasure } from "../../lib/perf";
 import { isRemoteHttpUrl, normalizeCardIdKey, resolveAvatarSrc } from "../../lib/normalize";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
@@ -561,37 +562,39 @@ export default function CollectionPage() {
   }, [sortedCardsInCollection, showVoted, activity, isMemberCollection, scopedActivityMap]);
 
   const voteCardViewModels = useMemo(() => {
-    return cardsToShow.map(({ card, cardId }) => {
-      const act = activity[cardId];
-      const scopedAct = scopedActivityMap[cardId];
-      const globalComments = Array.isArray(act?.comments) ? act.comments : [];
-      const comments = isMemberCollection
-        ? globalComments.filter((c) => (c as { collectionId?: unknown }).collectionId === collection?.id)
-        : globalComments.filter((c) => (c as { collectionId?: unknown }).collectionId == null);
-      const voteActivity: CardActivity = isMemberCollection
-        ? {
-            countA: scopedAct?.countA ?? 0,
-            countB: scopedAct?.countB ?? 0,
-            comments,
-            userSelectedOption: scopedAct?.userSelectedOption,
-            userVotedAt: scopedAct?.userVotedAt,
-          }
-        : { ...(act ?? { countA: 0, countB: 0, comments: [] }), comments };
-      const merged = getMergedCounts(
-        isMemberCollection ? 0 : (card.countA ?? 0),
-        isMemberCollection ? 0 : (card.countB ?? 0),
-        card.commentCount ?? 0,
-        voteActivity
-      );
-      return {
-        card,
-        cardId,
-        merged,
-        initialSelectedOption: isMemberCollection
-          ? (scopedAct?.userSelectedOption ?? null)
-          : (act?.userSelectedOption ?? null),
-        backgroundImageUrl: backgroundForCard(card, cardId),
-      };
+    return perfMeasure("collection.voteCardViewModels", () => {
+      return cardsToShow.map(({ card, cardId }) => {
+        const act = activity[cardId];
+        const scopedAct = scopedActivityMap[cardId];
+        const globalComments = Array.isArray(act?.comments) ? act.comments : [];
+        const comments = isMemberCollection
+          ? globalComments.filter((c) => (c as { collectionId?: unknown }).collectionId === collection?.id)
+          : globalComments.filter((c) => (c as { collectionId?: unknown }).collectionId == null);
+        const voteActivity: CardActivity = isMemberCollection
+          ? {
+              countA: scopedAct?.countA ?? 0,
+              countB: scopedAct?.countB ?? 0,
+              comments,
+              userSelectedOption: scopedAct?.userSelectedOption,
+              userVotedAt: scopedAct?.userVotedAt,
+            }
+          : { ...(act ?? { countA: 0, countB: 0, comments: [] }), comments };
+        const merged = getMergedCounts(
+          isMemberCollection ? 0 : (card.countA ?? 0),
+          isMemberCollection ? 0 : (card.countB ?? 0),
+          card.commentCount ?? 0,
+          voteActivity
+        );
+        return {
+          card,
+          cardId,
+          merged,
+          initialSelectedOption: isMemberCollection
+            ? (scopedAct?.userSelectedOption ?? null)
+            : (act?.userSelectedOption ?? null),
+          backgroundImageUrl: backgroundForCard(card, cardId),
+        };
+      });
     });
   }, [cardsToShow, activity, scopedActivityMap, isMemberCollection, collection?.id]);
 
