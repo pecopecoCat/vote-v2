@@ -53,6 +53,8 @@ export interface VoteCardProps {
   currentUser?: CurrentUser;
   /** コメントページへのリンク用（指定時はコメントアイコンが /comments/[cardId] へ） */
   cardId?: string;
+  /** コメント導線の遷移先を上書き（メンバー限定コレクション内コメント等） */
+  commentsHref?: string;
   /** ブックマークトグル時（cardId と新しいフラグを渡す） */
   onBookmarkToggle?: (cardId: string, bookmarked: boolean) => void;
   /** 指定時はブックマークタップでこのコールバックのみ呼ぶ（コレクション選択モーダル用） */
@@ -103,6 +105,7 @@ function VoteCard({
   creator,
   currentUser,
   cardId,
+  commentsHref,
   onBookmarkToggle,
   onBookmarkClick,
   initialSelectedOption = null,
@@ -329,7 +332,7 @@ function VoteCard({
         ) : cardId != null ? (
           selectedOption != null || hasCommented ? (
             <Link
-              href={`/comments/${cardId}`}
+              href={commentsHref ?? `/comments/${cardId}`}
               className="flex items-center gap-1 hover:opacity-80"
               aria-label={`コメント ${commentCount}件、コメントページへ`}
               onClick={handleNavigateToComments}
@@ -368,14 +371,14 @@ function VoteCard({
           aria-label={isBookmarked ? "ブックマークを外す" : "ブックマーク"}
           onClick={() => {
             if (cardId == null) return;
+            if (onBookmarkClick) {
+              onBookmarkClick(cardId);
+              return;
+            }
             if (isBookmarked) {
               removeBookmarkFully(cardId);
               setIsBookmarked(false);
               showAppToast("bookmarkを解除しました");
-              return;
-            }
-            if (onBookmarkClick) {
-              onBookmarkClick(cardId);
               return;
             }
             const next = !isBookmarked;

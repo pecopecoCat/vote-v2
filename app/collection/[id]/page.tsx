@@ -506,12 +506,16 @@ export default function CollectionPage() {
     };
     for (const { cardId } of cardsInCollection) {
       const a = activity[cardId];
-      if ((a?.comments ?? []).some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
+      const list = Array.isArray(a?.comments) ? a.comments : [];
+      const filtered = isMemberCollection
+        ? list.filter((c) => (c as { collectionId?: unknown }).collectionId === collection?.id)
+        : list.filter((c) => (c as { collectionId?: unknown }).collectionId == null);
+      if (filtered.some((c) => isCommentAuthoredByCurrentUser(c.user?.name, opts))) {
         set.add(cardId);
       }
     }
     return set;
-  }, [activity, auth.isLoggedIn, auth.user?.name, cardsInCollection]);
+  }, [activity, auth.isLoggedIn, auth.user?.name, cardsInCollection, isMemberCollection, collection?.id]);
 
   const memberJoinProfiles = useMemo(() => {
     if (!collection?.id || collection.visibility !== "member") return {};
@@ -560,15 +564,19 @@ export default function CollectionPage() {
     return cardsToShow.map(({ card, cardId }) => {
       const act = activity[cardId];
       const scopedAct = scopedActivityMap[cardId];
+      const globalComments = Array.isArray(act?.comments) ? act.comments : [];
+      const comments = isMemberCollection
+        ? globalComments.filter((c) => (c as { collectionId?: unknown }).collectionId === collection?.id)
+        : globalComments.filter((c) => (c as { collectionId?: unknown }).collectionId == null);
       const voteActivity: CardActivity = isMemberCollection
         ? {
             countA: scopedAct?.countA ?? 0,
             countB: scopedAct?.countB ?? 0,
-            comments: act?.comments ?? [],
+            comments,
             userSelectedOption: scopedAct?.userSelectedOption,
             userVotedAt: scopedAct?.userVotedAt,
           }
-        : (act ?? { countA: 0, countB: 0, comments: [] });
+        : { ...(act ?? { countA: 0, countB: 0, comments: [] }), comments };
       const merged = getMergedCounts(
         isMemberCollection ? 0 : (card.countA ?? 0),
         isMemberCollection ? 0 : (card.countB ?? 0),
@@ -585,7 +593,7 @@ export default function CollectionPage() {
         backgroundImageUrl: backgroundForCard(card, cardId),
       };
     });
-  }, [cardsToShow, activity, scopedActivityMap, isMemberCollection]);
+  }, [cardsToShow, activity, scopedActivityMap, isMemberCollection, collection?.id]);
 
   const handleCollectionVote = useCallback(
     (cid: string, option: "A" | "B") => {
@@ -826,6 +834,11 @@ export default function CollectionPage() {
                   creator={card.creator}
                   currentUser={currentUser}
                   cardId={cardId}
+                  commentsHref={
+                    isMemberCollection && collection?.id
+                      ? `/comments/${cardId}?collectionId=${encodeURIComponent(collection.id)}`
+                      : undefined
+                  }
                   bookmarked={isCardBookmarked(cardId)}
                   hasCommented={commentedCardIdSet.has(cardId)}
                   initialSelectedOption={initialSelectedOption}

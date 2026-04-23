@@ -236,11 +236,63 @@ async function saveProfileToApi(userId: DemoUserId, profile: LineAuthUser): Prom
 export function updateCurrentUserProfile(updates: Partial<LineAuthUser>): void {
   const state = load();
   if (!state.isLoggedIn || !state.user) return;
+  const prevName = state.user.name;
   const nextUser: LineAuthUser = {
     name: updates.name ?? state.user.name,
     iconUrl: updates.iconUrl !== undefined ? updates.iconUrl : state.user.iconUrl,
   };
   save({ ...state, user: nextUser });
+  // 過去コメントの表示名/アイコンも更新（コメントは global activity に保存されるため、ここで一括置換）
+  if (typeof window !== "undefined") {
+    try {
+      const GLOBAL_ACTIVITY_KEY = "vote_card_activity_global";
+      const ACTIVITY_UPDATED_EVENT = "vote_activity_global_updated";
+      const raw = window.localStorage.getItem(GLOBAL_ACTIVITY_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (parsed && typeof parsed === "object") {
+          const obj = parsed as Record<string, unknown>;
+          let changed = false;
+          const next: Record<string, unknown> = { ...obj };
+          for (const [cardId, v] of Object.entries(obj)) {
+            if (!v || typeof v !== "object") continue;
+            const row = v as { countA?: unknown; countB?: unknown; comments?: unknown };
+            const comments = Array.isArray(row.comments) ? (row.comments as unknown[]) : null;
+            if (!comments || comments.length === 0) continue;
+            let anyCardChanged = false;
+            const nextComments = comments.map((c) => {
+              if (!c || typeof c !== "object") return c;
+              const cc = c as { user?: unknown };
+              const u = cc.user;
+              if (!u || typeof u !== "object") return c;
+              const userObj = u as { name?: unknown; iconUrl?: unknown };
+              const name = typeof userObj.name === "string" ? userObj.name : "";
+              if (name !== prevName) return c;
+              anyCardChanged = true;
+              changed = true;
+              return {
+                ...cc,
+                user: {
+                  ...userObj,
+                  name: nextUser.name,
+                  ...(nextUser.iconUrl !== undefined ? { iconUrl: nextUser.iconUrl } : {}),
+                },
+              };
+            });
+            if (anyCardChanged) {
+              next[cardId] = { ...row, comments: nextComments };
+            }
+          }
+          if (changed) {
+            window.localStorage.setItem(GLOBAL_ACTIVITY_KEY, JSON.stringify(next));
+            window.dispatchEvent(new Event(ACTIVITY_UPDATED_EVENT));
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
   const userId = state.userId ?? (state.user && DEMO_USER_IDS.includes(state.user.name as DemoUserId) ? (state.user.name as DemoUserId) : null);
   if (userId) {
     saveProfile(userId, nextUser);

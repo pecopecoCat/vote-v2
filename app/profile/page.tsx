@@ -421,7 +421,17 @@ function ProfileContent() {
     return list;
   }, [votedCardsRaw, voteTabSortOrder]);
 
-  const allBookmarkedIds = useMemo(() => getBookmarkIds(), [collections, bookmarkRefreshKey, auth]);
+  /** Bookmark ALL: ブックマーク + 自分のコレクション登録分（member 限定コレクションは除外） */
+  const allBookmarkedIds = useMemo(() => {
+    const ids = new Set<string>(getBookmarkIds());
+    for (const col of collections) {
+      if (col.visibility === "member") continue;
+      for (const cid of col.cardIds ?? []) {
+        if (typeof cid === "string" && cid.length > 0) ids.add(cid);
+      }
+    }
+    return Array.from(ids);
+  }, [collections, bookmarkRefreshKey, auth]);
   const bookmarkedCards = useMemo(
     () => allCardsFiltered.filter((c) => allBookmarkedIds.includes(resolveStableVoteCardId(c))),
     [allCardsFiltered, allBookmarkedIds]

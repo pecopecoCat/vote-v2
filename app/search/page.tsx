@@ -199,6 +199,7 @@ function SearchContent() {
   const [popularCollectionsVisibleCount, setPopularCollectionsVisibleCount] = useState(8);
   /** VOTE 検索結果の段階表示 */
   const [voteSearchVisibleCount, setVoteSearchVisibleCount] = useState(8);
+  const restoredUiStateRef = useRef(false);
   const trendingLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const collectionsLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const voteSearchLoadSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -356,7 +357,77 @@ function SearchContent() {
   useEffect(() => {
     setTagListSortOrder("newest");
   }, [tagFromUrl]);
+
+  const UI_STATE_KEY = "vote_search_ui_state_v1";
+  const saveUiState = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (isTagFilterView) return;
+    try {
+      const state = {
+        activeTab,
+        trendingTagsVisibleCount,
+        popularCollectionsVisibleCount,
+        voteSearchVisibleCount,
+        scrollY: window.scrollY,
+      };
+      window.sessionStorage.setItem(UI_STATE_KEY, JSON.stringify(state));
+    } catch {
+      // ignore
+    }
+  }, [activeTab, isTagFilterView, trendingTagsVisibleCount, popularCollectionsVisibleCount, voteSearchVisibleCount]);
+
+  // 戻るで復元（TOP表示のときだけ）
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (isTagFilterView) return;
+    if (tagFromUrl.length > 0 || qFromUrl.length > 0 || committedVoteQuery.length > 0) return;
+    try {
+      const raw = window.sessionStorage.getItem(UI_STATE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<{
+        activeTab: "trending" | "collections" | "favorite";
+        trendingTagsVisibleCount: number;
+        popularCollectionsVisibleCount: number;
+        voteSearchVisibleCount: number;
+        scrollY: number;
+      }>;
+      if (parsed.activeTab === "trending" || parsed.activeTab === "collections" || parsed.activeTab === "favorite") {
+        setActiveTab(parsed.activeTab);
+      }
+      if (typeof parsed.trendingTagsVisibleCount === "number" && parsed.trendingTagsVisibleCount > 0) {
+        setTrendingTagsVisibleCount(parsed.trendingTagsVisibleCount);
+      }
+      if (typeof parsed.popularCollectionsVisibleCount === "number" && parsed.popularCollectionsVisibleCount > 0) {
+        setPopularCollectionsVisibleCount(parsed.popularCollectionsVisibleCount);
+      }
+      if (typeof parsed.voteSearchVisibleCount === "number" && parsed.voteSearchVisibleCount > 0) {
+        setVoteSearchVisibleCount(parsed.voteSearchVisibleCount);
+      }
+      if (typeof parsed.scrollY === "number" && parsed.scrollY >= 0) {
+        requestAnimationFrame(() => window.scrollTo(0, parsed.scrollY ?? 0));
+      }
+      restoredUiStateRef.current = true;
+    } catch {
+      // ignore
+    }
+  }, [isTagFilterView, tagFromUrl, qFromUrl, committedVoteQuery]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPageHide = () => saveUiState();
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, [saveUiState]);
+
+  useEffect(() => {
+    saveUiState();
+  }, [saveUiState]);
+  useEffect(() => {
+    // 戻る復元の直後は初期化しない（表示件数が5に戻るのを防ぐ）
+    if (restoredUiStateRef.current) {
+      restoredUiStateRef.current = false;
+      return;
+    }
     setPopularCollectionsVisibleCount(8);
     setTrendingTagsVisibleCount(5);
     setVoteSearchVisibleCount(8);
@@ -693,15 +764,6 @@ function SearchContent() {
         value={searchValue}
         onChange={handleSearchValueChange}
         {...(!isTagFilterView && { onSubmit: handleKeywordSearchSubmit })}
-        backHref={
-          isTagFilterView
-            ? "/search"
-            : voteResultsFromUrl && qFromUrl.length > 0
-              ? `/search?q=${encodeURIComponent(qFromUrl)}`
-              : qFromUrl.length > 0
-                ? "/search"
-                : "/"
-        }
         {...(isTagFilterView && {
           onFavoriteClick: (tag) => {
             toggleFavoriteTag(tag);

@@ -13,6 +13,8 @@ export interface VoteComment {
   id: string;
   /** コメントしたユーザー */
   user: { name: string; iconUrl?: string };
+  /** メンバー限定コレクション内コメントの場合のみ collectionId を持つ（通常コメントは undefined） */
+  collectionId?: string;
   /** コメントされた日付（ISO文字列） */
   date: string;
   /** コメントテキスト */
@@ -208,7 +210,8 @@ export function addComment(
   cardId: string,
   comment: { user: { name: string; iconUrl?: string }; text: string },
   parentCommentId?: string,
-  commenterVoteOption?: "A" | "B"
+  commenterVoteOption?: "A" | "B",
+  collectionId?: string
 ): void {
   const global = loadGlobal();
   const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
@@ -216,6 +219,7 @@ export function addComment(
   const newComment: VoteComment = {
     id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     user: comment.user,
+    ...(typeof collectionId === "string" && collectionId.length > 0 ? { collectionId } : {}),
     date: new Date().toISOString(),
     text: comment.text,
     likeCount: 0,

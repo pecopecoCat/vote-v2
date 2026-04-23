@@ -498,6 +498,19 @@ function HomeContent() {
     [collections, bookmarkRefreshKey, auth]
   );
 
+  /** myTimeline: 自分のコレクションに登録したカードも含める（ただし member 限定は除外） */
+  const nonMemberCollectionCardIdSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const col of collections) {
+      if (col.visibility === "member") continue;
+      for (const rawId of col.cardIds ?? []) {
+        if (typeof rawId !== "string") continue;
+        set.add(rawId);
+      }
+    }
+    return set;
+  }, [collections]);
+
   /**
    * 急上昇・新着：activity の userSelectedOption で投票済みを除外（キーずれを防ぐ）。
    * 投票したカード ID をここに入れてタブ切替・visibility まで一覧に残す（結果表示のまま）。
@@ -629,8 +642,9 @@ function HomeContent() {
         return sortByNewest(cardsForFeed);
       case "myTimeline": {
         const opts = { isLoggedIn: auth.isLoggedIn, displayName: auth.user?.name };
+        const mySet = new Set<string>([...bookmarkedIds, ...nonMemberCollectionCardIdSet]);
         return allCardsFiltered
-          .filter((card) => bookmarkedIds.has(resolveStableVoteCardId(card)))
+          .filter((card) => mySet.has(resolveStableVoteCardId(card)))
           .sort((a, b) => {
             const tb = myTimelineLastActivityMs(b, activity, opts);
             const ta = myTimelineLastActivityMs(a, activity, opts);

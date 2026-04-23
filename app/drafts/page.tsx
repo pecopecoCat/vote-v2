@@ -43,10 +43,10 @@ export default function DraftsPage() {
             {drafts.map((draft) => (
               <li key={draft.id} className="flex items-center gap-3 px-[5.333vw] py-4">
                 <Link
-                  href={`/create/form?q=${encodeURIComponent(draft.text)}`}
+                  href={`/create/form?draft=${encodeURIComponent(draft.id)}`}
                   className="min-w-0 flex-1 text-sm text-gray-900"
                 >
-                  {draft.text}
+                  {draft.title}
                 </Link>
                 <button
                   type="button"

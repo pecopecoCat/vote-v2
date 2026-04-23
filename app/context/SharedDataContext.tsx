@@ -197,7 +197,8 @@ export interface SharedDataContextValue {
     cardId: string,
     comment: { user: { name: string; iconUrl?: string }; text: string },
     parentCommentId?: string,
-    commenterVoteOption?: "A" | "B"
+    commenterVoteOption?: "A" | "B",
+    collectionId?: string
   ) => Promise<void>;
   /** 自分のコメント／リプライのみ削除（KV 時は API 経由） */
   removeComment: (
@@ -564,7 +565,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       cardId: string,
       comment: { user: { name: string; iconUrl?: string }; text: string },
       parentCommentId?: string,
-      commenterVoteOption?: "A" | "B"
+      commenterVoteOption?: "A" | "B",
+      collectionId?: string
     ) => {
       const timeline = isRemote
         ? createdVotesForTimelineRef.current
@@ -592,6 +594,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
                   date: now,
                   parentId: parentCommentId,
                   userVoteOption: commenterVoteOption,
+                  ...(typeof collectionId === "string" && collectionId.length > 0 ? { collectionId } : {}),
                 },
               ],
             },
@@ -606,6 +609,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
             comment,
             parentCommentId,
             commenterVoteOption,
+            ...(typeof collectionId === "string" && collectionId.length > 0 ? { collectionId } : {}),
           }),
         });
         if (res.ok) {
@@ -625,7 +629,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         }
         return;
       }
-      addCommentLocal(cardId, comment, parentCommentId, commenterVoteOption);
+      addCommentLocal(cardId, comment, parentCommentId, commenterVoteOption, collectionId);
       setActivity((prev) => ({ ...prev, ...getAllActivity() }));
     },
     [isRemote, fetchActivity]

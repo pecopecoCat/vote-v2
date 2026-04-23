@@ -10,7 +10,7 @@ import { getCollections, addCardToCollection } from "../../data/collections";
 import { getAuth, getCurrentActivityUserId } from "../../data/auth";
 import { CARD_BACKGROUND_IMAGES, recommendedTagList } from "../../data/voteCards";
 import { useSharedData } from "../../context/SharedDataContext";
-import { addDraft } from "../../data/drafts";
+import { addDraft, getDraftById } from "../../data/drafts";
 import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "../../lib/appToast";
 
 const QUESTION_MAX = 80;
@@ -26,6 +26,8 @@ function CreateFormContent() {
   const searchParams = useSearchParams();
   const { addCreatedVote: sharedAddCreatedVote } = useSharedData();
   const qFromUrl = searchParams.get("q") ?? "";
+  const draftIdFromUrl = searchParams.get("draft") ?? "";
+  const draftLoadedRef = useRef(false);
 
   const [question, setQuestion] = useState(qFromUrl);
   const [optionA, setOptionA] = useState("");
@@ -64,8 +66,38 @@ function CreateFormContent() {
   }, []);
 
   useEffect(() => {
-    if (qFromUrl) setQuestion(qFromUrl);
+    if (!draftLoadedRef.current && qFromUrl) setQuestion(qFromUrl);
   }, [qFromUrl]);
+
+  // 下書きIDで開いたとき：保存済みの全入力を復元
+  useEffect(() => {
+    if (!draftIdFromUrl) return;
+    const d = getDraftById(draftIdFromUrl);
+    if (!d) return;
+    const data = d.data;
+    draftLoadedRef.current = true;
+    setQuestion(data.question ?? "");
+    setOptionA(data.optionA ?? "");
+    setOptionB(data.optionB ?? "");
+    setOptionAImageUrl(data.optionAImageUrl || undefined);
+    setOptionBImageUrl(data.optionBImageUrl || undefined);
+    setReason(data.reason ?? "");
+    setNoComments(Boolean(data.noComments));
+    setTags(Array.isArray(data.tags) ? data.tags : []);
+    setTagInput("");
+    if (typeof data.selectedBackgroundUrl === "string" && data.selectedBackgroundUrl.length > 0) {
+      setSelectedBackgroundUrl(data.selectedBackgroundUrl);
+    }
+    setSelectedCollectionId(data.selectedCollectionId ?? "");
+    setVisibility(data.visibility === "private" ? "private" : "public");
+    setUseVotePeriod(Boolean(data.useVotePeriod));
+    if (typeof data.startYear === "number") setStartYear(data.startYear);
+    if (typeof data.startMonth === "number") setStartMonth(data.startMonth);
+    if (typeof data.startDay === "number") setStartDay(data.startDay);
+    if (typeof data.endYear === "number") setEndYear(data.endYear);
+    if (typeof data.endMonth === "number") setEndMonth(data.endMonth);
+    if (typeof data.endDay === "number") setEndDay(data.endDay);
+  }, [draftIdFromUrl]);
 
   /** ログイン後のみVOTEを作成可能。ログイン後はこの画面へ戻す */
   useEffect(() => {
@@ -158,10 +190,48 @@ function CreateFormContent() {
   ]);
 
   const handleSaveDraftAndGoToDrafts = useCallback(() => {
-    const text = question.trim() || "（未入力）";
-    addDraft(text);
+    addDraft({
+      question,
+      optionA,
+      optionB,
+      optionAImageUrl,
+      optionBImageUrl,
+      reason,
+      noComments,
+      tags,
+      selectedBackgroundUrl,
+      selectedCollectionId,
+      visibility,
+      useVotePeriod,
+      startYear,
+      startMonth,
+      startDay,
+      endYear,
+      endMonth,
+      endDay,
+    });
     router.push("/drafts");
-  }, [question, router]);
+  }, [
+    question,
+    optionA,
+    optionB,
+    optionAImageUrl,
+    optionBImageUrl,
+    reason,
+    noComments,
+    tags,
+    selectedBackgroundUrl,
+    selectedCollectionId,
+    visibility,
+    useVotePeriod,
+    startYear,
+    startMonth,
+    startDay,
+    endYear,
+    endMonth,
+    endDay,
+    router,
+  ]);
 
   const handleImageSelect = useCallback(
     (side: "A" | "B", e: React.ChangeEvent<HTMLInputElement>) => {

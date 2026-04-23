@@ -15,6 +15,7 @@ export type GlobalCardData = {
   comments: Array<{
     id: string;
     user: { name: string; iconUrl?: string };
+    collectionId?: string;
     date: string;
     text: string;
     likeCount?: number;
@@ -116,6 +117,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       const comment = body.comment as { user?: { name: string; iconUrl?: string }; text?: string };
       const parentCommentId = body.parentCommentId as string | undefined;
       const commenterVoteOption = body.commenterVoteOption as "A" | "B" | undefined;
+      const collectionId = typeof body.collectionId === "string" ? body.collectionId : undefined;
       if (!cardId || !comment?.user?.name || typeof comment.text !== "string") {
         return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
       }
@@ -127,6 +129,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
         {
           id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
           user: comment.user,
+          ...(collectionId && collectionId.length > 0 ? { collectionId } : {}),
           date: new Date().toISOString(),
           text: comment.text,
           likeCount: 0,

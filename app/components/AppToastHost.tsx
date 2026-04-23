@@ -5,25 +5,16 @@ import { APP_TOAST_EVENT, type AppToastDetail, type AppToastKind } from "../lib/
 
 const TOAST_MS = 2000;
 
-function ToastCheckIcon({ className }: { className?: string }) {
+function ToastVoteIcon({ className }: { className?: string }) {
   return (
-    <svg
+    <img
+      src="/icons/white_vote.svg"
+      alt=""
       className={className}
       width={18}
       height={18}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <path
-        d="M20 6L9 17l-5-5"
-        stroke="currentColor"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+      decoding="async"
+    />
   );
 }
 
@@ -55,11 +46,11 @@ export default function AppToastHost() {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[200] flex justify-center px-[10px]">
       <div
-        className="box-border flex w-[min(355px,calc(100vw*355/375))] items-center justify-center gap-2 rounded-[10px] bg-[#FFE100] px-4 py-3.5 text-[14px] font-medium leading-snug text-black shadow-[0_2px_10px_rgba(0,0,0,0.08)]"
+        className="box-border flex w-[min(355px,calc(100vw*355/375))] items-center justify-center gap-2 rounded-[10px] bg-[#FFE100] px-4 py-3.5 text-[14px] font-bold leading-snug text-black shadow-[0_2px_10px_rgba(0,0,0,0.08)]"
         role="status"
       >
-        {kind === "success" ? <ToastCheckIcon className="shrink-0 text-black" /> : null}
-        <span className="min-w-0 text-center">{message}</span>
+        {kind === "success" ? <ToastVoteIcon className="h-[18px] w-[18px] shrink-0" /> : null}
+        <span className="min-w-0 text-center font-bold">{message}</span>
       </div>
     </div>
   );

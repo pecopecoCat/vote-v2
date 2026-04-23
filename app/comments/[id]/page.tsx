@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import AppHeader from "../../components/AppHeader";
 import VoteCard from "../../components/VoteCard";
@@ -74,8 +73,10 @@ const emptyActivity = { countA: 0, countB: 0, comments: [] as VoteComment[], use
 
 export default function CommentsPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const id = typeof params.id === "string" ? params.id : "0";
+  const collectionIdFromUrl = (searchParams.get("collectionId") ?? "").trim();
   const stableId = useMemo(() => normalizeCardIdKey(id), [id]);
   const shared = useSharedData();
   const {
@@ -86,7 +87,21 @@ export default function CommentsPage() {
     addComment: sharedAddComment,
     removeComment: sharedRemoveComment,
   } = shared;
-  const activity = sharedActivity[stableId] ?? sharedActivity[id] ?? emptyActivity;
+  const activityRaw = sharedActivity[stableId] ?? sharedActivity[id] ?? emptyActivity;
+  const activity = useMemo(() => {
+    const list = Array.isArray(activityRaw.comments) ? activityRaw.comments : [];
+    if (!collectionIdFromUrl) {
+      // 通常コメントページは「コレクション内コメント」を混ぜない
+      return {
+        ...activityRaw,
+        comments: list.filter((c) => (c as { collectionId?: unknown }).collectionId == null),
+      };
+    }
+    return {
+      ...activityRaw,
+      comments: list.filter((c) => (c as { collectionId?: unknown }).collectionId === collectionIdFromUrl),
+    };
+  }, [activityRaw, collectionIdFromUrl]);
   const [sessionSelectedOption, setSessionSelectedOption] = useState<"A" | "B" | null>(null);
 
   const card = useMemo(
@@ -270,7 +285,13 @@ export default function CommentsPage() {
     parentCommentId?: string
   ) => {
     const commenterVote = effectiveSelectedOption;
-    void sharedAddComment(cardId, payload, parentCommentId, commenterVote).then(() =>
+    void sharedAddComment(
+      cardId,
+      payload,
+      parentCommentId,
+      commenterVote,
+      collectionIdFromUrl || undefined
+    ).then(() =>
       setReplyingToCommentId(null)
     );
   };
