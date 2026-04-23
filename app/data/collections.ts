@@ -306,19 +306,32 @@ export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<
       addParticipatedMemberCollectionIfNeeded(col, { skipRemote: true });
     }
 
-    // KV側から消えた参加中コレクションはローカルからも掃除（作成者削除の反映）
+    /**
+     * リモートに無い参加中コレクションをローカルから消すのは「作成者が削除した」ケースだけに限定する。
+     * KV容量上限などで参加中の保存ができていないと、単純な差分掃除で参加中が消えてしまうため。
+     */
     const current = getCollections();
-    const removedIds = current
-      .filter((c) => c.joinedParticipation && !remoteIds.has(c.id))
-      .map((c) => c.id);
-    const next = current.filter((c) => !c.joinedParticipation || remoteIds.has(c.id));
-    if (next.length !== current.length) {
-      save(uid, next);
-    }
-    // 参加中リストから消えた = その端末に残っているコレ内データも掃除（投票/参加者/コメント）
-    for (const rid of removedIds) {
-      clearCollectionScopedLocalData(rid);
-      removeLocalCommentsForCollection(rid);
+    const candidates = current.filter((c) => c.joinedParticipation && !remoteIds.has(c.id));
+    if (candidates.length > 0) {
+      const toRemove = new Set<string>();
+      for (const c of candidates) {
+        try {
+          const r = await fetch(`/api/collection/${encodeURIComponent(c.id)}?userId=${encodeURIComponent(uid)}`);
+          if (r.status === 404) toRemove.add(c.id);
+        } catch {
+          // ignore（ネットワーク失敗時は消さない）
+        }
+      }
+      if (toRemove.size > 0) {
+        const next = current.filter((c) => !(c.joinedParticipation && toRemove.has(c.id)));
+        if (next.length !== current.length) {
+          save(uid, next);
+        }
+        for (const rid of toRemove) {
+          clearCollectionScopedLocalData(rid);
+          removeLocalCommentsForCollection(rid);
+        }
+      }
     }
   } catch {
     // ignore
