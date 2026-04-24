@@ -859,14 +859,21 @@ function SearchContent() {
                   <button
                     type="button"
                     onClick={() => setActiveTab("trending")}
-                    className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
+                    className={`relative flex flex-1 min-w-0 flex-col px-2 pt-[14.4px] pb-[11.4px] text-sm font-bold ${
                       activeTab === "trending" ? "text-gray-900" : "text-gray-500"
                     }`}
                   >
-                    <span className="flex-1" aria-hidden />
-                    <span className="inline-flex items-center justify-center gap-1">
-                      <img src="/icons/icon_chumoku.svg" alt="" className="h-[9px] w-[18px] shrink-0" width={18} height={9} />
-                      注目タグ
+                    <span className="flex min-h-[2.5rem] w-full flex-col items-center justify-end gap-1">
+                      <span className="inline-flex items-center justify-center gap-1.5">
+                        <img
+                          src="/icons/icon_chumoku.svg"
+                          alt=""
+                          className={`h-[9px] w-[18px] shrink-0 ${activeTab === "trending" ? "" : "opacity-60"}`}
+                          width={18}
+                          height={9}
+                        />
+                        注目タグ
+                      </span>
                     </span>
                     {activeTab === "trending" && (
                       <span
@@ -878,14 +885,21 @@ function SearchContent() {
                   <button
                     type="button"
                     onClick={() => setActiveTab("collections")}
-                    className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
+                    className={`relative flex flex-1 min-w-0 flex-col px-2 pt-[14.4px] pb-[11.4px] text-sm font-bold ${
                       activeTab === "collections" ? "text-gray-900" : "text-gray-500"
                     }`}
                   >
-                    <span className="flex-1" aria-hidden />
-                    <span className="inline-flex items-center justify-center gap-1">
-                      <img src="/icons/bookmark.svg" alt="" className="h-4 w-4 shrink-0" width={16} height={16} />
-                      コレクション
+                    <span className="flex min-h-[2.5rem] w-full flex-col items-center justify-end gap-1">
+                      <span className="inline-flex items-center justify-center gap-1.5">
+                        <img
+                          src="/icons/bookmark.svg"
+                          alt=""
+                          className={`h-4 w-4 shrink-0 ${activeTab === "collections" ? "" : "opacity-60"}`}
+                          width={16}
+                          height={16}
+                        />
+                        コレクション
+                      </span>
                     </span>
                     {activeTab === "collections" && (
                       <span
@@ -897,20 +911,21 @@ function SearchContent() {
                   <button
                     type="button"
                     onClick={() => setActiveTab("favorite")}
-                    className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
+                    className={`relative flex flex-1 min-w-0 flex-col px-2 pt-[14.4px] pb-[11.4px] text-sm font-bold ${
                       activeTab === "favorite" ? "text-gray-900" : "text-gray-500"
                     }`}
                   >
-                    <span className="flex-1" aria-hidden />
-                    <span className="inline-flex items-center justify-center gap-1">
-                      <img
-                        src={favoriteTags.length > 0 ? "/icons/icon_heart_on_gray.svg" : "/icons/icon_heart.svg"}
-                        alt=""
-                        className="h-4 w-4 shrink-0"
-                        width={18}
-                        height={16}
-                      />
-                      お気に入りタグ
+                    <span className="flex min-h-[2.5rem] w-full flex-col items-center justify-end gap-1">
+                      <span className="inline-flex items-center justify-center gap-1.5">
+                        <img
+                          src={favoriteTags.length > 0 ? "/icons/icon_heart_on_gray.svg" : "/icons/icon_heart.svg"}
+                          alt=""
+                          className={`h-4 w-4 shrink-0 ${activeTab === "favorite" ? "" : "opacity-60"}`}
+                          width={18}
+                          height={16}
+                        />
+                        お気に入りタグ
+                      </span>
                     </span>
                     {activeTab === "favorite" && (
                       <span
