@@ -44,6 +44,16 @@ function isCommentsDisabledOnCard(cardId: string, timeline: VoteCardData[]): boo
 
 const CREATED_VOTES_API = "/api/created-votes";
 const ACTIVITY_API = "/api/activity";
+/** KV 利用時の初回：created-votes + activity を1リクエストで取得 */
+const TIMELINE_BOOTSTRAP_API = "/api/timeline-bootstrap";
+
+type ActivityApiPayload = {
+  global?: Record<string, { countA?: number; countB?: number; comments?: CardActivity["comments"] }>;
+  userSelections?: Record<string, unknown>;
+  voteEvents?: VoteEvent[];
+  bookmarkEvents?: BookmarkEvent[];
+  memberJoinEvents?: MemberJoinOwnerEvent[];
+};
 
 function normalizeCardFromApi(raw: { userId?: string; card?: unknown }): VoteCardData | null {
   const card = raw?.card;
@@ -298,37 +308,127 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const applyActivityResponseData = useCallback((data: ActivityApiPayload, userId: string) => {
+    const global = data?.global && typeof data.global === "object" ? data.global : {};
+    const userSelections: Record<string, unknown> =
+      data?.userSelections && typeof data.userSelections === "object" && data.userSelections !== null
+        ? (data.userSelections as Record<string, unknown>)
+        : {};
+    setActivity((prev) => {
+      if (lastActivityFetchUserIdRef.current !== userId) {
+        lastActivityFetchUserIdRef.current = userId;
+        return buildActivityFromApi(global, userSelections);
+      }
+      return mergeActivityFromApiFetch(prev, global, userSelections);
+    });
+    setVoteEvents(Array.isArray(data?.voteEvents) ? data.voteEvents : []);
+    setBookmarkEvents(Array.isArray(data?.bookmarkEvents) ? data.bookmarkEvents : []);
+    setMemberJoinEvents(Array.isArray(data?.memberJoinEvents) ? data.memberJoinEvents : []);
+  }, []);
+
   const fetchActivity = useCallback(async (): Promise<boolean> => {
     const userId = getCurrentActivityUserId();
     try {
       const res = await fetch(`${ACTIVITY_API}?userId=${encodeURIComponent(userId)}`);
       if (res.status !== 200) return false;
-      const data = (await res.json()) as {
-        global?: Record<string, { countA?: number; countB?: number; comments?: CardActivity["comments"] }>;
-        userSelections?: Record<string, unknown>;
-        voteEvents?: VoteEvent[];
-        bookmarkEvents?: BookmarkEvent[];
-        memberJoinEvents?: MemberJoinOwnerEvent[];
-      };
-      const global = data?.global && typeof data.global === "object" ? data.global : {};
-      const userSelections: Record<string, unknown> =
-        data?.userSelections && typeof data.userSelections === "object" && data.userSelections !== null
-          ? (data.userSelections as Record<string, unknown>)
-          : {};
-      setActivity((prev) => {
-        if (lastActivityFetchUserIdRef.current !== userId) {
-          lastActivityFetchUserIdRef.current = userId;
-          return buildActivityFromApi(global, userSelections);
-        }
-        return mergeActivityFromApiFetch(prev, global, userSelections);
-      });
-      setVoteEvents(Array.isArray(data?.voteEvents) ? data.voteEvents : []);
-      setBookmarkEvents(Array.isArray(data?.bookmarkEvents) ? data.bookmarkEvents : []);
-      setMemberJoinEvents(Array.isArray(data?.memberJoinEvents) ? data.memberJoinEvents : []);
+      const data = (await res.json()) as ActivityApiPayload;
+      applyActivityResponseData(data, userId);
       return true;
     } catch {
       return false;
     }
+  }, [applyActivityResponseData]);
+
+  const runInitialRemoteBootstrap = useCallback(async (): Promise<boolean> => {
+    const userId = getCurrentActivityUserId();
+    try {
+      const res = await fetch(`${TIMELINE_BOOTSTRAP_API}?userId=${encodeURIComponent(userId)}`);
+      if (res.status !== 200) return false;
+      const raw = (await res.json()) as ActivityApiPayload & {
+        createdVotes?: Array<{ userId?: string; card?: unknown }>;
+      };
+      const list = raw.createdVotes;
+      if (!Array.isArray(list)) return false;
+      const cards: VoteCardData[] = [];
+      for (const item of list) {
+        const card = normalizeCardFromApi(item);
+        if (card) cards.push(card);
+      }
+      setCreatedVotesForTimeline(cards);
+      applyActivityResponseData(raw, userId);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [applyActivityResponseData]);
+
+  const tryApplyActivityPostSync = useCallback((sync: unknown): boolean => {
+    if (!sync || typeof sync !== "object") return false;
+    const s = sync as {
+      type?: string;
+      cardId?: string;
+      card?: { countA?: number; countB?: number; comments?: CardActivity["comments"] };
+      userSelection?: { userSelectedOption?: "A" | "B"; votedAt?: string };
+      voteEvent?: VoteEvent;
+      bookmarkEvent?: BookmarkEvent;
+    };
+    if (s.type === "vote" && s.cardId && s.card && s.userSelection && s.voteEvent) {
+      const cardId = s.cardId;
+      const g = s.card;
+      const countA = typeof g.countA === "number" ? g.countA : 0;
+      const countB = typeof g.countB === "number" ? g.countB : 0;
+      const comments = Array.isArray(g.comments) ? g.comments : [];
+      const opt = s.userSelection.userSelectedOption;
+      const votedAt = typeof s.userSelection.votedAt === "string" ? s.userSelection.votedAt : undefined;
+      if (opt !== "A" && opt !== "B") return false;
+      setActivity((prev) => {
+        const p = prev[cardId];
+        return {
+          ...prev,
+          [cardId]: {
+            ...(p ?? { countA: 0, countB: 0, comments: [] }),
+            countA,
+            countB,
+            comments: mergeCommentsPreferNewest(p?.comments, comments),
+            userSelectedOption: opt,
+            userVotedAt: votedAt ?? p?.userVotedAt,
+          },
+        };
+      });
+      setVoteEvents((prev) => [...prev, s.voteEvent!].slice(-200));
+      return true;
+    }
+    if (
+      (s.type === "comment" || s.type === "delete_comment") &&
+      s.cardId &&
+      s.card &&
+      typeof s.card.countA === "number" &&
+      typeof s.card.countB === "number"
+    ) {
+      const cardId = s.cardId;
+      const comments = Array.isArray(s.card.comments) ? s.card.comments : [];
+      setActivity((prev) => {
+        const p = prev[cardId] ?? { countA: 0, countB: 0, comments: [] };
+        return {
+          ...prev,
+          [cardId]: {
+            ...p,
+            countA: s.card!.countA!,
+            countB: s.card!.countB!,
+            // サーバー確定一覧（楽観コメントの local-* と二重にならないようマージしない）
+            comments,
+            userSelectedOption: p.userSelectedOption,
+            userVotedAt: p.userVotedAt,
+          },
+        };
+      });
+      return true;
+    }
+    if (s.type === "bookmark" && s.bookmarkEvent?.cardId && s.bookmarkEvent.date) {
+      setBookmarkEvents((prev) => [...prev, s.bookmarkEvent!].slice(-200));
+      return true;
+    }
+    return false;
   }, []);
 
   /** ハイドレーション直後に React の activity が空のまま固まるのを防ぐ（localStorage を即同期） */
@@ -341,8 +441,13 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        const [createdOk, activityOk] = await Promise.all([fetchCreatedVotes(), fetchActivity()]);
-        if (mounted && createdOk && activityOk) setIsRemote(true);
+        const bootOk = await runInitialRemoteBootstrap();
+        if (mounted && bootOk) {
+          setIsRemote(true);
+        } else if (mounted) {
+          const [createdOk, activityOk] = await Promise.all([fetchCreatedVotes(), fetchActivity()]);
+          if (createdOk && activityOk) setIsRemote(true);
+        }
       } finally {
         if (mounted) setActivityBootstrapDone(true);
       }
@@ -350,7 +455,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [fetchCreatedVotes, fetchActivity]);
+  }, [runInitialRemoteBootstrap, fetchCreatedVotes, fetchActivity]);
 
   useEffect(() => {
     const DEBOUNCE_MS = 280;
@@ -534,8 +639,14 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({ type: "vote", userId, cardId, option }),
         });
         if (res.ok) {
-          // カウント/コメントを最新化（楽観表示済みのためブロックしない）
-          void fetchActivity();
+          let usedSync = false;
+          try {
+            const body = (await res.json()) as { ok?: boolean; sync?: unknown };
+            if (body?.ok && tryApplyActivityPostSync(body.sync)) usedSync = true;
+          } catch {
+            /* ignore */
+          }
+          if (!usedSync) void fetchActivity();
         } else {
           // 失敗時は楽観更新を戻す（投票済みの誤表示を避ける）
           setActivity((prev) => {
@@ -557,7 +668,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       addVoteLocal(cardId, option);
       setActivity((prev) => ({ ...prev, ...getAllActivity() }));
     },
-    [isRemote, fetchActivity]
+    [isRemote, fetchActivity, tryApplyActivityPostSync]
   );
 
   const addComment = useCallback(
@@ -616,7 +727,14 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           }),
         });
         if (res.ok) {
-          void fetchActivity();
+          let usedSync = false;
+          try {
+            const body = (await res.json()) as { ok?: boolean; sync?: unknown };
+            if (body?.ok && tryApplyActivityPostSync(body.sync)) usedSync = true;
+          } catch {
+            /* ignore */
+          }
+          if (!usedSync) void fetchActivity();
         } else {
           // 失敗時は追加した分だけ取り消し（楽観コメントの残存を避ける）
           setActivity((prev) => {
@@ -635,7 +753,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       addCommentLocal(cardId, comment, parentCommentId, commenterVoteOption, collectionId);
       setActivity((prev) => ({ ...prev, ...getAllActivity() }));
     },
-    [isRemote, fetchActivity]
+    [isRemote, fetchActivity, tryApplyActivityPostSync]
   );
 
   const removeComment = useCallback(
@@ -655,14 +773,23 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "delete_comment", cardId, commentId, authorName }),
         });
-        if (res.ok) await fetchActivity();
+        if (res.ok) {
+          let usedSync = false;
+          try {
+            const body = (await res.json()) as { ok?: boolean; sync?: unknown };
+            if (body?.ok && tryApplyActivityPostSync(body.sync)) usedSync = true;
+          } catch {
+            /* ignore */
+          }
+          if (!usedSync) await fetchActivity();
+        }
         return res.ok;
       }
       const ok = removeCommentLocal(cardId, commentId, currentCard);
       if (ok) setActivity((prev) => ({ ...prev, ...getAllActivity() }));
       return ok;
     },
-    [isRemote, fetchActivity]
+    [isRemote, fetchActivity, tryApplyActivityPostSync]
   );
 
   const recordBookmarkEvent = useCallback(
@@ -674,12 +801,21 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "bookmark", cardId }),
         });
-        if (res.ok) void fetchActivity();
+        if (res.ok) {
+          let usedSync = false;
+          try {
+            const body = (await res.json()) as { ok?: boolean; sync?: unknown };
+            if (body?.ok && tryApplyActivityPostSync(body.sync)) usedSync = true;
+          } catch {
+            /* ignore */
+          }
+          if (!usedSync) void fetchActivity();
+        }
       } catch {
         // ignore
       }
     },
-    [isRemote, fetchActivity]
+    [isRemote, fetchActivity, tryApplyActivityPostSync]
   );
 
   const removeCreatedVote = useCallback((cardId: string) => {

@@ -354,7 +354,7 @@ export default function CommentsPage() {
   if (waitingForCreatedCard) {
     return (
       <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
-        <AppHeader type="title" title="みんなのコメント" backHref="/" />
+        <AppHeader type="title" title="みんなのコメント" />
         <main className="mx-auto max-w-lg px-[5.333vw] pt-12 text-center">
           <p className="text-base leading-relaxed text-[#191919]">
             準備中です。もう少し待ってね🙏
@@ -368,7 +368,7 @@ export default function CommentsPage() {
   if (!card) {
     return (
       <div className="min-h-screen bg-[#F1F1F1]">
-        <AppHeader type="title" title="みんなのコメント" backHref="/" />
+        <AppHeader type="title" title="みんなのコメント" />
         <main className="p-4">
           <p className="text-gray-600">カードが見つかりませんでした。</p>
           <Link href="/" className="mt-4 inline-block text-blue-600 underline">
@@ -381,7 +381,7 @@ export default function CommentsPage() {
 
   return (
     <div className="min-h-screen bg-[#F1F1F1] pb-[120px]">
-      <AppHeader type="title" title="みんなのコメント" backHref="/" />
+      <AppHeader type="title" title="みんなのコメント" />
 
       <main className="mx-auto max-w-lg px-[5.333vw] py-4">
         {/* ページ上部：VOTE CARD mini（登録された投票数・コメント数を反映） */}

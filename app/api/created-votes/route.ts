@@ -2,11 +2,9 @@ import { NextResponse } from "next/server";
 import { getKV } from "../../lib/kv";
 import { httpResponseFromKvWriteError } from "../../lib/kvWriteErrors";
 import { resolveStableVoteCardId, type VoteCardData } from "../../data/voteCards";
+import { readCreatedVotesList, KV_CREATED_VOTES, type CreatedVoteEntry } from "../../lib/kvTimelineReads";
 
-const KV_KEY = "vote_created_votes";
-
-/** 保存形式: { userId: string, card: VoteCardData }[] */
-export type CreatedVoteEntry = { userId: string; card: Record<string, unknown> };
+export type { CreatedVoteEntry };
 
 function stableIdFromStoredCard(card: Record<string, unknown>): string {
   return resolveStableVoteCardId({
@@ -30,8 +28,7 @@ export async function GET(): Promise<NextResponse<CreatedVoteEntry[] | { error: 
     );
   }
   try {
-    const raw = await kv.get<CreatedVoteEntry[]>(KV_KEY);
-    const list = Array.isArray(raw) ? raw : [];
+    const list = await readCreatedVotesList(kv);
     return NextResponse.json(list);
   } catch (e) {
     console.error("[api/created-votes] GET error:", e);
@@ -64,11 +61,11 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
           { status: 400 }
         );
       }
-      const list = (await kv.get<CreatedVoteEntry[]>(KV_KEY)) ?? [];
+      const list = await readCreatedVotesList(kv);
       const next = list.filter(
         (e) => !(e.userId === userId && stableIdFromStoredCard(e.card) === cardId)
       );
-      await kv.set(KV_KEY, next);
+      await kv.set(KV_CREATED_VOTES, next);
       return NextResponse.json({ ok: true });
     }
 
@@ -80,7 +77,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
         { status: 400 }
       );
     }
-    const list = (await kv.get<CreatedVoteEntry[]>(KV_KEY)) ?? [];
+    const list = await readCreatedVotesList(kv);
     const entry: CreatedVoteEntry = {
       userId,
       card: {
@@ -90,7 +87,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       },
     };
     const next = [entry, ...list];
-    await kv.set(KV_KEY, next);
+    await kv.set(KV_CREATED_VOTES, next);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/created-votes] POST error:", e);

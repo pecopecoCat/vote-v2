@@ -422,11 +422,14 @@ function ProfileContent() {
     return list;
   }, [votedCardsRaw, voteTabSortOrder]);
 
-  /** Bookmark ALL: ブックマーク + 自分のコレクション登録分（member 限定コレクションは除外） */
+  /**
+   * Bookmark ALL: ブックマーク + 自分のコレクションに入れたカード。
+   * メンバー限定は「自分が作ったもの」は除外（コレ画面で管理）、参加中（他人のメンバー限定に参加したもの）は ALL に含める。
+   */
   const allBookmarkedIds = useMemo(() => {
     const ids = new Set<string>(getBookmarkIds());
     for (const col of collections) {
-      if (col.visibility === "member") continue;
+      if (col.visibility === "member" && !col.joinedParticipation) continue;
       for (const cid of col.cardIds ?? []) {
         if (typeof cid === "string" && cid.length > 0) ids.add(cid);
       }

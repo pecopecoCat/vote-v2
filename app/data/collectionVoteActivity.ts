@@ -340,6 +340,43 @@ function mergeJoinProfileMaps(
   return out;
 }
 
+/**
+ * 参加者・参加プロフィールはサーバーが正（マイリスト解除で KV から消えた人をローカルが復活させない）。
+ * 自分の楽観更新だけ、サーバーにまだ無いときだけローカルを残す。
+ * サーバーが空でローカルだけあるときは GET 欠損の可能性があるため従来の和集合マージにフォールバック。
+ */
+function mergeParticipantMapsPreferServer(
+  local: Record<string, ParticipantRow>,
+  server: Record<string, ParticipantRow>,
+  currentUserId: string
+): Record<string, ParticipantRow> {
+  if (Object.keys(server).length === 0 && Object.keys(local).length > 0) {
+    return mergeParticipantsMaps(local, server);
+  }
+  const out: Record<string, ParticipantRow> = { ...server };
+  for (const [uid, row] of Object.entries(local)) {
+    if (server[uid]) continue;
+    if (uid === currentUserId) out[uid] = row;
+  }
+  return out;
+}
+
+function mergeJoinProfileMapsPreferServer(
+  local: Record<string, MemberCollectionJoinProfile>,
+  server: Record<string, MemberCollectionJoinProfile>,
+  currentUserId: string
+): Record<string, MemberCollectionJoinProfile> {
+  if (Object.keys(server).length === 0 && Object.keys(local).length > 0) {
+    return mergeJoinProfileMaps(local, server);
+  }
+  const out: Record<string, MemberCollectionJoinProfile> = { ...server };
+  for (const [uid, row] of Object.entries(local)) {
+    if (server[uid]) continue;
+    if (uid === currentUserId) out[uid] = row;
+  }
+  return out;
+}
+
 /** GET が POST より先に返ると投票直後のローカルが消えるため、票数は max、選択は votedAt が新しい方を採用 */
 function mergeScopedGlobalMaps(
   local: Record<string, GlobalRow>,
@@ -398,16 +435,37 @@ function mergeScopedUserSelectionsMaps(
   return out;
 }
 
+export type HydrateCollectionScopedMode = "fromFetch" | "fromPost";
+
 /** KV から取得した内容で localStorage を上書き（他ユーザー分の集計を反映） */
-export function hydrateCollectionScopedFromSnapshot(collectionId: string, snap: MemberCollectionVotesSnapshot): void {
+export function hydrateCollectionScopedFromSnapshot(
+  collectionId: string,
+  snap: MemberCollectionVotesSnapshot,
+  opts?: { mode?: HydrateCollectionScopedMode }
+): void {
+  const mode: HydrateCollectionScopedMode = opts?.mode ?? "fromFetch";
   const normalized = normalizeSnapshotKeys(snap);
-  const mergedGlobal = mergeScopedGlobalMaps(loadScopedGlobal(collectionId), normalized.global);
+  const localG = loadScopedGlobal(collectionId);
+  /** POST 直後は楽観表示と競合し得るため max マージ。GET/ポーリングはサーバー集計を正とする（メンバー離脱で票数が減る） */
+  const mergedGlobal =
+    mode === "fromPost"
+      ? mergeScopedGlobalMaps(localG, normalized.global)
+      : { ...normalized.global };
   saveScopedGlobal(collectionId, mergedGlobal);
   const mergedUser = mergeScopedUserSelectionsMaps(loadScopedUserSelections(collectionId), normalized.userSelections);
   saveScopedUserSelections(collectionId, mergedUser);
-  const mergedParticipants = mergeParticipantsMaps(loadParticipantsMap(collectionId), normalized.participants);
+  const uid = getCurrentActivityUserId();
+  const mergedParticipants = mergeParticipantMapsPreferServer(
+    loadParticipantsMap(collectionId),
+    normalized.participants,
+    uid
+  );
   saveParticipantsMap(collectionId, mergedParticipants);
-  const mergedJoin = mergeJoinProfileMaps(loadJoinProfilesMap(collectionId), normalized.joinProfiles ?? {});
+  const mergedJoin = mergeJoinProfileMapsPreferServer(
+    loadJoinProfilesMap(collectionId),
+    normalized.joinProfiles ?? {},
+    uid
+  );
   saveJoinProfilesMap(collectionId, mergedJoin);
   notifyCollectionScopedUpdated(collectionId);
 }
@@ -422,7 +480,8 @@ export async function fetchMemberCollectionVotesRemote(
   const userId = getCurrentActivityUserId();
   try {
     const res = await fetch(
-      `${COLLECTION_READ_API(collectionId)}?userId=${encodeURIComponent(userId)}`
+      `${COLLECTION_READ_API(collectionId)}?userId=${encodeURIComponent(userId)}`,
+      { cache: "no-store" }
     );
     if (res.status === 503) return { ok: false, reason: "no_kv" };
     if (res.status === 404) return { ok: false, reason: "not_found" };
@@ -436,7 +495,9 @@ export async function fetchMemberCollectionVotesRemote(
       if (snap) return { ok: true, snapshot: snap };
     }
 
-    const resVotes = await fetch(`${VOTES_API(collectionId)}?userId=${encodeURIComponent(userId)}`);
+    const resVotes = await fetch(`${VOTES_API(collectionId)}?userId=${encodeURIComponent(userId)}`, {
+      cache: "no-store",
+    });
     if (resVotes.status === 503) return { ok: false, reason: "no_kv" };
     if (resVotes.status === 404) return { ok: false, reason: "not_found" };
     if (!resVotes.ok) return { ok: false, reason: "error" };
@@ -567,6 +628,7 @@ export function addCollectionScopedVote(
     try {
       const res = await fetch(VOTES_API(collectionId), {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: getCurrentActivityUserId(),
@@ -577,7 +639,7 @@ export function addCollectionScopedVote(
       });
       if (!res.ok) return;
       const snap = normalizeSnapshot(await res.json());
-      if (snap) hydrateCollectionScopedFromSnapshot(collectionId, snap);
+      if (snap) hydrateCollectionScopedFromSnapshot(collectionId, snap, { mode: "fromPost" });
     } catch {
       // ローカルは既に apply済み。API 失敗時はこの端末のみの集計のまま。
     }

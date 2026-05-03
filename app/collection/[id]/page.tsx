@@ -439,13 +439,22 @@ export default function CollectionPage() {
     };
   }, [collection?.id, collection?.visibility, activityUserId]);
 
-  /** メンバー限定: 定期・フォーカス・タブ復帰で再取得 */
+  /**
+   * メンバー限定: 定期・フォーカス・タブ復帰で再取得。
+   * 他端末の参加・投票は CustomEvent で届かないため GET で追う（Safari は間隔が長いと体感遅れやすい）。
+   */
   useEffect(() => {
     if (!collection?.id || collection.visibility !== "member") return;
     const colId = collection.id;
     let inFlight = false;
     let lastPullAt = 0;
-    const pull = async () => {
+    const applyRemote = (r: Awaited<ReturnType<typeof fetchMemberCollectionVotesRemote>>) => {
+      if (r.ok) {
+        hydrateCollectionScopedFromSnapshot(colId, r.snapshot);
+        setScopedVotesVersion((v) => v + 1);
+      }
+    };
+    const pullThrottled = async () => {
       const now = Date.now();
       if (inFlight) return;
       if (now - lastPullAt < 800) return;
@@ -453,15 +462,21 @@ export default function CollectionPage() {
       lastPullAt = now;
       const r = await fetchMemberCollectionVotesRemote(colId);
       inFlight = false;
-      if (r.ok) {
-        hydrateCollectionScopedFromSnapshot(colId, r.snapshot);
-        setScopedVotesVersion((v) => v + 1);
-      }
+      applyRemote(r);
     };
-    const interval = window.setInterval(() => void pull(), 20_000);
-    const onFocus = () => void pull();
+    /** タブ復帰・ウィンドウフォーカス時はスロットルを外し、すぐ他メンバーのアイコン反映を試みる */
+    const pullImmediate = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      lastPullAt = Date.now();
+      const r = await fetchMemberCollectionVotesRemote(colId);
+      inFlight = false;
+      applyRemote(r);
+    };
+    const interval = window.setInterval(() => void pullThrottled(), 3_000);
+    const onFocus = () => void pullImmediate();
     const onVis = () => {
-      if (document.visibilityState === "visible") void pull();
+      if (document.visibilityState === "visible") void pullImmediate();
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVis);
@@ -766,6 +781,7 @@ export default function CollectionPage() {
                   <li key={p.userId} className="flex max-w-[10rem] min-w-0 items-center gap-1.5">
                     <span className="relative inline-block h-6 w-6 shrink-0 rounded-full bg-gray-200 align-middle ring-1 ring-[rgba(0,0,0,0.06)] [transform:translateZ(0)]">
                       <img
+                        key={`${p.userId}-${p.lastVotedAt}-${p.iconUrl ?? ""}`}
                         src={avatarSrc}
                         alt=""
                         className="block h-6 w-6 rounded-full object-cover object-center"

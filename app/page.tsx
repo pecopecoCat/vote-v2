@@ -10,7 +10,7 @@ import {
   useRef,
   memo,
 } from "react";
-import { useSearchParams, usePathname } from "next/navigation";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import AppHeader from "./components/AppHeader";
 import VoteCard from "./components/VoteCard";
 import AdCard from "./components/AdCard";
@@ -357,14 +357,12 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
 
 function HomeContent() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<FeedTabId>(() =>
     tabFromUrl === "new" ? "new" : tabFromUrl === "myTimeline" ? "myTimeline" : "trending"
   );
-  useEffect(() => {
-    if (tabFromUrl === "new") setActiveTab("new");
-    else if (tabFromUrl === "myTimeline") setActiveTab("myTimeline");
-  }, [tabFromUrl]);
 
   /** VOTE作成完了後、HOME の新着タブ表示時に一度だけトースト */
   useEffect(() => {
@@ -430,12 +428,44 @@ function HomeContent() {
     [auth.isLoggedIn, auth.user]
   );
 
-  /** 未ログイン時は myTimeline タブを出さないので、選択中なら急上昇中に切り替え */
+  const searchParamsKey = searchParams.toString();
+
+  /** ブラウザの戻る／進む・URL直打ちでタブをURLと一致させる */
   useEffect(() => {
-    if (currentUser.type !== "sns" && activeTab === "myTimeline") {
-      setActiveTab("trending");
+    if (tabFromUrl === "new") {
+      setActiveTab("new");
+      return;
     }
-  }, [currentUser.type, activeTab]);
+    if (tabFromUrl === "myTimeline" && currentUser.type === "sns") {
+      setActiveTab("myTimeline");
+      return;
+    }
+    setActiveTab("trending");
+  }, [tabFromUrl, currentUser.type]);
+
+  /** 未ログインなのに ?tab=myTimeline のときだけクエリを外す */
+  useEffect(() => {
+    if (currentUser.type === "sns" || tabFromUrl !== "myTimeline") return;
+    const params = new URLSearchParams(searchParamsKey);
+    params.delete("tab");
+    const qs = params.toString();
+    void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [currentUser.type, tabFromUrl, pathname, router, searchParamsKey]);
+
+  const selectFeedTab = useCallback(
+    (id: FeedTabId) => {
+      setActiveTab(id);
+      const params = new URLSearchParams(searchParamsKey);
+      if (id === "trending") {
+        params.delete("tab");
+      } else {
+        params.set("tab", id);
+      }
+      const qs = params.toString();
+      void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParamsKey]
+  );
 
   useEffect(() => {
     const eventName = getCollectionsUpdatedEventName();
@@ -570,7 +600,6 @@ function HomeContent() {
   const bumpTrendingOrder = useCallback(() => {
     setTrendingOrderTick((t) => t + 1);
   }, []);
-  const pathname = usePathname();
   const prevPathnameRef = useRef(pathname);
 
   useLayoutEffect(() => {
@@ -691,7 +720,7 @@ function HomeContent() {
       {/* タブ：急上昇中 / 新着 / myTimeline */}
       <FeedTabs
         activeId={activeTab}
-        onSelect={setActiveTab}
+        onSelect={selectFeedTab}
         isLoggedIn={currentUser.type === "sns"}
       />
 

@@ -254,7 +254,6 @@ function CreateFormContent() {
       <AppHeader
         type="title"
         title="VOTEを作成"
-        backHref="/"
         right={
           <button
             type="button"
