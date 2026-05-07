@@ -16,7 +16,7 @@ function activeKey(userId: string): string {
   return KV_KEY_PREFIX + userId;
 }
 
-/** GET: 現在ログイン中のユーザーIDの一覧（最大10人） */
+/** GET: 現在ログイン中のユーザーIDの一覧（デモ user 最大6人） */
 export async function GET(): Promise<NextResponse<{ userIds: string[] } | { error: string }>> {
   const kv = await getKV();
   if (!kv) {

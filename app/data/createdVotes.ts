@@ -134,7 +134,7 @@ function loadLegacy(): VoteCardData[] {
   }
 }
 
-/** タイムライン・カード解決用：全ユーザーの作ったVOTEをマージ（user1..user10） */
+/** タイムライン・カード解決用：全ユーザーの作ったVOTEをマージ（user1..user6） */
 export function getCreatedVotesForTimeline(): VoteCardData[] {
   if (typeof window === "undefined") return [];
   const all: VoteCardData[] = [];

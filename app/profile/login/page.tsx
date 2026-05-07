@@ -7,16 +7,12 @@ import BottomNav from "../../components/BottomNav";
 import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, getDisplayUserForDemo, fetchUserProfileFromApi, DEMO_USER_IDS, DEMO_USERS, type DemoUserId } from "../../data/auth";
 
 const USER_MEMOS: Record<DemoUserId, string> = {
-  user1: "普通",
-  user2: "ママ",
-  user3: "ドラマ好き",
-  user4: "パパ",
-  user5: "Kpop好き",
-  user6: "猫好き",
-  user7: "アート・クリエイティブ好き",
-  user8: "映画好き",
-  user9: "アイドル好き",
-  user10: "オーガニック女子",
+  user1: "35歳",
+  user2: "37歳",
+  user3: "アイドル好き",
+  user4: "スポーツ好き",
+  user5: "28歳",
+  user6: "31歳",
 };
 
 function ProfileLoginContent() {
@@ -216,7 +212,7 @@ function ProfileLoginContent() {
                   <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{loginError}</p>
                 )}
                 <p className="mb-3 text-sm font-bold text-gray-700">どれでログインする？</p>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {DEMO_USER_IDS.map((userId) => {
                     const lastId = getLastLoggedInUserId();
                     const apiProfile = profilesFromApi[userId];

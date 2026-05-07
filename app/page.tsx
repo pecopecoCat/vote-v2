@@ -208,6 +208,15 @@ const RESET_COLLECTIONS_FLAG = "vote_collections_reset_v3";
 const TIMELINE_INITIAL_VISIBLE = 12;
 const TIMELINE_LOAD_MORE = 10;
 
+/** HOME の Suspense / KV ブートストラップ待ちで共通（文言は1種類のみ） */
+function HomeLoadingMessage() {
+  return (
+    <p className="rounded-2xl bg-white/90 px-4 py-3 text-center text-sm leading-relaxed text-[#191919] shadow-[0_2px_1px_0_rgba(51,51,51,0.08)]">
+      読み込み中…
+    </p>
+  );
+}
+
 function ensureVoteCountsResetOnce(): void {
   if (typeof window === "undefined") return;
   if (window.localStorage.getItem(RESET_VOTE_COUNTS_FLAG)) return;
@@ -379,15 +388,6 @@ function HomeContent() {
   const [collections, setCollections] = useState(() => getCollections());
   const shared = useSharedData();
   const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
-  const [showFeedPreparingNotice, setShowFeedPreparingNotice] = useState(false);
-  useEffect(() => {
-    if (activityBootstrapDone) {
-      setShowFeedPreparingNotice(false);
-      return;
-    }
-    const t = window.setTimeout(() => setShowFeedPreparingNotice(true), 400);
-    return () => window.clearTimeout(t);
-  }, [activityBootstrapDone]);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
@@ -724,44 +724,40 @@ function HomeContent() {
         isLoggedIn={currentUser.type === "sns"}
       />
 
-      {showFeedPreparingNotice ? (
-        <div className="mx-auto max-w-lg px-[5.333vw] pt-3">
-          <p className="rounded-2xl bg-white/90 px-4 py-3 text-center text-sm leading-relaxed text-[#191919] shadow-[0_2px_1px_0_rgba(51,51,51,0.08)]">
-            準備中です。もう少し待ってね🙏
-          </p>
-        </div>
-      ) : null}
-
       {/* メインコンテンツ（下ナビ分の余白を確保） */}
       <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
-        <div className="flex flex-col gap-[5.333vw]">
-          {activeTab === "myTimeline" && cardsForTab.length === 0 ? (
-            <div className="rounded-[2rem] bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
-              <p className="text-sm text-gray-600">
-                ブックマークした投稿がここに表示されます。
-              </p>
-            </div>
-          ) : (activeTab === "trending" || activeTab === "new") && cardsForTab.length === 0 ? (
-            <div className="rounded-[2rem] bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
-              <p className="text-sm text-gray-600">
-                まだ投票できる投稿がありません。
-              </p>
-            </div>
-          ) : null}
+        {!activityBootstrapDone ? (
+          <HomeLoadingMessage />
+        ) : (
+          <div className="flex flex-col gap-[5.333vw]">
+            {activeTab === "myTimeline" && cardsForTab.length === 0 ? (
+              <div className="rounded-[2rem] bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
+                <p className="text-sm text-gray-600">
+                  ブックマークした投稿がここに表示されます。
+                </p>
+              </div>
+            ) : (activeTab === "trending" || activeTab === "new") && cardsForTab.length === 0 ? (
+              <div className="rounded-[2rem] bg-white px-6 py-12 text-center shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
+                <p className="text-sm text-gray-600">
+                  まだ投票できる投稿がありません。
+                </p>
+              </div>
+            ) : null}
 
-          <HomeTimelineFeed
-            key={activeTab}
-            timelineItems={timelineItems}
-            timelineTagList={homeTagList}
-            activity={activity}
-            commentedCardIdSet={commentedCardIdSet}
-            bookmarkedIds={bookmarkedIds}
-            currentUser={currentUser}
-            handleVote={handleVote}
-            onBookmarkClick={setModalCardId}
-            onMoreClick={handleCardMoreClick}
-          />
-        </div>
+            <HomeTimelineFeed
+              key={activeTab}
+              timelineItems={timelineItems}
+              timelineTagList={homeTagList}
+              activity={activity}
+              commentedCardIdSet={commentedCardIdSet}
+              bookmarkedIds={bookmarkedIds}
+              currentUser={currentUser}
+              handleVote={handleVote}
+              onBookmarkClick={setModalCardId}
+              onMoreClick={handleCardMoreClick}
+            />
+          </div>
+        )}
       </main>
 
       {/* 下部ナビ（スマホメイン） */}
@@ -811,14 +807,7 @@ function HomeFallback() {
     <div className="min-h-screen bg-[#F1F1F1]">
       <AppHeader type="logo" />
       <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
-        <div className="flex flex-col gap-[5.333vw] animate-pulse">
-          <div className="h-10 w-32 rounded-full bg-gray-200" aria-hidden />
-          <div className="flex flex-col gap-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-[200px] rounded-[18px] bg-gray-200" aria-hidden />
-            ))}
-          </div>
-        </div>
+        <HomeLoadingMessage />
       </main>
       <BottomNav activeId="home" />
     </div>

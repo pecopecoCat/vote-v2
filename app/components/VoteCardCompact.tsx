@@ -143,10 +143,15 @@ export default function VoteCardCompact({
               <button
                 type="button"
                 className={`flex w-full overflow-hidden rounded-lg bg-white text-left shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${
-                  onVote && periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-not-allowed opacity-50"
+                  onVote && periodAllowsVote
+                    ? "transition-opacity active:opacity-90"
+                    : onVote
+                      ? "cursor-default"
+                      : "cursor-not-allowed opacity-50"
                 }`}
                 onClick={onVote && periodAllowsVote ? () => onVote("A") : undefined}
-                disabled={!onVote || !periodAllowsVote}
+                disabled={!onVote}
+                aria-disabled={Boolean(onVote) && !periodAllowsVote}
               >
                 <span className="flex w-[14.25%] min-w-[36px] shrink-0 items-center justify-center self-stretch rounded-l-lg bg-[#E63E48] py-2 text-sm font-bold text-white">
                   A
@@ -160,10 +165,15 @@ export default function VoteCardCompact({
               <button
                 type="button"
                 className={`flex w-full overflow-hidden rounded-lg bg-white text-left shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${
-                  onVote && periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-not-allowed opacity-50"
+                  onVote && periodAllowsVote
+                    ? "transition-opacity active:opacity-90"
+                    : onVote
+                      ? "cursor-default"
+                      : "cursor-not-allowed opacity-50"
                 }`}
                 onClick={onVote && periodAllowsVote ? () => onVote("B") : undefined}
-                disabled={!onVote || !periodAllowsVote}
+                disabled={!onVote}
+                aria-disabled={Boolean(onVote) && !periodAllowsVote}
               >
                 <span className="flex w-[14.25%] min-w-[36px] shrink-0 items-center justify-center self-stretch rounded-l-lg bg-[#3273E3] py-2 text-sm font-bold text-white">
                   B
@@ -178,7 +188,7 @@ export default function VoteCardCompact({
           ) : (
             <>
               <div
-                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${onVote && selectedSide == null && periodAllowsVote ? "cursor-pointer active:opacity-90" : ""} ${onVote && selectedSide == null && !periodAllowsVote ? "cursor-not-allowed opacity-50" : ""}`}
+                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${onVote && selectedSide == null && periodAllowsVote ? "cursor-pointer active:opacity-90" : ""} ${onVote && selectedSide == null && !periodAllowsVote ? "cursor-default" : ""}`}
                 onClick={onVote && selectedSide == null && periodAllowsVote ? () => onVote("A") : undefined}
                 role={onVote && selectedSide == null && periodAllowsVote ? "button" : undefined}
               >
@@ -219,7 +229,7 @@ export default function VoteCardCompact({
                 </div>
               </div>
               <div
-                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${onVote && selectedSide == null && periodAllowsVote ? "cursor-pointer active:opacity-90" : ""} ${onVote && selectedSide == null && !periodAllowsVote ? "cursor-not-allowed opacity-50" : ""}`}
+                className={`relative flex overflow-visible rounded-lg bg-white shadow-[0_2px_6px_rgba(0,0,0,0.06)] ${expandMini ? "items-stretch" : "items-center"} ${onVote && selectedSide == null && periodAllowsVote ? "cursor-pointer active:opacity-90" : ""} ${onVote && selectedSide == null && !periodAllowsVote ? "cursor-default" : ""}`}
                 onClick={onVote && selectedSide == null && periodAllowsVote ? () => onVote("B") : undefined}
                 role={onVote && selectedSide == null && periodAllowsVote ? "button" : undefined}
               >
@@ -348,7 +358,7 @@ export default function VoteCardCompact({
 
       {periodStatusText ? (
         <div
-          className="px-5 pb-2 text-[15px]"
+          className="px-5 pb-2 text-[13px]"
           style={{ color: "#8A8A8A" }}
         >
           {periodStatusText}

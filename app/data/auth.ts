@@ -35,25 +35,18 @@ export interface LineAuthUser {
   iconUrl?: string;
 }
 
-/** デモ用ユーザーID（user1..user10） */
-export const DEMO_USER_IDS = [
-  "user1", "user2", "user3", "user4", "user5",
-  "user6", "user7", "user8", "user9", "user10",
-] as const;
+/** デモ用ユーザーID（user1..user6） */
+export const DEMO_USER_IDS = ["user1", "user2", "user3", "user4", "user5", "user6"] as const;
 export type DemoUserId = (typeof DEMO_USER_IDS)[number];
 
-/** 簡易ログイン用：10ユーザー（user1..user9 は public/user1.png..user9.png、user10 はデフォルト） */
+/** 簡易ログイン用：6ユーザー（アイコンは public/user1.png … user6.png） */
 export const DEMO_USERS: Record<DemoUserId, { name: string; iconUrl: string }> = {
-  user1: { name: "user1", iconUrl: "/user1.png" },
-  user2: { name: "user2", iconUrl: "/user2.png" },
-  user3: { name: "user3", iconUrl: "/user3.png" },
-  user4: { name: "user4", iconUrl: "/user4.png" },
-  user5: { name: "user5", iconUrl: "/user5.png" },
-  user6: { name: "user6", iconUrl: "/user6.png" },
-  user7: { name: "user7", iconUrl: "/user7.png" },
-  user8: { name: "user8", iconUrl: "/user8.png" },
-  user9: { name: "user9", iconUrl: "/user9.png" },
-  user10: { name: "user10", iconUrl: "/user10.png" },
+  user1: { name: "ママ", iconUrl: "/user1.png" },
+  user2: { name: "パパ", iconUrl: "/user2.png" },
+  user3: { name: "25歳（女）", iconUrl: "/user3.png" },
+  user4: { name: "23歳（男）", iconUrl: "/user4.png" },
+  user5: { name: "社会人（男）", iconUrl: "/user5.png" },
+  user6: { name: "社会人（女）", iconUrl: "/user6.png" },
 };
 
 export interface AuthState {
@@ -173,7 +166,7 @@ export function getDisplayUserForDemo(userId: DemoUserId): { name: string; iconU
   };
 }
 
-/** 簡易デモ：user1..user10 のいずれかでログイン（localStorage 優先、なければ API から復元） */
+/** 簡易デモ：user1..user6 のいずれかでログイン（localStorage 優先、なければ API から復元） */
 export async function loginAsDemoUser(userId: DemoUserId): Promise<void> {
   const defaultUser = DEMO_USERS[userId];
   let saved = loadSavedProfile(userId);
@@ -302,7 +295,7 @@ export function updateCurrentUserProfile(updates: Partial<LineAuthUser>): void {
 
 /**
  * 保存済みログイン状態から、active-user KV を解除する用のデモ userId を解決する。
- * `userId` が無い旧データでは `user.name` が user1..user10 のときだけ一致させる。
+ * `userId` が無い旧データでは `user.name` が user1..user6 のときだけ一致させる。
  */
 export function resolveStoredDemoUserId(state: AuthState): DemoUserId | undefined {
   if (state.userId && DEMO_USER_IDS.includes(state.userId)) return state.userId;

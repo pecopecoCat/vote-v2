@@ -275,10 +275,10 @@ function VoteCard({
               <button
                 type="button"
                 className={`vote-card-answer-shadow flex w-full overflow-hidden rounded-xl bg-white text-left ${
-                  periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-not-allowed opacity-50"
+                  periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-default"
                 }`}
                 onClick={handleSelectA}
-                disabled={!periodAllowsVote}
+                aria-disabled={!periodAllowsVote}
               >
                 <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#E63E48] py-3.5 text-base font-bold text-white">
                   A
@@ -290,10 +290,10 @@ function VoteCard({
               <button
                 type="button"
                 className={`vote-card-answer-shadow flex w-full overflow-hidden rounded-xl bg-white text-left ${
-                  periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-not-allowed opacity-50"
+                  periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-default"
                 }`}
                 onClick={handleSelectB}
-                disabled={!periodAllowsVote}
+                aria-disabled={!periodAllowsVote}
               >
                 <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#3273E3] py-3.5 text-base font-bold text-white">
                   B
@@ -473,9 +473,10 @@ function VoteCard({
           {optionAImageUrl != null && (
             <button
               type="button"
-              className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFE100] disabled:cursor-not-allowed"
+              className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFE100] disabled:cursor-default disabled:opacity-100"
               onClick={handleSelectA}
-              disabled={selectedOption !== null || !periodAllowsVote}
+              disabled={selectedOption !== null}
+              aria-disabled={!periodAllowsVote && selectedOption === null}
               aria-label="Aを投票"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -497,9 +498,10 @@ function VoteCard({
           {optionBImageUrl != null && (
             <button
               type="button"
-              className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFE100] disabled:cursor-not-allowed"
+              className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFE100] disabled:cursor-default disabled:opacity-100"
               onClick={handleSelectB}
-              disabled={selectedOption !== null || !periodAllowsVote}
+              disabled={selectedOption !== null}
+              aria-disabled={!periodAllowsVote && selectedOption === null}
               aria-label="Bを投票"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -541,7 +543,7 @@ function VoteCard({
       {/* 投票期間（タグの下・薄いグレー15px。「追加したいコレクションを選択」と同じ色 #8A8A8A） */}
       {periodStatusText ? (
         <div
-          className={`px-5 ${tags.length > 0 ? "pt-1" : "pt-2"} pb-[0.78em] text-[15px]`}
+          className={`px-5 ${tags.length > 0 ? "pt-1" : "pt-2"} pb-[0.78em] text-[13px]`}
           style={{ color: "#8A8A8A" }}
         >
           {periodStatusText}
