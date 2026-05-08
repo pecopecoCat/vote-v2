@@ -603,7 +603,7 @@ export const voteCardsData: VoteCardData[] = [
   },
   {
     patternType: "geometric-stripes",
-    question: "記念日、向こうだけ忘れてて一番こわいのはどっちだと思う？",
+    question: "記念日で一番避けたいのはどっちだと思う？",
     optionA: "自分が忘れたパターン😱",
     optionB: "相手だけ忘れてるパターン☠️",
     countA: 12,
@@ -656,9 +656,9 @@ export const voteCardsData: VoteCardData[] = [
   },
   {
     patternType: "yellow-loops",
-    question: "恋のライバル（推しと呼ばれる人）っぽい存在が見えたら、自分はどっちに寄る？",
-    optionA: "さりげなく聞けるなら確認したい派",
-    optionB: "様子見で信じるしかないとのめり込み回避派",
+    question: "恋のライバルっぽい存在が見えたら、どうする？",
+    optionA: "さりげなく調査",
+    optionB: "気にしない",
     countA: 11,
     countB: 19,
     commentCount: 2,
@@ -683,8 +683,8 @@ export const voteCardsData: VoteCardData[] = [
   {
     patternType: "orange-purple",
     question: "恋愛の『嫌な線引き』だけを選ぶとしたら、「浮気」の定義はどっちに寄る？（超ざっくり）",
-    optionA: "浮気になりうる／ならないの壁は精神的な親密さ寄り💭",
-    optionB: "身体かどうかがまずひとつの大きめの線🚧",
+    optionA: "心",
+    optionB: "身体",
     countA: 18,
     countB: 15,
     commentCount: 5,
