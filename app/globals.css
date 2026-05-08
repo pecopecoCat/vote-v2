@@ -99,9 +99,12 @@ select {
   overflow-wrap: break-word;
 }
 
-/* A/B 回答テキスト */
+/* A/B 回答テキスト（日本語の禁則＋複数行時のレイアウト崩れ軽減） */
 .vote-card-option-text {
   font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-break: strict;
 }
 
 /* パーセント表示：数字 Lato 14px Bold #191919、% は 12px */

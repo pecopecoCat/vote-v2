@@ -12,7 +12,8 @@ import { clearCollectionScopedLocalData } from "./collectionVoteActivity";
 import { removeLocalCommentsForCollection } from "./voteCardActivity";
 import { addBookmark, removeBookmark } from "./bookmarks";
 import { showAppToast } from "../lib/appToast";
-import { getSeedPapaWarningCardIds } from "./voteCards";
+import { getSeedClassicCardIds, getSeedPapaWarningCardIds } from "./voteCards";
+import { DEFAULT_MAMA_AVATAR_URL, DEFAULT_RYO_AVATAR_URL } from "./avatarUrls";
 
 const STORAGE_KEY_PREFIX = "vote_collections_";
 const PINNED_STORAGE_KEY_PREFIX = "vote_pinned_collection_ids_";
@@ -197,7 +198,21 @@ export function ensureSeedPapaWarningCollection(): void {
   if (cardIds.length === 0) return;
 
   const cols = load(uid);
-  if (cols.some((c) => c.id === SEED_PAPA_WARNING_COLLECTION_ID)) return;
+  const existingIndex = cols.findIndex((c) => c.id === SEED_PAPA_WARNING_COLLECTION_ID);
+  if (existingIndex >= 0) {
+    const existing = cols[existingIndex];
+    // 既存があっても、作成者表示はデモ要件に合わせて更新（miki固定）
+    const next: Collection = {
+      ...existing,
+      // 末尾 seed の入れ替えに追従（カード数が変わった場合）
+      cardIds: [...cardIds],
+      createdByDisplayName: "miki",
+      createdByIconUrl: DEFAULT_MAMA_AVATAR_URL,
+    };
+    cols[existingIndex] = next;
+    save(uid, [...cols]);
+    return;
+  }
 
   const seedCol: Collection = {
     id: SEED_PAPA_WARNING_COLLECTION_ID,
@@ -207,12 +222,29 @@ export function ensureSeedPapaWarningCollection(): void {
     visibility: "public",
     cardIds: [...cardIds],
     createdByUserId: uid,
+    createdByDisplayName: "miki",
+    createdByIconUrl: DEFAULT_MAMA_AVATAR_URL,
   };
   save(uid, [...cols, seedCol]);
 }
 
-/** 他ユーザー作成のコレクション（デモ用シードは未使用。API 連携などで差し込む場合に利用） */
-export const OTHER_USERS_COLLECTIONS: Collection[] = [];
+/** 定番の2択（デモ用の固定コレクション。作成者: ryo） */
+export const SEED_CLASSIC_COLLECTION_ID = "col-seed-classic";
+
+/** 他ユーザー作成のコレクション（デモ用の固定分をここで差し込む） */
+export const OTHER_USERS_COLLECTIONS: Collection[] = [
+  {
+    id: SEED_CLASSIC_COLLECTION_ID,
+    name: "定番の2択",
+    color: "#C4B5FD",
+    gradient: "purple-pink",
+    visibility: "public",
+    cardIds: getSeedClassicCardIds(),
+    createdByUserId: "user5",
+    createdByDisplayName: "ryo",
+    createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
+  },
+];
 
 /** 他ユーザーのコレクション一覧を取得 */
 export function getOtherUsersCollections(): Collection[] {

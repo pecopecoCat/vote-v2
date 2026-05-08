@@ -279,7 +279,11 @@ export default function VoteCardCompact({
           className={`flex items-center gap-4 border-t border-gray-100 px-5 ${isMini ? "pt-2 pb-[14.4px]" : "py-2"}`}
         >
           <span className="flex items-center gap-1" aria-label="2択回答数">
-            <img src="/icons/votemark.svg" alt="" className="vote-card-footer-icon-square" />
+            <img
+              src={selectedSide ? "/icons/votemark.svg" : "/icons/votemark-black.svg"}
+              alt=""
+              className="vote-card-footer-icon-square"
+            />
             <span className="vote-card-footer-count">{displayTotal}</span>
           </span>
           {commentsDisabled ? (

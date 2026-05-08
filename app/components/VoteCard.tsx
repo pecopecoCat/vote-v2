@@ -274,32 +274,32 @@ function VoteCard({
             <>
               <button
                 type="button"
-                className={`vote-card-answer-shadow flex w-full overflow-hidden rounded-xl bg-white text-left ${
+                className={`vote-card-answer-shadow flex w-full items-stretch overflow-hidden rounded-xl bg-white text-left ${
                   periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-default"
                 }`}
                 onClick={handleSelectA}
                 aria-disabled={!periodAllowsVote}
               >
-                <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#E63E48] py-3.5 text-base font-bold text-white">
+                <span className="flex w-[14.25%] min-w-[41px] shrink-0 flex-col justify-center self-stretch rounded-l-xl bg-[#E63E48] py-3.5 text-center text-base font-bold text-white">
                   A
                 </span>
-                <span className="vote-card-option-text flex flex-1 items-center rounded-r-xl bg-white px-4 py-3.5 font-semibold text-[#212121]">
-                  {optionA}
+                <span className="vote-card-option-text flex min-w-0 flex-1 items-start rounded-r-xl bg-white px-4 py-3.5 text-left text-[clamp(12px,4.8vw,16px)] font-semibold leading-snug text-[#212121]">
+                  <span className="min-w-0 whitespace-normal break-words">{optionA}</span>
                 </span>
               </button>
               <button
                 type="button"
-                className={`vote-card-answer-shadow flex w-full overflow-hidden rounded-xl bg-white text-left ${
+                className={`vote-card-answer-shadow flex w-full items-stretch overflow-hidden rounded-xl bg-white text-left ${
                   periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-default"
                 }`}
                 onClick={handleSelectB}
                 aria-disabled={!periodAllowsVote}
               >
-                <span className="flex w-[14.25%] min-w-[41px] shrink-0 items-center justify-center rounded-l-xl bg-[#3273E3] py-3.5 text-base font-bold text-white">
+                <span className="flex w-[14.25%] min-w-[41px] shrink-0 flex-col justify-center self-stretch rounded-l-xl bg-[#3273E3] py-3.5 text-center text-base font-bold text-white">
                   B
                 </span>
-                <span className="vote-card-option-text flex flex-1 items-center rounded-r-xl bg-white px-4 py-3.5 font-semibold text-[#212121]">
-                  {optionB}
+                <span className="vote-card-option-text flex min-w-0 flex-1 items-start rounded-r-xl bg-white px-4 py-3.5 text-left text-[clamp(12px,4.8vw,16px)] font-semibold leading-snug text-[#212121]">
+                  <span className="min-w-0 whitespace-normal break-words">{optionB}</span>
                 </span>
               </button>
             </>
@@ -365,7 +365,11 @@ function VoteCard({
         className={`flex items-center gap-4 border-t border-gray-100 px-5 pt-[2.73vw] ${tags.length > 0 ? "pb-[0.36em]" : "pb-[0.72em]"}`}
       >
         <span className="flex items-center gap-1" aria-label="2択回答数">
-          <img src="/icons/votemark.svg" alt="" className="vote-card-footer-icon-square" />
+          <img
+            src={showResult ? "/icons/votemark.svg" : "/icons/votemark-black.svg"}
+            alt=""
+            className="vote-card-footer-icon-square"
+          />
           <span className="vote-card-footer-count">{displayTotal}</span>
         </span>
         {commentsDisabled ? (

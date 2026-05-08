@@ -1,4 +1,12 @@
 import type { VoteCardPattern } from "../components/VoteCard";
+import {
+  DEFAULT_AI_AVATAR_URL,
+  DEFAULT_KOUTA_AVATAR_URL,
+  DEFAULT_MAMA_AVATAR_URL,
+  DEFAULT_PAPA_AVATAR_URL,
+  DEFAULT_RYO_AVATAR_URL,
+  DEFAULT_YUI_AVATAR_URL,
+} from "./avatarUrls";
 
 export interface VoteCardData {
   patternType: VoteCardPattern;
@@ -54,7 +62,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "電源・トイレ付きサイトと、ぶっつけ本色派、どちらもアリだけど論争が止まらない問いです。",
     bookmarkCount: 4,
     createdAt: "2026-05-02T09:00:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -67,7 +75,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["家の飯", "料理な2択"],
     bookmarkCount: 6,
     createdAt: "2026-05-04T11:30:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -81,7 +89,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "初日の腹の空き具合によって最適解が変わる伝説の2択。",
     bookmarkCount: 11,
     createdAt: "2026-05-05T07:15:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -94,7 +102,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["BBQ", "グルメ"],
     bookmarkCount: 5,
     createdAt: "2026-05-06T08:00:00.000Z",
-    creator: { name: "kouta", iconUrl: "/demo-user4.png" },
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -107,7 +115,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["乳液"],
     bookmarkCount: 3,
     createdAt: "2026-05-06T21:45:00.000Z",
-    creator: { name: "ryo", iconUrl: "/demo-user5.png" },
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -120,7 +128,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["キャンプ", "アウトドア", "料理な2択"],
     bookmarkCount: 2,
     createdAt: "2026-05-07T06:20:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -133,7 +141,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 8,
     createdAt: "2026-05-07T14:10:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -146,7 +154,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["アウトドア"],
     bookmarkCount: 1,
     createdAt: "2026-05-07T22:50:00.000Z",
-    creator: { name: "kouta", iconUrl: "/demo-user4.png" },
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
   },
   /* --- アイドル / アニメ / 育児ネタ --- */
   {
@@ -161,7 +169,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "貯金とも喧嘩しがち。この2択は永遠に結論が出ないタイプです。",
     bookmarkCount: 9,
     createdAt: "2026-05-08T03:05:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -174,7 +182,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["アイドル"],
     bookmarkCount: 5,
     createdAt: "2026-05-08T03:40:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -187,7 +195,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["アイドル"],
     bookmarkCount: 4,
     createdAt: "2026-05-08T05:15:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -201,7 +209,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "完璧主義ツラい、でもゆるゆるだと見つからない問題。どっちでも正解。",
     bookmarkCount: 6,
     createdAt: "2026-05-08T06:02:00.000Z",
-    creator: { name: "ryo", iconUrl: "/demo-user5.png" },
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -214,7 +222,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["アイドル"],
     bookmarkCount: 7,
     createdAt: "2026-05-08T06:48:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -227,7 +235,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["アニメ"],
     bookmarkCount: 8,
     createdAt: "2026-05-08T07:20:00.000Z",
-    creator: { name: "kouta", iconUrl: "/demo-user4.png" },
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -240,7 +248,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["アニメ"],
     bookmarkCount: 3,
     createdAt: "2026-05-08T07:55:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -253,7 +261,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["アニメ"],
     bookmarkCount: 4,
     createdAt: "2026-05-08T08:30:00.000Z",
-    creator: { name: "ryo", iconUrl: "/demo-user5.png" },
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -266,7 +274,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["アニメ"],
     bookmarkCount: 6,
     createdAt: "2026-05-08T09:05:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -280,7 +288,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "スクショ禁止のときほどまた見たくなる問題。",
     bookmarkCount: 5,
     createdAt: "2026-05-08T09:42:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -293,7 +301,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["アニメ", "アイドル"],
     bookmarkCount: 4,
     createdAt: "2026-05-08T10:18:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -306,7 +314,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児"],
     bookmarkCount: 7,
     createdAt: "2026-05-08T10:55:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -320,7 +328,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "月齢でも季節でも答え変わりますね…",
     bookmarkCount: 6,
     createdAt: "2026-05-08T11:30:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -333,7 +341,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児", "アウトドア"],
     bookmarkCount: 3,
     createdAt: "2026-05-08T12:06:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -346,7 +354,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児"],
     bookmarkCount: 8,
     createdAt: "2026-05-08T12:42:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -359,7 +367,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児", "家の飯"],
     bookmarkCount: 5,
     createdAt: "2026-05-08T13:18:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -372,7 +380,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児", "料理な2択"],
     bookmarkCount: 2,
     createdAt: "2026-05-08T13:55:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -385,7 +393,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児", "アニメ"],
     bookmarkCount: 4,
     createdAt: "2026-05-08T14:31:00.000Z",
-    creator: { name: "kouta", iconUrl: "/demo-user4.png" },
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -398,7 +406,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児"],
     bookmarkCount: 3,
     createdAt: "2026-05-08T15:08:00.000Z",
-    creator: { name: "ryo", iconUrl: "/demo-user5.png" },
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -412,7 +420,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "いずれ「ママ／パパの推し」を理解される未来が…？",
     bookmarkCount: 5,
     createdAt: "2026-05-08T15:45:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   /* --- パパ友あるある（末尾6個より前のみに追記すること） --- */
   {
@@ -427,7 +435,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "園イベントの細かい段取りだけはLINEに戻された…なんて声も。",
     bookmarkCount: 3,
     createdAt: "2026-05-08T18:05:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -440,7 +448,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児", "パパ友"],
     bookmarkCount: 4,
     createdAt: "2026-05-08T18:21:00.000Z",
-    creator: { name: "kouta", iconUrl: "/demo-user4.png" },
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -453,7 +461,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児", "パパ友"],
     bookmarkCount: 5,
     createdAt: "2026-05-08T18:38:00.000Z",
-    creator: { name: "ryo", iconUrl: "/demo-user5.png" },
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -466,7 +474,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児", "パパ友"],
     bookmarkCount: 2,
     createdAt: "2026-05-08T18:52:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -479,7 +487,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児", "パパ友"],
     bookmarkCount: 3,
     createdAt: "2026-05-08T19:05:00.000Z",
-    creator: { name: "kouta", iconUrl: "/demo-user4.png" },
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -493,7 +501,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "どちらも「ちゃんと話したい」の裏返しだったりします。",
     bookmarkCount: 4,
     createdAt: "2026-05-08T19:22:00.000Z",
-    creator: { name: "ryo", iconUrl: "/demo-user5.png" },
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
   },
   /* --- 新社会人あるある --- */
   {
@@ -507,7 +515,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["新社会人あるある"],
     bookmarkCount: 3,
     createdAt: "2026-05-09T02:10:00.000Z",
-    creator: { name: "ryo", iconUrl: "/demo-user5.png" },
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -520,7 +528,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["新社会人あるある"],
     bookmarkCount: 2,
     createdAt: "2026-05-09T02:28:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -533,7 +541,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["新社会人あるある"],
     bookmarkCount: 3,
     createdAt: "2026-05-09T02:46:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -546,7 +554,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["新社会人あるある"],
     bookmarkCount: 4,
     createdAt: "2026-05-09T03:04:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -559,7 +567,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["新社会人あるある"],
     bookmarkCount: 3,
     createdAt: "2026-05-09T03:22:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
   /* --- 恋愛2択 --- */
   {
@@ -573,7 +581,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["恋愛"],
     bookmarkCount: 5,
     createdAt: "2026-05-09T04:00:00.000Z",
-    creator: { name: "kouta", iconUrl: "/demo-user4.png" },
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -586,7 +594,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["恋愛"],
     bookmarkCount: 4,
     createdAt: "2026-05-09T04:15:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -599,7 +607,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["恋愛"],
     bookmarkCount: 6,
     createdAt: "2026-05-09T04:30:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -613,7 +621,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "「こわい」の定義は人それぞれ。笑いで納得する2択でもOK。",
     bookmarkCount: 4,
     createdAt: "2026-05-09T04:45:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -626,7 +634,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["恋愛"],
     bookmarkCount: 5,
     createdAt: "2026-05-09T05:00:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -639,7 +647,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["恋愛"],
     bookmarkCount: 3,
     createdAt: "2026-05-09T05:15:00.000Z",
-    creator: { name: "ryo", iconUrl: "/demo-user5.png" },
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -652,7 +660,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["恋愛"],
     bookmarkCount: 3,
     createdAt: "2026-05-09T05:30:00.000Z",
-    creator: { name: "kouta", iconUrl: "/demo-user4.png" },
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -665,7 +673,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["恋愛"],
     bookmarkCount: 4,
     createdAt: "2026-05-09T05:45:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -678,7 +686,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["恋愛"],
     bookmarkCount: 2,
     createdAt: "2026-05-09T06:00:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -692,7 +700,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "価値観の話なので絶対正解ありません。**今の自分の感覚**でどうぞ。",
     bookmarkCount: 6,
     createdAt: "2026-05-09T06:15:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   /* --- グルメ2択 --- */
   {
@@ -706,7 +714,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 4,
     createdAt: "2026-05-09T07:05:00.000Z",
-    creator: { name: "kouta", iconUrl: "/demo-user4.png" },
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -719,7 +727,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 5,
     createdAt: "2026-05-09T07:20:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -732,7 +740,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 3,
     createdAt: "2026-05-09T07:35:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -745,7 +753,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 3,
     createdAt: "2026-05-09T07:50:00.000Z",
-    creator: { name: "ryo", iconUrl: "/demo-user5.png" },
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -758,7 +766,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 4,
     createdAt: "2026-05-09T08:05:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -771,7 +779,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 2,
     createdAt: "2026-05-09T08:20:00.000Z",
-    creator: { name: "たかし", iconUrl: "/demo-user2.png" },
+    creator: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -784,7 +792,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 3,
     createdAt: "2026-05-09T08:35:00.000Z",
-    creator: { name: "kouta", iconUrl: "/demo-user4.png" },
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -797,7 +805,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 5,
     createdAt: "2026-05-09T08:50:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -810,7 +818,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 4,
     createdAt: "2026-05-09T09:05:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -823,7 +831,112 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["グルメ"],
     bookmarkCount: 3,
     createdAt: "2026-05-09T09:20:00.000Z",
-    creator: { name: "ryo", iconUrl: "/demo-user5.png" },
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
+  },
+  /* --- 定番（定番の2択コレクション収録） --- */
+  {
+    patternType: "pink-blue",
+    question: "目玉焼きにかけるなら、しょうゆ？ソース？",
+    optionA: "しょうゆ派（ごはんも進む）",
+    optionB: "ソース派（パンにも合う）",
+    countA: 28,
+    countB: 19,
+    commentCount: 6,
+    tags: ["定番", "ごはん"],
+    bookmarkCount: 5,
+    createdAt: "2026-05-09T10:00:00.000Z",
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
+  },
+  {
+    patternType: "blue-cyan",
+    question: "旅行の計画、どっちがワクワクする？",
+    optionA: "行き当たりばったりで現地で決めたい✈️",
+    optionB: "予約・ルートはガチガチに固めたい🗺️",
+    countA: 21,
+    countB: 24,
+    commentCount: 5,
+    tags: ["定番", "旅行"],
+    bookmarkCount: 4,
+    createdAt: "2026-05-09T10:10:00.000Z",
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
+  },
+  {
+    patternType: "yellow-loops",
+    question: "朝のタイプ、どっちが近い？",
+    optionA: "起きてすぐ動ける（朝が得意）🌞",
+    optionB: "ギリギリまで寝たい（朝が苦手）😴",
+    countA: 18,
+    countB: 30,
+    commentCount: 4,
+    tags: ["定番", "生活"],
+    bookmarkCount: 3,
+    createdAt: "2026-05-09T10:20:00.000Z",
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
+  },
+  {
+    patternType: "orange-purple",
+    question: "映画館での鑑賞、席はどっち派？",
+    optionA: "後ろ〜真ん中で全体を見たい🎬",
+    optionB: "前めで迫力重視で没入したい",
+    countA: 26,
+    countB: 16,
+    commentCount: 3,
+    tags: ["定番", "映画"],
+    bookmarkCount: 3,
+    createdAt: "2026-05-09T10:30:00.000Z",
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
+  },
+  {
+    patternType: "geometric-stripes",
+    question: "お風呂、どっちが落ち着く？",
+    optionA: "湯船に浸かってリセット🛁",
+    optionB: "シャワーでサクッと派🚿",
+    countA: 29,
+    countB: 17,
+    commentCount: 5,
+    tags: ["定番", "生活"],
+    bookmarkCount: 4,
+    createdAt: "2026-05-09T10:40:00.000Z",
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
+  },
+  {
+    patternType: "pink-blue",
+    question: "スマホの通知、基本はどっち？",
+    optionA: "必要最低限だけON（静かが正義）",
+    optionB: "全部ON（見逃しが怖い）📣",
+    countA: 23,
+    countB: 20,
+    commentCount: 2,
+    tags: ["定番", "スマホ"],
+    bookmarkCount: 2,
+    createdAt: "2026-05-09T10:50:00.000Z",
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
+  },
+  {
+    patternType: "blue-cyan",
+    question: "ごはんのお供、どっちが最強だと思う？",
+    optionA: "明太子（とにかく強い）",
+    optionB: "納豆（毎日いける）",
+    countA: 20,
+    countB: 22,
+    commentCount: 4,
+    tags: ["定番", "ごはん"],
+    bookmarkCount: 3,
+    createdAt: "2026-05-09T11:00:00.000Z",
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
+  },
+  {
+    patternType: "yellow-loops",
+    question: "休日の過ごし方、どっちが回復する？",
+    optionA: "外に出て予定を入れる派🏃",
+    optionB: "家でだらだら充電派🛋️",
+    countA: 17,
+    countB: 29,
+    commentCount: 3,
+    tags: ["定番", "休日"],
+    bookmarkCount: 4,
+    createdAt: "2026-05-09T11:10:00.000Z",
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
   },
   /* --- ママ目線・⚠️パパ閲覧注意コレ収録（必ず末尾6件＝voteCardsData の最後になるよう追加） --- */
   {
@@ -838,7 +951,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "⚠️ ママ視点ツッコミ系。パパを責める話ではなく、夫婦の温度差ネタです。パパだけで見るときは覚悟を。",
     bookmarkCount: 6,
     createdAt: "2026-05-08T19:40:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "blue-cyan",
@@ -851,7 +964,7 @@ export const voteCardsData: VoteCardData[] = [
     tags: ["育児", "パパ閲覧注意"],
     bookmarkCount: 4,
     createdAt: "2026-05-08T19:52:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   {
     patternType: "yellow-loops",
@@ -865,7 +978,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "⚠️ パパの頑張りは本当に尊いので、読んだらちゃんと「ありがとう」と言ってあげてくださいね。",
     bookmarkCount: 5,
     createdAt: "2026-05-08T20:05:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
   {
     patternType: "orange-purple",
@@ -879,7 +992,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "⚠️ ママ友同士では普通の愚痴でも、パパにそのまま見せると空気が読めなくなるタイプの話題、というニュアンスです。",
     bookmarkCount: 3,
     createdAt: "2026-05-08T20:18:00.000Z",
-    creator: { name: "miki", iconUrl: "/demo-user1.png" },
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
   },
   {
     patternType: "pink-blue",
@@ -893,7 +1006,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "⚠️ 数値勝負にしないジャンル。**あくまで自分の体感票** にしてくださいね。",
     bookmarkCount: 7,
     createdAt: "2026-05-08T20:32:00.000Z",
-    creator: { name: "yui", iconUrl: "/demo-user6.png" },
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
   {
     patternType: "geometric-stripes",
@@ -907,7 +1020,7 @@ export const voteCardsData: VoteCardData[] = [
     readMoreText: "⚠️ 医療の正解論争ではなく、**連れて行ってくれた人へのメンタル回復**ネタです。",
     bookmarkCount: 4,
     createdAt: "2026-05-08T20:48:00.000Z",
-    creator: { name: "あい", iconUrl: "/demo-user3.png" },
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
   },
 ];
 
@@ -919,6 +1032,13 @@ export function getSeedPapaWarningCardIds(): string[] {
   const len = voteCardsData.length;
   if (len < n) return [];
   return Array.from({ length: n }, (_, i) => `seed-${len - n + i}`);
+}
+
+/** 定番コレ（定番タグのシードカードのみ） */
+export function getSeedClassicCardIds(): string[] {
+  return voteCardsData
+    .filter((c) => (c.tags ?? []).includes("定番"))
+    .map((c) => resolveStableVoteCardId(c));
 }
 
 const VOTE_SEED_KEY_TO_ID: Map<string, string> = (() => {

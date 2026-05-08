@@ -4,6 +4,14 @@
  */
 
 import type { VoteCardData } from "./voteCards";
+import {
+  DEFAULT_AI_AVATAR_URL,
+  DEFAULT_KOUTA_AVATAR_URL,
+  DEFAULT_MAMA_AVATAR_URL,
+  DEFAULT_PAPA_AVATAR_URL,
+  DEFAULT_RYO_AVATAR_URL,
+  DEFAULT_YUI_AVATAR_URL,
+} from "./avatarUrls";
 
 const STORAGE_KEY = "vote_line_auth";
 const EVENT_NAME = "vote_auth_updated";
@@ -41,14 +49,14 @@ export interface LineAuthUser {
 export const DEMO_USER_IDS = ["user1", "user2", "user3", "user4", "user5", "user6"] as const;
 export type DemoUserId = (typeof DEMO_USER_IDS)[number];
 
-/** 簡易ログイン用：6ユーザー（アイコンは public/demo-user1.png … demo-user6.png・デザイン案の切り出し） */
+/** 簡易ログイン用：6ユーザー（ママ系・パパ系は既定アイコン PNG） */
 export const DEMO_USERS: Record<DemoUserId, { name: string; iconUrl: string }> = {
-  user1: { name: "miki", iconUrl: "/demo-user1.png" },
-  user2: { name: "たかし", iconUrl: "/demo-user2.png" },
-  user3: { name: "あい", iconUrl: "/demo-user3.png" },
-  user4: { name: "kouta", iconUrl: "/demo-user4.png" },
-  user5: { name: "ryo", iconUrl: "/demo-user5.png" },
-  user6: { name: "yui", iconUrl: "/demo-user6.png" },
+  user1: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
+  user2: { name: "たかし", iconUrl: DEFAULT_PAPA_AVATAR_URL },
+  user3: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
+  user4: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
+  user5: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
+  user6: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
 };
 
 export interface AuthState {

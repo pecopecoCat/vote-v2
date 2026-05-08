@@ -563,6 +563,15 @@ function HomeContent() {
     return set;
   }, [activity, auth.isLoggedIn, auth.user?.name]);
 
+  /** myTimeline 用：投票したカード（activity の userSelectedOption のみ走査） */
+  const votedCardIdSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const [cardId, a] of Object.entries(activity)) {
+      if (a?.userSelectedOption != null) set.add(cardId);
+    }
+    return set;
+  }, [activity]);
+
   const handleCardMoreClick = useCallback((cardId: string) => {
     setCardOptionsCardId(cardId);
     const card = allCardsFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
@@ -657,6 +666,13 @@ function HomeContent() {
   const bumpTrendingOrder = useCallback(() => {
     setTrendingOrderTick((t) => t + 1);
   }, []);
+
+  /** myTimeline: 並び替えタイミングは「タブ切替」「ページ離脱→復帰」「リロード相当」のみ */
+  const [myTimelineOrderTick, setMyTimelineOrderTick] = useState(0);
+  const [myTimelineFrozenIds, setMyTimelineFrozenIds] = useState<string[] | null>(null);
+  const bumpMyTimelineOrder = useCallback(() => {
+    setMyTimelineOrderTick((t) => t + 1);
+  }, []);
   const prevPathnameRef = useRef(pathname);
 
   useLayoutEffect(() => {
@@ -675,6 +691,9 @@ function HomeContent() {
     if (pathname === "/" && prev !== "/" && activeTabRef.current === "trending") {
       bumpTrendingOrder();
     }
+    if (pathname === "/" && prev !== "/" && activeTabRef.current === "myTimeline") {
+      bumpMyTimelineOrder();
+    }
   }, [pathname, bumpTrendingOrder]);
 
   useEffect(() => {
@@ -688,6 +707,10 @@ function HomeContent() {
         wasHidden = false;
         bumpTrendingOrder();
       }
+      if (wasHidden && activeTabRef.current === "myTimeline") {
+        wasHidden = false;
+        bumpMyTimelineOrder();
+      }
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
@@ -696,10 +719,20 @@ function HomeContent() {
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted && activeTabRef.current === "trending") bumpTrendingOrder();
+      if (e.persisted && activeTabRef.current === "myTimeline") bumpMyTimelineOrder();
     };
     window.addEventListener("pageshow", onPageShow as EventListener);
     return () => window.removeEventListener("pageshow", onPageShow as EventListener);
   }, [bumpTrendingOrder]);
+
+  useEffect(() => {
+    if (activeTab !== "myTimeline") {
+      setMyTimelineFrozenIds(null);
+      return;
+    }
+    bumpMyTimelineOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const cardsForTab = useMemo(() => {
     switch (activeTab) {
@@ -729,8 +762,13 @@ function HomeContent() {
         return sortByNewest(cardsForFeed);
       case "myTimeline": {
         const opts = { isLoggedIn: auth.isLoggedIn, displayName: auth.user?.name };
-        const mySet = new Set<string>([...bookmarkedIds, ...nonMemberCollectionCardIdSet]);
-        return allCardsFiltered
+        const mySet = new Set<string>([
+          ...bookmarkedIds,
+          ...nonMemberCollectionCardIdSet,
+          ...commentedCardIdSet,
+          ...votedCardIdSet,
+        ]);
+        const sortedNow = allCardsFiltered
           .filter((card) => mySet.has(resolveStableVoteCardId(card)))
           .sort((a, b) => {
             const tb = myTimelineLastActivityMs(b, activity, opts);
@@ -738,6 +776,25 @@ function HomeContent() {
             if (tb !== ta) return tb - ta;
             return (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0");
           });
+        if (myTimelineFrozenIds == null || myTimelineFrozenIds.length === 0) return sortedNow;
+        const byId = new Map(sortedNow.map((c) => [resolveStableVoteCardId(c), c]));
+        const out: VoteCardData[] = [];
+        const used = new Set<string>();
+        for (const id of myTimelineFrozenIds) {
+          const c = byId.get(id);
+          if (c) {
+            out.push(c);
+            used.add(id);
+          }
+        }
+        for (const c of sortedNow) {
+          const id = resolveStableVoteCardId(c);
+          if (!used.has(id)) {
+            out.push(c);
+            used.add(id);
+          }
+        }
+        return out;
       }
       default:
         return publicCards;
@@ -750,8 +807,42 @@ function HomeContent() {
     activity,
     auth.isLoggedIn,
     auth.user?.name,
+    commentedCardIdSet,
+    votedCardIdSet,
     publicCards,
     trendingFrozenIds,
+    myTimelineFrozenIds,
+  ]);
+
+  useLayoutEffect(() => {
+    if (activeTab !== "myTimeline") return;
+    const opts = { isLoggedIn: auth.isLoggedIn, displayName: auth.user?.name };
+    const mySet = new Set<string>([
+      ...bookmarkedIds,
+      ...nonMemberCollectionCardIdSet,
+      ...commentedCardIdSet,
+      ...votedCardIdSet,
+    ]);
+    const sortedNow = allCardsFiltered
+      .filter((card) => mySet.has(resolveStableVoteCardId(card)))
+      .sort((a, b) => {
+        const tb = myTimelineLastActivityMs(b, activity, opts);
+        const ta = myTimelineLastActivityMs(a, activity, opts);
+        if (tb !== ta) return tb - ta;
+        return (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0");
+      });
+    setMyTimelineFrozenIds(sortedNow.map((c) => resolveStableVoteCardId(c)));
+  }, [
+    activeTab,
+    myTimelineOrderTick,
+    allCardsFiltered,
+    activity,
+    auth.isLoggedIn,
+    auth.user?.name,
+    bookmarkedIds,
+    nonMemberCollectionCardIdSet,
+    commentedCardIdSet,
+    votedCardIdSet,
   ]);
 
   /** 実際にあるコレクションからランダム表示用プール */
