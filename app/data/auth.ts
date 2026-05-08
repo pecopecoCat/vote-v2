@@ -3,6 +3,8 @@
  * 本番では LINE Login SDK で取得したアクセストークン・ユーザー情報と連携する想定。
  */
 
+import type { VoteCardData } from "./voteCards";
+
 const STORAGE_KEY = "vote_line_auth";
 const EVENT_NAME = "vote_auth_updated";
 /** ユーザーごとのプロフィール（ニックネーム・アイコン）を永続化。ログアウトしても保持 */
@@ -39,14 +41,14 @@ export interface LineAuthUser {
 export const DEMO_USER_IDS = ["user1", "user2", "user3", "user4", "user5", "user6"] as const;
 export type DemoUserId = (typeof DEMO_USER_IDS)[number];
 
-/** 簡易ログイン用：6ユーザー（アイコンは public/user1.png … user6.png） */
+/** 簡易ログイン用：6ユーザー（アイコンは public/demo-user1.png … demo-user6.png・デザイン案の切り出し） */
 export const DEMO_USERS: Record<DemoUserId, { name: string; iconUrl: string }> = {
-  user1: { name: "ママ", iconUrl: "/user1.png" },
-  user2: { name: "パパ", iconUrl: "/user2.png" },
-  user3: { name: "25歳（女）", iconUrl: "/user3.png" },
-  user4: { name: "23歳（男）", iconUrl: "/user4.png" },
-  user5: { name: "社会人（男）", iconUrl: "/user5.png" },
-  user6: { name: "社会人（女）", iconUrl: "/user6.png" },
+  user1: { name: "miki", iconUrl: "/demo-user1.png" },
+  user2: { name: "たかし", iconUrl: "/demo-user2.png" },
+  user3: { name: "あい", iconUrl: "/demo-user3.png" },
+  user4: { name: "kouta", iconUrl: "/demo-user4.png" },
+  user5: { name: "ryo", iconUrl: "/demo-user5.png" },
+  user6: { name: "yui", iconUrl: "/demo-user6.png" },
 };
 
 export interface AuthState {
@@ -164,6 +166,23 @@ export function getDisplayUserForDemo(userId: DemoUserId): { name: string; iconU
     name: saved.name ?? defaultUser.name,
     iconUrl: saved.iconUrl ?? defaultUser.iconUrl,
   };
+}
+
+/**
+ * KV 等に古い表示名が保存されていても、タイムライン上の作成者は現在のデモ設定＋端末のプロフィールに揃える。
+ */
+export function applyDemoCreatorDisplayToCard(card: VoteCardData): VoteCardData {
+  const uid = card.createdByUserId;
+  if (!uid || !(DEMO_USER_IDS as readonly string[]).includes(uid)) return card;
+  const display = getDisplayUserForDemo(uid as DemoUserId);
+  return {
+    ...card,
+    creator: { name: display.name, iconUrl: display.iconUrl },
+  };
+}
+
+export function mapDemoCreatorDisplayForTimeline(cards: VoteCardData[]): VoteCardData[] {
+  return cards.map(applyDemoCreatorDisplayToCard);
 }
 
 /** 簡易デモ：user1..user6 のいずれかでログイン（localStorage 優先、なければ API から復元） */

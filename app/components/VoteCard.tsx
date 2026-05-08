@@ -550,9 +550,9 @@ function VoteCard({
         </div>
       ) : null}
 
-      {/* 続きを読む（テキスト下・続きを読む上下のマージンは15px） */}
+      {/* 続きを読む（左右 px-5 に合わせて下側も pb-5 で余白を揃える） */}
       {readMoreText && (
-        <div className="px-5 pt-[0.8em]">
+        <div className="px-5 pt-[0.8em] pb-5">
           <p
             ref={readMoreRef}
             className={`text-[14px] text-gray-600 ${!readMoreExpanded ? "line-clamp-2" : ""}`}
@@ -560,7 +560,7 @@ function VoteCard({
             {readMoreExpanded ? readMoreText : readMoreText}
           </p>
           {readMoreOverflows ? (
-            <div className="mt-[15px] border-t border-[#E5E7EB] pt-[15px] pb-[15px] -mx-5">
+            <div className="mt-[15px] border-t border-[#E5E7EB] pt-[15px] -mx-5">
               <div className="px-5 text-center">
                 <button
                   type="button"

@@ -26,10 +26,17 @@ import {
   removeComment as removeCommentLocal,
   ACTIVITY_GLOBAL_UPDATED_EVENT,
 } from "../data/voteCardActivity";
-import { getCurrentActivityUserId, getAuthUpdatedEventName, getAuth } from "../data/auth";
+import {
+  getCurrentActivityUserId,
+  getAuthUpdatedEventName,
+  getAuth,
+  mapDemoCreatorDisplayForTimeline,
+  applyDemoCreatorDisplayToCard,
+} from "../data/auth";
 import {
   hydrateParticipatedMemberCollectionsFromRemote,
   hydrateUserOwnedCollectionsFromRemote,
+  ensureSeedPapaWarningCollection,
 } from "../data/collections";
 import { hydrateBookmarksFromRemote } from "../data/bookmarks";
 import type { MemberJoinOwnerEvent } from "../lib/memberJoinOwnerNotifications";
@@ -234,7 +241,8 @@ export function useSharedData(): SharedDataContextValue {
   const ctx = useContext(SharedDataContext);
   if (!ctx) {
     return {
-      createdVotesForTimeline: typeof window !== "undefined" ? getCreatedVotesForTimeline() : [],
+      createdVotesForTimeline:
+        typeof window !== "undefined" ? mapDemoCreatorDisplayForTimeline(getCreatedVotesForTimeline()) : [],
       activity: typeof window !== "undefined" ? getAllActivity() : {},
       voteEvents: [],
       bookmarkEvents: [],
@@ -269,7 +277,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   /** fetchActivity のマージは同一 userId のときのみ（アカウント切替で前ユーザーの投票済みが残らないように） */
   const lastActivityFetchUserIdRef = useRef<string>("");
   const [createdVotesForTimeline, setCreatedVotesForTimeline] = useState<VoteCardData[]>(() =>
-    typeof window !== "undefined" ? getCreatedVotesForTimeline() : []
+    typeof window !== "undefined" ? mapDemoCreatorDisplayForTimeline(getCreatedVotesForTimeline()) : []
   );
   const [activity, setActivity] = useState<Record<string, CardActivity>>(() =>
     typeof window !== "undefined" ? getAllActivity() : {}
@@ -301,7 +309,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         const card = normalizeCardFromApi(item);
         if (card) cards.push(card);
       }
-      setCreatedVotesForTimeline(cards);
+      setCreatedVotesForTimeline(mapDemoCreatorDisplayForTimeline(cards));
       return true;
     } catch {
       return false;
@@ -354,7 +362,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         const card = normalizeCardFromApi(item);
         if (card) cards.push(card);
       }
-      setCreatedVotesForTimeline(cards);
+      setCreatedVotesForTimeline(mapDemoCreatorDisplayForTimeline(cards));
       applyActivityResponseData(raw, userId);
       return true;
     } catch {
@@ -501,6 +509,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     const hydrateAllFromRemote = () => {
       void (async () => {
         await hydrateUserOwnedCollectionsFromRemote();
+        ensureSeedPapaWarningCollection();
         await hydrateParticipatedMemberCollectionsFromRemote();
         await hydrateBookmarksFromRemote();
       })();
@@ -558,12 +567,21 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       if (isRemoteRef.current) {
         void fetchCreatedVotes();
       } else {
-        setCreatedVotesForTimeline(getCreatedVotesForTimeline());
+        setCreatedVotesForTimeline(mapDemoCreatorDisplayForTimeline(getCreatedVotesForTimeline()));
       }
     };
     window.addEventListener(name, handler);
     return () => window.removeEventListener(name, handler);
   }, [fetchCreatedVotes]);
+
+  /** デモユーザーのプロフィール変更後、タイムラインの作成者表示をその場で同期 */
+  useEffect(() => {
+    const onAuthUpdated = () => {
+      setCreatedVotesForTimeline((prev) => mapDemoCreatorDisplayForTimeline(prev));
+    };
+    window.addEventListener(getAuthUpdatedEventName(), onAuthUpdated);
+    return () => window.removeEventListener(getAuthUpdatedEventName(), onAuthUpdated);
+  }, []);
 
   const addCreatedVote = useCallback(
     async (card: VoteCardData) => {
@@ -575,7 +593,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           createdAt: card.createdAt ?? new Date().toISOString(),
           createdByUserId: userId,
         };
-        setCreatedVotesForTimeline((prev) => [cardWithMeta, ...prev]);
+        setCreatedVotesForTimeline((prev) => [applyDemoCreatorDisplayToCard(cardWithMeta), ...prev]);
         try {
           const res = await fetch(CREATED_VOTES_API, {
             method: "POST",
@@ -605,7 +623,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         return;
       }
       addCreatedVoteLocal(card);
-      setCreatedVotesForTimeline(getCreatedVotesForTimeline());
+      setCreatedVotesForTimeline(mapDemoCreatorDisplayForTimeline(getCreatedVotesForTimeline()));
     },
     [isRemote, fetchCreatedVotes]
   );

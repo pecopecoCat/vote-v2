@@ -12,6 +12,7 @@ import { clearCollectionScopedLocalData } from "./collectionVoteActivity";
 import { removeLocalCommentsForCollection } from "./voteCardActivity";
 import { addBookmark, removeBookmark } from "./bookmarks";
 import { showAppToast } from "../lib/appToast";
+import { getSeedPapaWarningCardIds } from "./voteCards";
 
 const STORAGE_KEY_PREFIX = "vote_collections_";
 const PINNED_STORAGE_KEY_PREFIX = "vote_pinned_collection_ids_";
@@ -177,6 +178,37 @@ export async function hydrateUserOwnedCollectionsFromRemote(): Promise<void> {
   } catch {
     // ignore
   }
+}
+
+/**
+ * ログイン済みユーザー向けにおすすめシードを1件だけ自動追加（削除済みの場合は再利用しない）。
+ * 「⚠️パパ閲覧注意」＝voteCards の末尾シードカードのみ格納。
+ */
+export const SEED_PAPA_WARNING_COLLECTION_ID = "col-seed-papa-warning";
+
+export function ensureSeedPapaWarningCollection(): void {
+  if (typeof window === "undefined") return;
+  const auth = getAuth();
+  if (!auth.isLoggedIn) return;
+  const uid = getCurrentActivityUserId();
+  if (uid.startsWith("guest_")) return;
+
+  const cardIds = getSeedPapaWarningCardIds();
+  if (cardIds.length === 0) return;
+
+  const cols = load(uid);
+  if (cols.some((c) => c.id === SEED_PAPA_WARNING_COLLECTION_ID)) return;
+
+  const seedCol: Collection = {
+    id: SEED_PAPA_WARNING_COLLECTION_ID,
+    name: "⚠️パパ閲覧注意",
+    color: "#FFB020",
+    gradient: "orange-yellow",
+    visibility: "public",
+    cardIds: [...cardIds],
+    createdByUserId: uid,
+  };
+  save(uid, [...cols, seedCol]);
 }
 
 /** 他ユーザー作成のコレクション（デモ用シードは未使用。API 連携などで差し込む場合に利用） */

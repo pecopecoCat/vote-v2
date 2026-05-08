@@ -35,7 +35,7 @@ export default function CommentInputModal({
   onCancelReply,
 }: CommentInputModalProps) {
   const [value, setValue] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [keyboardInsetPx, setKeyboardInsetPx] = useState(0);
 
   useEffect(() => {
@@ -83,16 +83,27 @@ export default function CommentInputModal({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open || disabled || !cardId || !onCommentSubmit) return;
+    const id = window.requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      try {
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      } catch {
+        // ignore
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open, disabled, cardId, onCommentSubmit]);
+
   if (!open) return null;
 
   const effectiveDisabled = Boolean(disabled) || !cardId || !onCommentSubmit;
   const trimmed = value.trim();
   const canSubmit = !effectiveDisabled && trimmed.length > 0;
-
-  const focusInput = () => {
-    if (effectiveDisabled) return;
-    inputRef.current?.focus();
-  };
 
   const handleSubmit = () => {
     if (!canSubmit || !cardId || !onCommentSubmit) return;
@@ -179,13 +190,8 @@ export default function CommentInputModal({
           </button>
         </div>
 
-        {/* body (tap-to-focus, input not visible) */}
-        <button
-          type="button"
-          className="block w-full flex-1 px-5 py-6 text-left"
-          onClick={focusInput}
-          disabled={effectiveDisabled}
-        >
+        {/* body: 見えるテキストエリア（非表示 input + 鏡表示より IME・余白が安定） */}
+        <div className="px-5 pb-2 pt-4">
           {replyToUserName ? (
             <div className="mb-3 flex items-center justify-between gap-3 text-[12px] text-[#191919]">
               <div className="flex min-w-0 items-center gap-2">
@@ -202,45 +208,40 @@ export default function CommentInputModal({
                 <span className="shrink-0 text-[#191919]/35">さんに返信</span>
               </div>
               {onCancelReply ? (
-                <button
-                  type="button"
-                  className="shrink-0 font-medium opacity-70 hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCancelReply();
-                  }}
-                >
+                <button type="button" className="shrink-0 font-medium opacity-70 hover:opacity-100" onClick={onCancelReply}>
                   解除
                 </button>
               ) : null}
             </div>
           ) : null}
 
-          {trimmed.length === 0 ? (
-            <p className="text-sm font-medium text-[#191919]/35">
-              {disabled ? (disabledPlaceholder ?? hintText) : hintText}
-            </p>
-          ) : (
-            <p className="whitespace-pre-wrap break-words text-sm font-medium text-[#191919]">{value}</p>
-          )}
-        </button>
-
-        {/* actual input (hidden) */}
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              handleSubmit();
-            }
-          }}
-          className="pointer-events-none absolute h-0 w-0 opacity-0"
-          aria-hidden
-          tabIndex={-1}
-        />
+          <label className="sr-only" htmlFor="comment-modal-input">
+            {modalTitle}
+          </label>
+          <textarea
+            id="comment-modal-input"
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => !effectiveDisabled && setValue(e.target.value)}
+            disabled={effectiveDisabled}
+            rows={6}
+            enterKeyHint="send"
+            placeholder={effectiveDisabled ? (disabledPlaceholder ?? hintText) : hintText}
+            onKeyDown={(e) => {
+              if (
+                !e.nativeEvent.isComposing &&
+                e.key === "Enter" &&
+                (e.metaKey || e.ctrlKey)
+              ) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            className={`placeholder:text-[#191919]/35 w-full min-h-[8.5rem] resize-none border-0 bg-transparent text-left text-[15px] font-medium leading-relaxed tracking-normal text-[#191919] focus:outline-none focus:ring-0 ${
+              effectiveDisabled ? "cursor-not-allowed opacity-80" : ""
+            }`}
+          />
+        </div>
 
         {/* footer: send button only */}
         <div className="border-t border-[#DADADA] bg-white px-5 py-5">

@@ -9,10 +9,7 @@ export interface RecommendedTagsProps {
 }
 
 export default function RecommendedTags({ tags, className }: RecommendedTagsProps) {
-  const sectionClass = [
-    "-mx-[5.333vw] w-full border-t border-b border-[#E5E7EB]",
-    className,
-  ]
+  const sectionClass = ["-mx-[5.333vw] w-full", className]
     .filter(Boolean)
     .join(" ");
 
