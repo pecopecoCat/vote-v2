@@ -140,10 +140,66 @@ const COLLECTION_EVERY = 5;
 const TAGS_EVERY = 10;
 const PR_BANNER_EVERY = 15;
 
-/** PRバナー（何種類か登録可能・15個に1つでローテーション） */
-const PR_BANNERS: { brandName: string; caption: string; imageUrl?: string }[] = [
-  { brandName: "Oisix", caption: "入会のご案内", imageUrl: "/banners/oisix-banner.png" },
-  { brandName: "PR", caption: "おすすめ" },
+/** PRバナー（何種類か登録可能・15個に1つで順番ローテーション） */
+const PR_BANNERS: {
+  brandName: string;
+  caption: string;
+  imageUrl?: string;
+  fallbackGradientClassName?: string;
+}[] = [
+  {
+    brandName: "Oisix",
+    caption: "入会のご案内",
+    imageUrl: "/banners/oisix-banner.png",
+  },
+  {
+    brandName: "TRAVEL SNAP",
+    caption: "週末旅プラン｜読者アンケート募集中",
+    fallbackGradientClassName:
+      "bg-gradient-to-br from-sky-500/95 via-blue-600/90 to-indigo-800/95",
+  },
+  {
+    brandName: "MINI MART",
+    caption: "新商品お試し｜店舗限定クーポン（デモ）",
+    fallbackGradientClassName:
+      "bg-gradient-to-br from-amber-400/95 via-orange-500/90 to-rose-600/90",
+  },
+  {
+    brandName: "FIT LOOP",
+    caption: "毎日5分｜姿勢ケアアプリ特集",
+    fallbackGradientClassName:
+      "bg-gradient-to-br from-emerald-500/95 via-teal-600/90 to-cyan-800/95",
+  },
+  {
+    brandName: "AUDIO LAB",
+    caption: "ノイキャン比較｜人気3モデルまとめ",
+    fallbackGradientClassName:
+      "bg-gradient-to-br from-violet-600/95 via-purple-700/90 to-fuchsia-900/95",
+  },
+  {
+    brandName: "HOME BOX",
+    caption: "収納アイデア｜before/after 特集",
+    fallbackGradientClassName:
+      "bg-gradient-to-br from-stone-500/95 via-neutral-600/90 to-zinc-900/95",
+  },
+  {
+    brandName: "SWEET NOTE",
+    caption: "季節スイーツ｜都内カフェ10選",
+    fallbackGradientClassName:
+      "bg-gradient-to-br from-pink-400/95 via-rose-500/90 to-red-700/90",
+  },
+  {
+    brandName: "LOCAL NEWS+",
+    caption: "地域トピック｜ライター募集（デモ）",
+    fallbackGradientClassName:
+      "bg-gradient-to-br from-slate-600/95 via-slate-800/90 to-slate-950/95",
+  },
+  {
+    brandName: "PR",
+    caption: "おすすめコンテンツ",
+    fallbackGradientClassName:
+      "bg-gradient-to-br from-red-400/90 via-red-500/80 to-green-600/90",
+  },
 ];
 
 export type TimelineItem =
@@ -352,6 +408,7 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
               brandName={item.banner.brandName}
               caption={item.banner.caption}
               imageUrl={item.banner.imageUrl}
+              fallbackGradientClassName={item.banner.fallbackGradientClassName}
             />
           );
         }

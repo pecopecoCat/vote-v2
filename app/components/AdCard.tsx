@@ -1,22 +1,30 @@
 "use client";
 
+const DEFAULT_FALLBACK_GRADIENT =
+  "bg-gradient-to-br from-red-400/90 via-red-500/80 to-green-600/90";
+
 export interface AdCardProps {
   brandName: string;
   caption: string;
   imageUrl?: string;
+  /** 画像がないときの背景（Tailwind の gradient クラス） */
+  fallbackGradientClassName?: string;
 }
 
 export default function AdCard({
   brandName,
   caption,
   imageUrl,
+  fallbackGradientClassName,
 }: AdCardProps) {
+  const bgNoImage =
+    fallbackGradientClassName?.trim() || DEFAULT_FALLBACK_GRADIENT;
   return (
     <article className="relative w-full overflow-hidden rounded-[18px] bg-gray-200 shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
       {/* 画像エリア（VOTE CARD と角丸統一） */}
       <div
         className={`flex min-h-[160px] items-end justify-start bg-cover bg-center bg-no-repeat p-4 ${
-          imageUrl ? "" : "bg-gradient-to-br from-red-400/90 via-red-500/80 to-green-600/90"
+          imageUrl ? "" : bgNoImage
         }`}
         style={imageUrl ? { backgroundImage: `url(${imageUrl})` } : undefined}
       >
