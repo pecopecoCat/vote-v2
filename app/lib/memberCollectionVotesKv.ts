@@ -9,6 +9,8 @@ export const MEMBER_PARTS_PREFIX = "vote_coll_member_parts:";
 export const MEMBER_PARTS_HASH_PREFIX = "vote_coll_member_parts_h:";
 /** 参加時に保存する表示用プロフィール（投票前でも、コレ内に1票入ったら一覧に出す） */
 export const MEMBER_JOIN_PROFILE_PREFIX = "vote_coll_member_join_prof:";
+/** 作成者削除時に参加者のマイリストを掃除するための逆引きインデックス */
+export const MEMBER_COLLECTION_MEMBERS_PREFIX = "vote_member_collection_members:";
 
 export type MemberGlobalMap = Record<string, { countA: number; countB: number }>;
 export type MemberUserRow = { userSelectedOption?: "A" | "B"; votedAt?: string };
@@ -38,6 +40,48 @@ export function memberPartsHashKey(collectionId: string): string {
 
 export function memberJoinProfileKey(collectionId: string): string {
   return MEMBER_JOIN_PROFILE_PREFIX + collectionId;
+}
+
+export function memberCollectionMembersKey(collectionId: string): string {
+  return MEMBER_COLLECTION_MEMBERS_PREFIX + collectionId;
+}
+
+/** 投票・参加登録時にメンバー逆引きへ追加（作成者削除・参加解除の掃除用） */
+export async function ensureCollectionMemberInKvIndex(
+  kv: KVClient,
+  collectionId: string,
+  userId: string
+): Promise<void> {
+  if (!userId) return;
+  const mKey = memberCollectionMembersKey(collectionId);
+  const membersRaw = await kv.get<unknown>(mKey);
+  const members = Array.isArray(membersRaw)
+    ? membersRaw.filter((v): v is string => typeof v === "string" && v.length > 0)
+    : [];
+  if (members.includes(userId)) return;
+  await kv.set(mKey, [...members, userId]);
+}
+
+/** 指定ユーザーの memberUserKey からコレクション全体の票数を再集計 */
+export async function rebuildMemberCollectionGlobalFromUserVotes(
+  kv: KVClient,
+  collectionId: string,
+  userIds: Iterable<string>
+): Promise<MemberGlobalMap> {
+  const global: MemberGlobalMap = {};
+  for (const uid of userIds) {
+    const uRaw = await kv.get<MemberUserMap>(memberUserKey(collectionId, uid));
+    if (!uRaw || typeof uRaw !== "object" || Array.isArray(uRaw)) continue;
+    for (const [cardId, row] of Object.entries(uRaw)) {
+      const opt =
+        row?.userSelectedOption === "A" || row?.userSelectedOption === "B" ? row.userSelectedOption : null;
+      if (!opt) continue;
+      const cur = global[cardId] ?? { countA: 0, countB: 0 };
+      global[cardId] =
+        opt === "A" ? { countA: cur.countA + 1, countB: cur.countB } : { countA: cur.countA, countB: cur.countB + 1 };
+    }
+  }
+  return global;
 }
 
 export async function readJoinProfilesMap(

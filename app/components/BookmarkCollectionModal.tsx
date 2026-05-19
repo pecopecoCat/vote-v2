@@ -232,11 +232,11 @@ export default function BookmarkCollectionModal({
                 onClick={handleRemoveFromBookmark}
               >
                 <img
-                  src="/icons/icon_bookmark_remove.png"
+                  src="/icons/remove_bookmark.svg"
                   alt=""
-                  className="h-5 w-5 shrink-0 object-contain"
+                  className="h-[17px] w-5 shrink-0 object-contain"
                   width={20}
-                  height={20}
+                  height={17}
                 />
                 Bookmark削除
               </button>

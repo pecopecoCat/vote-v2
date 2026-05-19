@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import type { CommentSubmitPayload } from "./CommentInput";
+import Button from "./Button";
 
 export interface CommentInputModalProps {
   open: boolean;
@@ -245,18 +246,9 @@ export default function CommentInputModal({
 
         {/* footer: send button only */}
         <div className="border-t border-[#DADADA] bg-white px-5 py-5">
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className={`w-full rounded-xl py-4 text-center text-sm font-bold ${
-              canSubmit
-                ? "bg-[#FFE100] text-[#191919] active:opacity-90"
-                : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
-            }`}
-          >
+          <Button type="button" variant="yellowPill" onClick={handleSubmit} disabled={!canSubmit}>
             送信
-          </button>
+          </Button>
         </div>
       </div>
     </>

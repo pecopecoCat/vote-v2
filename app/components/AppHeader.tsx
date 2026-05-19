@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { navigateBack } from "../lib/navigateBack";
 
 export type AppHeaderType = "logo" | "search" | "hashtag" | "title";
 
@@ -31,7 +32,7 @@ export interface AppHeaderHashtagProps {
 export interface AppHeaderTitleProps {
   type: "title";
   title: string;
-  /** 指定時は戻るでこのURLへ遷移（未指定は history.back） */
+  /** 履歴が無いときのフォールバック先（未指定は /） */
   backHref?: string;
   /** 右側のボタン（例: 下書きリンク） */
   right?: React.ReactNode;
@@ -55,6 +56,31 @@ const HEADER_BASE = `sticky top-0 z-50 flex items-center bg-[#FFE100] px-[5.333v
  * (4) title: 中央にページタイトル（戻る＋タイトル＋任意で右要素）
  */
 export default function AppHeader(props: AppHeaderProps) {
+  const router = useRouter();
+
+  const renderBackButton = (fallbackHref?: string) => {
+    const className = "flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]";
+    const img = (
+      <img
+        src="/icons/icon_back.svg"
+        alt=""
+        className="h-5 w-5"
+        width={8}
+        height={18}
+      />
+    );
+    return (
+      <button
+        type="button"
+        className={className}
+        aria-label="1つ前のページに戻る"
+        onClick={() => navigateBack(router, { fallbackHref: fallbackHref?.trim() || "/" })}
+      >
+        {img}
+      </button>
+    );
+  };
+
   if (props.type === "logo") {
     return (
       <header className={`${HEADER_BASE} justify-center`} aria-label="VOTE">
@@ -73,38 +99,9 @@ export default function AppHeader(props: AppHeaderProps) {
 
   if (props.type === "title") {
     const { title, right, backHref } = props;
-    const BackButton = () => {
-      const className = "flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]";
-      const img = (
-        <img
-          src="/icons/icon_back.svg"
-          alt=""
-          className="h-5 w-5"
-          width={8}
-          height={18}
-        />
-      );
-      if (backHref) {
-        return (
-          <Link href={backHref} className={className} aria-label="戻る">
-            {img}
-          </Link>
-        );
-      }
-      return (
-        <button
-          type="button"
-          className={className}
-          aria-label="1つ前のページに戻る"
-          onClick={() => window.history.back()}
-        >
-          {img}
-        </button>
-      );
-    };
     return (
       <header className={`sticky top-0 z-50 relative flex ${HEADER_HEIGHT} items-center bg-[#FFE100] pl-2.5 pr-[5.333vw] shadow-sm`} aria-label={title}>
-        <BackButton />
+        {renderBackButton(backHref)}
         <h1 className="absolute left-1/2 top-1/2 min-w-0 max-w-[calc(100%-5.5rem)] -translate-x-1/2 -translate-y-1/2 truncate px-2 text-center text-base font-bold text-gray-900">
           {title}
         </h1>
@@ -117,47 +114,17 @@ export default function AppHeader(props: AppHeaderProps) {
 
   const isSearch = props.type === "search";
   const placeholder = isSearch ? "気になるキーワードで検索" : "ハッシュタグ";
-  const backHref =
+  const backFallback =
     (props.type === "search" || props.type === "hashtag") && props.backHref?.trim()
       ? props.backHref.trim()
       : undefined;
-
-  const BackButton = () => {
-    const className = "flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]";
-    const img = (
-      <img
-        src="/icons/icon_back.svg"
-        alt=""
-        className="h-5 w-5"
-        width={8}
-        height={18}
-      />
-    );
-    if (backHref) {
-      return (
-        <Link href={backHref} className={className} aria-label="戻る">
-          {img}
-        </Link>
-      );
-    }
-    return (
-      <button
-        type="button"
-        className={className}
-        aria-label="1つ前のページに戻る"
-        onClick={() => window.history.back()}
-      >
-        {img}
-      </button>
-    );
-  };
 
   return (
     <header
       className={`sticky top-0 z-50 flex ${HEADER_HEIGHT} items-center gap-2 bg-[#FFE100] py-3 pl-2.5 pr-[5.333vw] shadow-sm`}
       aria-label={isSearch ? "検索" : "ハッシュタグ"}
     >
-      <BackButton />
+      {renderBackButton(backFallback)}
       <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-white px-3 py-2">
         {isSearch ? (
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200">

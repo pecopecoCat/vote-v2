@@ -1,5 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { navigateBack } from "../lib/navigateBack";
+
 export interface SearchHeaderProps {
   /** 検索窓の値（タグ名やキーワード） */
   value: string;
@@ -16,13 +19,14 @@ export default function SearchHeader({
   onSubmit,
   placeholder = "検索",
 }: SearchHeaderProps) {
+  const router = useRouter();
   return (
     <header className="sticky top-0 z-20 flex items-center gap-2 bg-[#FFE100] px-[5.333vw] py-3 shadow-sm">
       <button
         type="button"
         className="flex h-10 w-10 shrink-0 items-center justify-center text-gray-700"
         aria-label="1つ前のページに戻る"
-        onClick={() => window.history.back()}
+        onClick={() => navigateBack(router, { fallbackHref: "/search" })}
       >
         <BackIcon className="h-6 w-6" />
       </button>

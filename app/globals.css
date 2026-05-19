@@ -33,6 +33,9 @@
   /* VOTE CARD 外枠（一覧・検索・マイページ・mini で共通） */
   --vote-card-outer-radius: 18px;
   --vote-card-outer-shadow: 0 2px 1px 0 rgba(51, 51, 51, 0.1);
+
+  /* 黄色ボタン（Figma: VOTEを作成 / コメントする / リプライ）3D角丸 */
+  --btn-yellow-3d-shadow: #d4af37;
 }
 
 @theme inline {
@@ -197,6 +200,20 @@ select {
   background-color: var(--color-brand-logo);
 }
 
+/* 共通タブバー（UnderlineTabBar）：未選択 #787878 / 選択 #191919 */
+.tab-bar-icon-mask {
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  background-color: var(--color-text-gray);
+}
+.tab-bar-icon-mask[data-active="true"] {
+  background-color: var(--color-brand-logo);
+}
+
 /* 閉じる（×）アイコン：375px時 14×14px・相対 */
 .icon-close-responsive {
   width: calc(100vw * 14 / 375);
@@ -278,6 +295,29 @@ select {
 .btn-font {
   font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
   font-weight: 700;
+}
+
+/* VOTEを作成ボタン：角丸＋下方向の立体シャドウ */
+.btn-yellow-3d {
+  border-radius: 10px;
+  background-color: var(--color-brand-base);
+  color: var(--color-text-default);
+  box-shadow: 0 4px 0 var(--btn-yellow-3d-shadow);
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease,
+    opacity 0.1s ease;
+}
+.btn-yellow-3d:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--btn-yellow-3d-shadow);
+}
+.btn-yellow-3d:disabled {
+  transform: none;
+  box-shadow: none;
+  background-color: #e5e7eb;
+  color: #787878;
+  cursor: not-allowed;
 }
 
 /* マイページお気に入りタグ：Noto Sans JP Regular 13px #191919 */

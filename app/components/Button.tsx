@@ -5,8 +5,9 @@ import { type ButtonHTMLAttributes, type ReactNode } from "react";
 const fontClass = "btn-font font-bold";
 
 export type ButtonVariant =
-  | "createVote"   // VOTEを作成: 黄・黒文字・フラット
-  | "yellow"       // 黄色ボタン: 黄・黒文字・フラット
+  | "createVote"   // VOTEを作成: 黄・3D・角丸10px
+  | "yellow"       // 黄色ボタン: 黄・3D・角丸10px
+  | "yellowPill"   // コメントする / リプライ: 黄・3D角丸（VOTEを作成と同型）
   | "blackLarge"   // 大サイズ黒: 黒・白文字 60px
   | "blackMedium"  // 中サイズ黒: 黒・白文字 44px
   | "pill"         // 小サイズ丸: 黒(active) / グレー(inactive)
@@ -27,16 +28,9 @@ const variantStyles: Record<
   ButtonVariant,
   string | ((active?: boolean) => string)
 > = {
-  createVote: [
-    "h-12 w-full min-h-[52px] rounded-[10px]",
-    "bg-[#FFE100] text-[#191919]",
-    "disabled:bg-[#E5E7EB] disabled:text-[#787878]",
-  ].join(" "),
-  yellow: [
-    "h-12 min-h-[48px] rounded-[10px] px-6",
-    "bg-[#FFE100] text-[#191919]",
-    "hover:opacity-95 active:opacity-90",
-  ].join(" "),
+  createVote: "btn-yellow-3d h-12 w-full min-h-[52px]",
+  yellow: "btn-yellow-3d h-12 min-h-[48px] px-6",
+  yellowPill: "btn-yellow-3d w-full min-h-[52px] px-4 py-3.5 text-sm",
   blackLarge: [
     "h-[60px] min-h-[60px] rounded-[10px] px-6",
     "bg-black text-white",
@@ -77,8 +71,7 @@ export default function Button({
   ...rest
 }: ButtonProps) {
   const base =
-    "inline-flex items-center justify-center text-center transition-opacity " +
-    fontClass;
+    "inline-flex items-center justify-center text-center " + fontClass;
   const variantStyle =
     typeof variantStyles[variant] === "function"
       ? (variantStyles[variant] as (active?: boolean) => string)(

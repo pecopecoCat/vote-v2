@@ -15,6 +15,7 @@ import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import RecommendedTags from "../../components/RecommendedTags";
 import NewestOldestSortDropdown from "../../components/NewestOldestSortDropdown";
 import CommentThreadGroup from "../../components/CommentThreadGroup";
+import Button from "../../components/Button";
 import CommentInputModal from "../../components/CommentInputModal";
 import CommentOptionsModal from "../../components/CommentOptionsModal";
 import {
@@ -533,15 +534,10 @@ export default function CommentsPage() {
       {/* 画面下固定：入力を開くボタン（コメント受け付けないVOTEは非表示に近いグレー文言のみ） */}
       <div className="fixed inset-x-0 bottom-14 z-30 bg-transparent px-4 pb-4">
         <div className="mx-auto max-w-lg">
-          <button
+          <Button
             type="button"
-            className={`w-full rounded-[9999px] py-3.5 text-center text-sm font-bold shadow-lg ${
-              commentsDisabled
-                ? "cursor-default bg-[#E5E7EB] text-gray-600"
-                : canOpenPostModal
-                  ? "bg-[#FFE100] text-gray-900 hover:opacity-95 active:opacity-90"
-                  : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
-            }`}
+            variant="yellowPill"
+            className={commentsDisabled ? "disabled:text-gray-600" : ""}
             onClick={() => {
               if (commentsDisabled) return;
               if (!isLoggedIn) {
@@ -562,7 +558,7 @@ export default function CommentsPage() {
                     ? "リプライする"
                     : "コメントする"
                   : "投票するとコメントできます"}
-          </button>
+          </Button>
         </div>
       </div>
 

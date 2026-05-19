@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../../../lib/kv";
 import {
+  ensureCollectionMemberInKvIndex,
   loadMemberCollectionOrNull,
   memberGlobalKey,
   memberUserKey,
@@ -90,6 +91,7 @@ export async function POST(
 
     const partRow: MemberPartRow = { name, lastVotedAt, ...(iconUrl ? { iconUrl } : {}) };
     await upsertParticipantInKv(kv, collectionId, userId, partRow);
+    await ensureCollectionMemberInKvIndex(kv, collectionId, userId);
     const participantsOut = await readParticipantsMerged(kv, collectionId);
     const joinProfilesOut = await readJoinProfilesMap(kv, collectionId);
 

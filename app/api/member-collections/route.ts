@@ -3,10 +3,13 @@ import { getKV } from "../../lib/kv";
 import { appendMemberJoinOwnerEvent } from "../../lib/memberJoinOwnerNotifications";
 import {
   type MemberJoinProfileRow,
+  memberCollectionMembersKey,
   memberGlobalKey,
   memberPartsHashKey,
   memberPartsKey,
   memberUserKey,
+  readParticipantsMerged,
+  rebuildMemberCollectionGlobalFromUserVotes,
   removeUserJoinProfile,
   upsertJoinProfileInKv,
 } from "../../lib/memberCollectionVotesKv";
@@ -15,7 +18,6 @@ import type { CollectionPayload } from "../collection/[id]/route";
 const COLLECTION_KV_PREFIX = "vote_collection:";
 
 const KV_KEY_PREFIX = "vote_member_collections:";
-const KV_MEMBERS_INDEX_PREFIX = "vote_member_collection_members:";
 const KV_ACTIVITY_GLOBAL = "vote_activity_global";
 
 type MemberCollectionEntry = Pick<
@@ -28,7 +30,7 @@ function key(userId: string): string {
 }
 
 function membersKey(collectionId: string): string {
-  return KV_MEMBERS_INDEX_PREFIX + collectionId;
+  return memberCollectionMembersKey(collectionId);
 }
 
 function normalizeEntry(raw: unknown): MemberCollectionEntry | null {
@@ -205,21 +207,11 @@ export async function DELETE(
         }
       }
 
-      // 全体集計を、残っているメンバーの userSelections から再構築
-      const global: Record<string, { countA: number; countB: number }> = {};
-      for (const uid of nextMembers) {
-        const uRaw = await kv.get<unknown>(memberUserKey(collectionId, uid));
-        if (!uRaw || typeof uRaw !== "object" || Array.isArray(uRaw)) continue;
-        for (const [cardId, rowRaw] of Object.entries(uRaw as Record<string, unknown>)) {
-          if (!rowRaw || typeof rowRaw !== "object") continue;
-          const r = rowRaw as Record<string, unknown>;
-          const opt = r.userSelectedOption === "A" || r.userSelectedOption === "B" ? r.userSelectedOption : null;
-          if (!opt) continue;
-          const cur = global[cardId] ?? { countA: 0, countB: 0 };
-          global[cardId] =
-            opt === "A" ? { countA: cur.countA + 1, countB: cur.countB } : { countA: cur.countA, countB: cur.countB + 1 };
-        }
-      }
+      // 全体集計を、残っている投票者の userSelections から再構築（マイリスト未登録の投票者も participants に残る）
+      const remainingParticipants = await readParticipantsMerged(kv, collectionId);
+      const voterIds = new Set<string>([...nextMembers, ...Object.keys(remainingParticipants)]);
+      voterIds.delete(userId);
+      const global = await rebuildMemberCollectionGlobalFromUserVotes(kv, collectionId, voterIds);
       if (Object.keys(global).length === 0) {
         await kv.del(memberGlobalKey(collectionId));
       } else {

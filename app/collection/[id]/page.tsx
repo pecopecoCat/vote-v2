@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMemo, useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import VoteCard from "../../components/VoteCard";
@@ -37,7 +37,6 @@ import {
   fetchMemberCollectionVotesRemote,
   getAllCollectionScopedActivity,
   getCollectionScopedParticipants,
-  getMemberJoinProfiles,
   hydrateCollectionScopedFromSnapshot,
   parseMemberCollectionVotesPayload,
   type CollectionScopedParticipant,
@@ -58,6 +57,7 @@ import type { CollectionGradient } from "../../data/search";
 import { getAvatarProxySrc } from "../../lib/avatarProxy";
 import { perfMeasure } from "../../lib/perf";
 import { isRemoteHttpUrl, normalizeCardIdKey, resolveAvatarSrc } from "../../lib/normalize";
+import { navigateBack } from "../../lib/navigateBack";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   public: "公開",
@@ -151,31 +151,6 @@ function buildMemberParticipantsForDisplay(
   return [creatorRow, ...sortedOthers];
 }
 
-/** 参加APIでKVに載った人を一覧に混ぜる（まだ誰も投票していなくても表示する） */
-function appendJoinOnlyParticipants(
-  base: CollectionScopedParticipant[],
-  joinProfiles: Record<string, { name: string; iconUrl?: string; joinedAt: string }>,
-  creatorUserId?: string
-): CollectionScopedParticipant[] {
-  const entries = Object.entries(joinProfiles);
-  if (entries.length === 0) return base;
-  const seen = new Set(base.map((p) => p.userId));
-  const extra: CollectionScopedParticipant[] = [];
-  for (const [uid, prof] of entries) {
-    if (seen.has(uid)) continue;
-    if (creatorUserId && uid === creatorUserId) continue;
-    seen.add(uid);
-    extra.push({
-      userId: uid,
-      name: prof.name,
-      iconUrl: prof.iconUrl,
-      lastVotedAt: prof.joinedAt,
-    });
-  }
-  extra.sort((a, b) => (b.lastVotedAt || "").localeCompare(a.lastVotedAt || ""));
-  return [...base, ...extra];
-}
-
 function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
   if (id.startsWith("seed-")) {
     const index = parseInt(id.slice(5), 10);
@@ -207,6 +182,7 @@ const backgroundCache = new Map<string, string>();
 
 export default function CollectionPage() {
   const params = useParams();
+  const router = useRouter();
   const id = typeof params.id === "string" ? params.id : "";
   const shared = useSharedData();
   const { createdVotesForTimeline, activity, addVote: sharedAddVote, isRemote } = shared;
@@ -552,21 +528,16 @@ export default function CollectionPage() {
     return set;
   }, [activity, auth.isLoggedIn, auth.user?.name, cardsInCollection, isMemberCollection, collection?.id]);
 
-  const memberJoinProfiles = useMemo(() => {
-    if (!collection?.id || collection.visibility !== "member") return {};
-    return getMemberJoinProfiles(collection.id);
-  }, [collection?.id, collection?.visibility, scopedVotesVersion]);
-
+  /** コレ内の VOTE に1票でも入れた参加者（作成者は先頭・「作成」バッジ） */
   const memberParticipantsForDisplay = useMemo(() => {
     if (!collection || collection.visibility !== "member") return [];
-    const base = buildMemberParticipantsForDisplay(
+    return buildMemberParticipantsForDisplay(
       memberParticipants,
       collection,
       cardsInCollection,
       viewerAsOwnerProfile
     );
-    return appendJoinOnlyParticipants(base, memberJoinProfiles, collection.createdByUserId);
-  }, [collection, memberParticipants, cardsInCollection, viewerAsOwnerProfile, memberJoinProfiles]);
+  }, [collection, memberParticipants, cardsInCollection, viewerAsOwnerProfile]);
 
   /** メンバー限定を開いただけでもマイページのコレクション一覧に載せる（投票前でも可） */
   useEffect(() => {
@@ -706,15 +677,20 @@ export default function CollectionPage() {
         className={`flex items-center justify-between px-4 py-3 ${collection.gradient ? `bg-gradient-to-r ${getCollectionGradientClass(collection.gradient)}` : ""}`}
         style={collection.gradient ? undefined : { backgroundColor: collection.color }}
       >
-        <Link
-          href={isFromApi || isOtherUsersCollection(id) ? "/search" : "/profile"}
+        <button
+          type="button"
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/90 text-gray-900"
-          aria-label="戻る"
+          aria-label="1つ前のページに戻る"
+          onClick={() =>
+            navigateBack(router, {
+              fallbackHref: isFromApi || isOtherUsersCollection(id) ? "/search" : "/profile",
+            })
+          }
         >
-          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
           </svg>
-        </Link>
+        </button>
         <h1 className="min-w-0 flex-1 truncate text-center text-base font-bold text-white drop-shadow-sm">
           {collection.name}
         </h1>

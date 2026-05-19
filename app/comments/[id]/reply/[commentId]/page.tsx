@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "../../../../components/AppHeader";
+import Button from "../../../../components/Button";
 import CommentInputModal from "../../../../components/CommentInputModal";
 import CommentOptionsModal from "../../../../components/CommentOptionsModal";
 import ReportViolationModal from "../../../../components/ReportViolationModal";
@@ -217,15 +218,10 @@ export default function CommentReplyThreadPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-30 bg-transparent px-4 pb-4">
         <div className="mx-auto max-w-lg">
-          <button
+          <Button
             type="button"
-            className={`w-full rounded-[9999px] py-3.5 text-center text-sm font-bold shadow-lg ${
-              commentsDisabled
-                ? "cursor-default bg-[#E5E7EB] text-gray-600"
-                : canOpenPostModal
-                  ? "bg-[#FFE100] text-gray-900 hover:opacity-95 active:opacity-90"
-                  : "cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]"
-            }`}
+            variant="yellowPill"
+            className={commentsDisabled ? "disabled:text-gray-600" : ""}
             onClick={() => {
               if (commentsDisabled) return;
               if (!isLoggedIn) {
@@ -246,7 +242,7 @@ export default function CommentReplyThreadPage() {
                 : canPostByVote
                   ? "リプライする"
                   : "投票するとリプライできます"}
-          </button>
+          </Button>
         </div>
       </div>
 

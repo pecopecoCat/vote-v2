@@ -25,6 +25,7 @@ import Checkbox from "../components/Checkbox";
 import NewestOldestSortDropdown from "../components/NewestOldestSortDropdown";
 import EmptyStatePanel from "../components/EmptyStatePanel";
 import BottomNav from "../components/BottomNav";
+import UnderlineTabBar, { type UnderlineTabItem } from "../components/UnderlineTabBar";
 import type { CurrentUser } from "../components/VoteCard";
 import type { VoteCardData } from "../data/voteCards";
 import {
@@ -177,7 +178,8 @@ function SearchContent() {
     if (tagFromUrl.length > 0) return "";
     return voteResultsFromUrl ? qFromUrl : "";
   });
-  const [activeTab, setActiveTab] = useState<"trending" | "collections" | "favorite">("trending");
+  type SearchTabId = "trending" | "collections" | "favorite";
+  const [activeTab, setActiveTab] = useState<SearchTabId>("trending");
   const [showVoted, setShowVotedState] = useState(() => getShowVoted());
   /** ハッシュタグ一覧の並び（マイページ等と同じプルダウン） */
   const [tagListSortOrder, setTagListSortOrder] = useState<"newest" | "oldest">("newest");
@@ -572,6 +574,33 @@ function SearchContent() {
     [trendingTagsByScore, hiddenTagsVersion]
   );
 
+  const searchTabItems = useMemo(
+    (): UnderlineTabItem<SearchTabId>[] => [
+      {
+        id: "trending",
+        label: "注目タグ",
+        icon: { type: "mask", src: "/icons/icon_chumoku.svg", width: 18, height: 9 },
+      },
+      {
+        id: "collections",
+        label: "コレクション",
+        icon: { type: "mask", src: "/icons/bookmark.svg", width: 16, height: 16 },
+      },
+      {
+        id: "favorite",
+        label: "お気に入りタグ",
+        icon: {
+          type: "img",
+          src: "/icons/icon_heart.svg",
+          activeSrc: favoriteTags.length > 0 ? "/icons/icon_heart_on.svg" : undefined,
+          width: 18,
+          height: 16,
+        },
+      },
+    ],
+    [favoriteTags.length]
+  );
+
   /** 検索時：「query」が含まれるタグ（スコア順の一覧から抽出） */
   const matchedTags = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -855,88 +884,13 @@ function SearchContent() {
           {/* タブ：注目タグ / コレクション / お気に入りタグ */}
           {!isSearching && (
             <>
-              <div className="w-full min-w-0">
-                <nav className="flex w-full bg-white" aria-label="検索タブ">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("trending")}
-                    className={`relative flex flex-1 min-w-0 flex-col px-2 pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-                      activeTab === "trending" ? "text-gray-900" : "text-gray-500"
-                    }`}
-                  >
-                    <span className="flex min-h-[2.5rem] w-full flex-col items-center justify-end gap-1">
-                      <span className="inline-flex items-center justify-center gap-1.5">
-                        <img
-                          src="/icons/icon_chumoku.svg"
-                          alt=""
-                          className={`h-[9px] w-[18px] shrink-0 ${activeTab === "trending" ? "" : "opacity-60"}`}
-                          width={18}
-                          height={9}
-                        />
-                        注目タグ
-                      </span>
-                    </span>
-                    {activeTab === "trending" && (
-                      <span
-                        className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
-                        aria-hidden
-                      />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("collections")}
-                    className={`relative flex flex-1 min-w-0 flex-col px-2 pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-                      activeTab === "collections" ? "text-gray-900" : "text-gray-500"
-                    }`}
-                  >
-                    <span className="flex min-h-[2.5rem] w-full flex-col items-center justify-end gap-1">
-                      <span className="inline-flex items-center justify-center gap-1.5">
-                        <img
-                          src="/icons/bookmark.svg"
-                          alt=""
-                          className={`h-4 w-4 shrink-0 ${activeTab === "collections" ? "" : "opacity-60"}`}
-                          width={16}
-                          height={16}
-                        />
-                        コレクション
-                      </span>
-                    </span>
-                    {activeTab === "collections" && (
-                      <span
-                        className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
-                        aria-hidden
-                      />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("favorite")}
-                    className={`relative flex flex-1 min-w-0 flex-col px-2 pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-                      activeTab === "favorite" ? "text-gray-900" : "text-gray-500"
-                    }`}
-                  >
-                    <span className="flex min-h-[2.5rem] w-full flex-col items-center justify-end gap-1">
-                      <span className="inline-flex items-center justify-center gap-1.5">
-                        <img
-                          src={favoriteTags.length > 0 ? "/icons/icon_heart_on_gray.svg" : "/icons/icon_heart.svg"}
-                          alt=""
-                          className={`h-4 w-4 shrink-0 ${activeTab === "favorite" ? "" : "opacity-60"}`}
-                          width={18}
-                          height={16}
-                        />
-                        お気に入りタグ
-                      </span>
-                    </span>
-                    {activeTab === "favorite" && (
-                      <span
-                        className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
-                        aria-hidden
-                      />
-                    )}
-                  </button>
-                </nav>
-              </div>
+              <UnderlineTabBar
+                items={searchTabItems}
+                activeId={activeTab}
+                onSelect={setActiveTab}
+                ariaLabel="検索タブ"
+                layout="scroll"
+              />
               <div className="h-px bg-[#E5E7EB]" aria-hidden />
             </>
           )}

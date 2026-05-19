@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../../lib/kv";
 import {
+  memberCollectionMembersKey,
   memberGlobalKey,
   memberJoinProfileKey,
   memberPartsHashKey,
@@ -12,7 +13,6 @@ import {
 const KV_PREFIX = "vote_collection:";
 const INDEX_KEY = "vote_collections_index";
 const MEMBER_COLLECTIONS_PREFIX = "vote_member_collections:";
-const MEMBER_COLLECTION_MEMBERS_PREFIX = "vote_member_collection_members:";
 const KV_ACTIVITY_GLOBAL = "vote_activity_global";
 
 /** 公開・メンバー限定コレクションのみKVに保存。GETでリンクを知っている人（未ログイン含む）が閲覧可能 */
@@ -97,7 +97,7 @@ export async function DELETE(
 
     // メンバー限定: 参加者側の「参加中（bookmark）」も一括で削除
     if (raw && typeof raw === "object" && raw.visibility === "member") {
-      const membersKey = MEMBER_COLLECTION_MEMBERS_PREFIX + id;
+      const membersKey = memberCollectionMembersKey(id);
       const membersRaw = await kv.get<unknown>(membersKey);
       const memberUserIds = Array.isArray(membersRaw)
         ? membersRaw.filter((v): v is string => typeof v === "string" && v.length > 0)

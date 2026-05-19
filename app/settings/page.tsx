@@ -5,6 +5,19 @@ import { useRouter } from "next/navigation";
 import AppHeader from "../components/AppHeader";
 import { getAuth, logout } from "../data/auth";
 
+function SettingsRowChevron({ muted = false }: { muted?: boolean }) {
+  return (
+    <img
+      src="/icons/icon_chevron_right.svg"
+      alt=""
+      className={`h-[14px] w-2 shrink-0 ${muted ? "opacity-35" : ""}`}
+      width={8}
+      height={14}
+      aria-hidden
+    />
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const auth = getAuth();
@@ -22,15 +35,13 @@ export default function SettingsPage() {
           <>
             <section className="mb-6">
               <h2 className="mb-2 px-1 text-sm font-bold text-gray-900">各種設定</h2>
-              <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl bg-white">
                 <Link
                   href="/settings/account"
                   className="flex w-full items-center justify-between border-b border-gray-100 px-4 py-3 text-left text-gray-900 hover:bg-gray-50"
                 >
                   <span className="text-sm font-medium">アカウント管理</span>
-                  <span className="text-gray-400" aria-hidden>
-                    &gt;
-                  </span>
+                  <SettingsRowChevron />
                 </Link>
                 <button
                   type="button"
@@ -38,7 +49,7 @@ export default function SettingsPage() {
                   className="flex w-full items-center justify-between border-b border-gray-100 px-4 py-3 text-left text-gray-400"
                 >
                   <span className="text-sm font-medium">表示設定</span>
-                  <span aria-hidden>&gt;</span>
+                  <SettingsRowChevron muted />
                 </button>
                 <button
                   type="button"
@@ -46,7 +57,7 @@ export default function SettingsPage() {
                   className="flex w-full items-center justify-between px-4 py-3 text-left text-gray-400"
                 >
                   <span className="text-sm font-medium">VOTEの国・地域設定</span>
-                  <span aria-hidden>&gt;</span>
+                  <SettingsRowChevron muted />
                 </button>
               </div>
               <p className="mt-2 px-1 text-xs text-red-600">
@@ -56,34 +67,34 @@ export default function SettingsPage() {
 
             <section className="mb-6">
               <h2 className="mb-2 px-1 text-sm font-bold text-gray-900">このアプリについて</h2>
-              <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl bg-white">
                 <Link href="#" className="flex w-full items-center justify-between border-b border-gray-100 px-4 py-3 text-left text-gray-900 hover:bg-gray-50">
                   <span className="text-sm font-medium">VOTEマニュアル</span>
-                  <span className="text-gray-400" aria-hidden>&gt;</span>
+                  <SettingsRowChevron />
                 </Link>
                 <Link href="#" className="flex w-full items-center justify-between border-b border-gray-100 px-4 py-3 text-left text-gray-900 hover:bg-gray-50">
                   <span className="text-sm font-medium">利用規約</span>
-                  <span className="text-gray-400" aria-hidden>&gt;</span>
+                  <SettingsRowChevron />
                 </Link>
                 <Link href="#" className="flex w-full items-center justify-between border-b border-gray-100 px-4 py-3 text-left text-gray-900 hover:bg-gray-50">
                   <span className="text-sm font-medium">プライバシーポリシー</span>
-                  <span className="text-gray-400" aria-hidden>&gt;</span>
+                  <SettingsRowChevron />
                 </Link>
                 <Link href="#" className="flex w-full items-center justify-between border-b border-gray-100 px-4 py-3 text-left text-gray-900 hover:bg-gray-50">
                   <span className="text-sm font-medium">外部送信ポリシー</span>
-                  <span className="text-gray-400" aria-hidden>&gt;</span>
+                  <SettingsRowChevron />
                 </Link>
                 <Link href="#" className="flex w-full items-center justify-between border-b border-gray-100 px-4 py-3 text-left text-gray-900 hover:bg-gray-50">
                   <span className="text-sm font-medium">特定商取引法に基づく表示</span>
-                  <span className="text-gray-400" aria-hidden>&gt;</span>
+                  <SettingsRowChevron />
                 </Link>
                 <Link href="#" className="flex w-full items-center justify-between border-b border-gray-100 px-4 py-3 text-left text-gray-900 hover:bg-gray-50">
                   <span className="text-sm font-medium">ヘルプ・よくある質問</span>
-                  <span className="text-gray-400" aria-hidden>&gt;</span>
+                  <SettingsRowChevron />
                 </Link>
                 <Link href="#" className="flex w-full items-center justify-between px-4 py-3 text-left text-gray-900 hover:bg-gray-50">
                   <span className="text-sm font-medium">お問い合わせ</span>
-                  <span className="text-gray-400" aria-hidden>&gt;</span>
+                  <SettingsRowChevron />
                 </Link>
               </div>
             </section>

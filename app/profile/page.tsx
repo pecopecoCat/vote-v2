@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense, useRef } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import BottomNav from "../components/BottomNav";
 import VoteCard from "../components/VoteCard";
 import { VoteCardList } from "../components/VoteCardList";
@@ -54,6 +54,7 @@ import CardOptionsModal from "../components/CardOptionsModal";
 import ReportViolationModal from "../components/ReportViolationModal";
 import NewestOldestSortDropdown from "../components/NewestOldestSortDropdown";
 import CommentThreadGroup from "../components/CommentThreadGroup";
+import UnderlineTabBar, { type UnderlineTabItem } from "../components/UnderlineTabBar";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   public: "公開",
@@ -73,6 +74,13 @@ const PROFILE_COMMENT_CONTENT_WIDTH_CLASS =
   "mx-auto w-[min(100%,calc(100vw*335/375))]";
 
 type ProfileTabId = "myVOTE" | "vote" | "bookmark" | "comment";
+
+const PROFILE_TAB_IDS: ProfileTabId[] = ["myVOTE", "vote", "bookmark", "comment"];
+
+function parseProfileTabFromUrl(raw: string | null): ProfileTabId {
+  if (raw && PROFILE_TAB_IDS.includes(raw as ProfileTabId)) return raw as ProfileTabId;
+  return "vote";
+}
 
 type ProfileCommentDisplayRow = {
   key: string;
@@ -194,8 +202,12 @@ function backgroundForCard(card: VoteCardData, cardId: string): string {
 function ProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParamsKey = searchParams.toString();
+  const tabFromUrl = searchParams.get("tab");
+  const bookmarkFromUrl = searchParams.get("bookmark");
   const returnTo = searchParams.get("returnTo"); // 未ログインでVOTE作成から来た場合の戻り先
-  const [activeTab, setActiveTab] = useState<ProfileTabId>("vote");
+  const [activeTab, setActiveTab] = useState<ProfileTabId>(() => parseProfileTabFromUrl(tabFromUrl));
   const [collections, setCollections] = useState<Collection[]>([]);
   const shared = useSharedData();
   const {
@@ -207,7 +219,72 @@ function ProfileContent() {
   } = shared;
   const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
   /** Bookmark タブでコレクション or ALL を選択中。null = TOP（リスト表示） */
-  const [selectedBookmarkId, setSelectedBookmarkId] = useState<null | "all" | string>(null);
+  const [selectedBookmarkId, setSelectedBookmarkId] = useState<null | "all" | string>(() => {
+    if (bookmarkFromUrl === "all") return "all";
+    if (bookmarkFromUrl) return bookmarkFromUrl;
+    return null;
+  });
+
+  /** ブラウザの戻る／進む・URL直打ちでタブ・Bookmark 内階層を URL と一致させる */
+  useEffect(() => {
+    const tab = parseProfileTabFromUrl(tabFromUrl);
+    setActiveTab(tab);
+    if (bookmarkFromUrl === "all") {
+      setSelectedBookmarkId("all");
+      return;
+    }
+    if (bookmarkFromUrl) {
+      setSelectedBookmarkId(bookmarkFromUrl);
+      return;
+    }
+    setSelectedBookmarkId(null);
+  }, [tabFromUrl, bookmarkFromUrl]);
+
+  const replaceProfileQuery = useCallback(
+    (mutate: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParamsKey);
+      mutate(params);
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParamsKey]
+  );
+
+  const selectProfileTab = useCallback(
+    (id: ProfileTabId) => {
+      setActiveTab(id);
+      if (id !== "bookmark") setSelectedBookmarkId(null);
+      replaceProfileQuery((params) => {
+        if (id === "vote") {
+          params.delete("tab");
+          params.delete("bookmark");
+        } else {
+          params.set("tab", id);
+          if (id !== "bookmark") params.delete("bookmark");
+        }
+      });
+    },
+    [replaceProfileQuery]
+  );
+
+  const openBookmarkView = useCallback(
+    (bookmarkId: "all" | string) => {
+      setSelectedBookmarkId(bookmarkId);
+      replaceProfileQuery((params) => {
+        params.set("tab", "bookmark");
+        params.set("bookmark", bookmarkId);
+      });
+    },
+    [replaceProfileQuery]
+  );
+
+  const closeBookmarkView = useCallback(() => {
+    setSelectedBookmarkId(null);
+    replaceProfileQuery((params) => {
+      params.set("tab", "bookmark");
+      params.delete("bookmark");
+    });
+  }, [replaceProfileQuery]);
   /** ブックマーク先選択モーダルを開くカードID */
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
@@ -534,12 +611,15 @@ function ProfileContent() {
     });
   }, [commentedCardIds, activity, auth.isLoggedIn, auth.user?.name]);
 
-  const tabLabels: { id: ProfileTabId; label: string }[] = [
-    { id: "myVOTE", label: "myVOTE" },
-    { id: "vote", label: "投票" },
-    { id: "bookmark", label: "Bookmark" },
-    { id: "comment", label: "コメント" },
-  ];
+  const tabLabels: UnderlineTabItem<ProfileTabId>[] = useMemo(
+    () => [
+      { id: "myVOTE", label: "myVOTE" },
+      { id: "vote", label: "投票" },
+      { id: "bookmark", label: "Bookmark" },
+      { id: "comment", label: "コメント" },
+    ],
+    []
+  );
 
   const voteCount = createdVotes.length;
   const collectionCount = collections.length;
@@ -719,30 +799,13 @@ function ProfileContent() {
         </div>
       </div>
 
-      {/* タブバー */}
-      <div className="w-full min-w-0">
-        <nav className="flex w-full bg-white" aria-label="マイページタブ">
-          {tabLabels.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActiveTab(id)}
-              className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-                activeTab === id ? "text-gray-900" : "text-gray-500"
-              }`}
-            >
-              <span className="flex-1" aria-hidden />
-              <span className="inline-block">{label}</span>
-              {activeTab === id && (
-                <span
-                  className="absolute bottom-0 left-0 right-0 h-[4px] rounded-full bg-[#FFE100]"
-                  aria-hidden
-                />
-              )}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <UnderlineTabBar
+        items={tabLabels}
+        activeId={activeTab}
+        onSelect={selectProfileTab}
+        ariaLabel="マイページタブ"
+        layout="equal"
+      />
 
       <main className="mx-auto max-w-lg bg-[#F1F1F1] px-[5.333vw] pb-6 pt-[20px]">
         {activeTab === "myVOTE" && (
@@ -890,7 +953,7 @@ function ProfileContent() {
                 <button
                   type="button"
                   className="flex min-h-[64px] w-full items-center rounded-xl bg-white px-4 py-3"
-                  onClick={() => setSelectedBookmarkId("all")}
+                  onClick={() => openBookmarkView("all")}
                 >
                   <span className="text-sm font-bold text-gray-900">ALL</span>
                 </button>
@@ -951,7 +1014,7 @@ function ProfileContent() {
                     type="button"
                     className="flex h-9 w-9 items-center justify-center text-gray-600"
                     aria-label="戻る"
-                    onClick={() => setSelectedBookmarkId(null)}
+                    onClick={closeBookmarkView}
                   >
                     <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
