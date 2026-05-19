@@ -334,7 +334,7 @@ export const voteCardsData: VoteCardData[] = [
     patternType: "geometric-stripes",
     question: "公園日和、午前だけ活動 vs 午睡あけ夕方にもう一回外、どちら楽？",
     optionA: "午前ひと気合い外出して昼寝も早い⚡",
-    optionB: "夕方また砂場でひと汗流す派🛝",
+    optionB: "夕方また砂場でひと汗流し夜もしっかり寝てもらう派🛝",
     countA: 12,
     countB: 14,
     commentCount: 2,
@@ -359,7 +359,7 @@ export const voteCardsData: VoteCardData[] = [
   {
     patternType: "yellow-loops",
     question: "共働きの平日夜ごはん、「作りおき大作戦」それとも「当日さっさと簡単」？",
-    optionA: "日曜まとめて作りおきコロッケ魂",
+    optionA: "日曜まとめて作りおき！",
     optionB: "冷凍と惣菜＋ゆで卵でチャチャっと😋",
     countA: 19,
     countB: 24,
