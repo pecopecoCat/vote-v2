@@ -135,7 +135,7 @@ export default function UnderlineTabBar<T extends string>({
 
     const baseBtn =
       layout === "equal"
-        ? `relative flex min-w-0 flex-1 flex-col pt-[14.4px] pb-[11.4px] font-bold ${labelClassName}`
+        ? `relative flex min-w-0 flex-1 items-center justify-center gap-1.5 pt-[14.4px] pb-[11.4px] font-bold w-full text-center ${labelClassName}`
         : layout === "center"
           ? `relative inline-flex items-center justify-center gap-1.5 pb-[8px] leading-snug text-[15px] ${active ? "font-bold" : "font-normal"}`
           : `relative inline-flex min-h-[3.25rem] flex-none items-center gap-1.5 whitespace-nowrap font-bold ${labelClassName}`;
@@ -149,20 +149,8 @@ export default function UnderlineTabBar<T extends string>({
         style={colorStyle}
         aria-current={active ? "page" : undefined}
       >
-        {layout === "equal" ? (
-          <>
-            <span className="flex-1" aria-hidden />
-            <span className="inline-flex items-center justify-center gap-1.5">
-              {item.icon ? <TabIcon icon={item.icon} active={active} /> : null}
-              {item.label}
-            </span>
-          </>
-        ) : (
-          <>
-            {item.icon ? <TabIcon icon={item.icon} active={active} /> : null}
-            {item.label}
-          </>
-        )}
+        {item.icon ? <TabIcon icon={item.icon} active={active} /> : null}
+        <span className="truncate">{item.label}</span>
         {active ? <span className={indicator} aria-hidden /> : null}
       </button>
     );
@@ -185,7 +173,7 @@ export default function UnderlineTabBar<T extends string>({
   if (layout === "equal") {
     return (
       <div className={`w-full min-w-0 ${className}`}>
-        <nav className={`flex w-full ${bg}`} aria-label={ariaLabel}>
+        <nav className={`profile-tab-bar flex w-full ${bg}`} aria-label={ariaLabel}>
           {items.map(renderButton)}
         </nav>
       </div>

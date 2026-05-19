@@ -200,6 +200,15 @@ select {
   background-color: var(--color-brand-logo);
 }
 
+/* マイページ等（UnderlineTabBar layout=equal）：Safari でもラベルをセル中央に */
+.profile-tab-bar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+}
+
 /* 共通タブバー（UnderlineTabBar）：未選択 #787878 / 選択 #191919 */
 .tab-bar-icon-mask {
   -webkit-mask-repeat: no-repeat;

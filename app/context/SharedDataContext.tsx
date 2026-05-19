@@ -26,6 +26,8 @@ import {
   removeComment as removeCommentLocal,
   mergeVoteComments,
   resolveActivityForCard,
+  isOptimisticCommentId,
+  persistAllActivityToLocalStorage,
   ACTIVITY_GLOBAL_UPDATED_EVENT,
 } from "../data/voteCardActivity";
 import {
@@ -332,11 +334,15 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         ? (data.userSelections as Record<string, unknown>)
         : {};
     setActivity((prev) => {
-      if (lastActivityFetchUserIdRef.current !== userId) {
-        lastActivityFetchUserIdRef.current = userId;
-        return buildActivityFromApi(global, userSelections);
-      }
-      return mergeActivityFromApiFetch(prev, global, userSelections);
+      const next =
+        lastActivityFetchUserIdRef.current !== userId
+          ? (() => {
+              lastActivityFetchUserIdRef.current = userId;
+              return buildActivityFromApi(global, userSelections);
+            })()
+          : mergeActivityFromApiFetch(prev, global, userSelections);
+      persistAllActivityToLocalStorage(next);
+      return next;
     });
     setVoteEvents(Array.isArray(data?.voteEvents) ? data.voteEvents : []);
     setBookmarkEvents(Array.isArray(data?.bookmarkEvents) ? data.bookmarkEvents : []);
@@ -400,17 +406,23 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       if (opt !== "A" && opt !== "B") return false;
       setActivity((prev) => {
         const p = resolveActivityForCard(prev, cardId);
-        return collapseActivityByCardId({
+        const mergedComments = mergeVoteComments(
+          (p.comments ?? []).filter((c) => !isOptimisticCommentId(c.id)),
+          comments
+        );
+        const next = collapseActivityByCardId({
           ...prev,
           [cardId]: {
             ...p,
             countA,
             countB,
-            comments: mergeVoteComments(p.comments, comments),
+            comments: mergedComments,
             userSelectedOption: opt,
             userVotedAt: votedAt ?? p.userVotedAt,
           },
         });
+        persistAllActivityToLocalStorage(next);
+        return next;
       });
       setVoteEvents((prev) => [...prev, s.voteEvent!].slice(-200));
       return true;
@@ -427,18 +439,20 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       setActivity((prev) => {
         const p =
           resolveActivityForCard(prev, cardId) ?? { countA: 0, countB: 0, comments: [] };
-        const nextState = {
+        const nextState = collapseActivityByCardId({
           ...prev,
           [cardId]: {
             ...p,
             countA: s.card!.countA!,
             countB: s.card!.countB!,
-            comments: mergeVoteComments(p.comments, comments),
+            // サーバー確定一覧を正とする（楽観 local-* と二重表示しない）
+            comments,
             userSelectedOption: p.userSelectedOption,
             userVotedAt: p.userVotedAt,
           },
-        };
-        return collapseActivityByCardId(nextState);
+        });
+        persistAllActivityToLocalStorage(nextState);
+        return nextState;
       });
       return true;
     }
@@ -541,7 +555,10 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
             ...(p ?? a),
             countA: a.countA,
             countB: a.countB,
-            comments: mergeVoteComments(p?.comments, a.comments),
+            comments: mergeVoteComments(
+              (p?.comments ?? []).filter((c) => !isOptimisticCommentId(c.id)),
+              a.comments
+            ),
             // remote(KV) の userSelectedOption を localStorage(=undefined) で上書きしない
             userSelectedOption: p?.userSelectedOption ?? a.userSelectedOption,
             userVotedAt: a.userVotedAt ?? p?.userVotedAt,
@@ -654,16 +671,19 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       if (isRemote) {
         // 体感改善：POST/再取得を待たずに「投票済み」+ 票数を即反映（結果表示・コメント導線の遅延を防ぐ）
         const votedAt = new Date().toISOString();
-        setActivity((prev) => ({
-          ...prev,
-          [cardId]: {
-            ...(prev[cardId] ?? { countA: 0, countB: 0, comments: [] }),
-            countA: (prev[cardId]?.countA ?? 0) + (option === "A" ? 1 : 0),
-            countB: (prev[cardId]?.countB ?? 0) + (option === "B" ? 1 : 0),
-            userSelectedOption: option,
-            userVotedAt: votedAt,
-          },
-        }));
+        setActivity((prev) => {
+          const p = resolveActivityForCard(prev, cardId);
+          return collapseActivityByCardId({
+            ...prev,
+            [cardId]: {
+              ...p,
+              countA: p.countA + (option === "A" ? 1 : 0),
+              countB: p.countB + (option === "B" ? 1 : 0),
+              userSelectedOption: option,
+              userVotedAt: votedAt,
+            },
+          });
+        });
         const res = await fetch(ACTIVITY_API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -723,9 +743,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const now = new Date().toISOString();
         setActivity((prev) => {
-          const cur = prev[cardId] ?? { countA: 0, countB: 0, comments: [] as CardActivity["comments"] };
+          const cur = resolveActivityForCard(prev, cardId);
           const nextComments = Array.isArray(cur.comments) ? cur.comments : [];
-          return {
+          return collapseActivityByCardId({
             ...prev,
             [cardId]: {
               ...cur,
@@ -743,7 +763,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
                 },
               ],
             },
-          };
+          });
         });
         const res = await fetch(ACTIVITY_API, {
           method: "POST",

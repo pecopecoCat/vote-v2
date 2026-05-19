@@ -434,6 +434,67 @@ export function resetAllVoteCounts(): void {
   saveGlobal(next);
 }
 
+/** 送信直後の楽観表示用 ID（サーバー確定後は除去する） */
+export function isOptimisticCommentId(id: string | undefined): boolean {
+  return typeof id === "string" && id.startsWith("local-");
+}
+
+/**
+ * KV 同期後の activity を localStorage に書き戻す（リロード直後の getAllActivity / 投票済み表示用）。
+ * 楽観コメント（local-*）は保存しない。
+ */
+export function persistAllActivityToLocalStorage(activity: Record<string, CardActivity>): void {
+  if (typeof window === "undefined") return;
+  const global = loadGlobal();
+  const user = loadUserSelections();
+  const nextGlobal: Record<string, GlobalCardData> = { ...global };
+  const nextUser: Record<string, UserVoteSelectionRow> = { ...user };
+
+  const normalizedRows = new Map<string, CardActivity>();
+  for (const [rawId, row] of Object.entries(activity)) {
+    const nk = normalizeCardIdKey(rawId);
+    const existing = normalizedRows.get(nk);
+    if (!existing) {
+      normalizedRows.set(nk, row);
+      continue;
+    }
+    normalizedRows.set(nk, {
+      countA: Math.max(existing.countA, row.countA),
+      countB: Math.max(existing.countB, row.countB),
+      comments: mergeVoteComments(existing.comments, row.comments),
+      userSelectedOption: existing.userSelectedOption ?? row.userSelectedOption,
+      userVotedAt: existing.userVotedAt ?? row.userVotedAt,
+    });
+  }
+
+  for (const nk of normalizedRows.keys()) {
+    for (const k of Object.keys(nextGlobal)) {
+      if (normalizeCardIdKey(k) === nk) delete nextGlobal[k];
+    }
+    for (const k of Object.keys(nextUser)) {
+      if (normalizeCardIdKey(k) === nk) delete nextUser[k];
+    }
+  }
+
+  for (const [nk, row] of normalizedRows) {
+    const comments = (row.comments ?? []).filter((c) => !isOptimisticCommentId(c.id));
+    nextGlobal[nk] = {
+      countA: row.countA ?? 0,
+      countB: row.countB ?? 0,
+      comments,
+    };
+    if (row.userSelectedOption === "A" || row.userSelectedOption === "B") {
+      nextUser[nk] = {
+        userSelectedOption: row.userSelectedOption,
+        ...(row.userVotedAt ? { votedAt: row.userVotedAt } : {}),
+      };
+    }
+  }
+
+  saveGlobal(nextGlobal);
+  saveUserSelections(nextUser);
+}
+
 /** コメント一覧を ID でマージ（新しい方を優先） */
 export function mergeVoteComments(
   prev: VoteComment[] | undefined,

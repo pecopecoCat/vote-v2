@@ -1,0 +1,15 @@
+﻿項目,値
+実施日,
+実施者,
+ビルド（commit / Vercel URL）,
+データモード,□ローカルのみ □KV共有
+P0 合計,24項目中
+P0 Safari OK数,
+P0 Chrome OK数,
+P0 未完了数,
+リリース判定,□OK □NG（ブロッカー: ）
+,
+端末,ブラウザ,総合,メモ
+iPhone ___,Safari,,
+Mac,Chrome,,
+,Firefox,,

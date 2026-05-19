@@ -37,6 +37,7 @@ export default function CommentInputModal({
 }: CommentInputModalProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const submittingRef = useRef(false);
   const [keyboardInsetPx, setKeyboardInsetPx] = useState(0);
 
   useEffect(() => {
@@ -107,7 +108,8 @@ export default function CommentInputModal({
   const canSubmit = !effectiveDisabled && trimmed.length > 0;
 
   const handleSubmit = () => {
-    if (!canSubmit || !cardId || !onCommentSubmit) return;
+    if (!canSubmit || !cardId || !onCommentSubmit || submittingRef.current) return;
+    submittingRef.current = true;
     const payload: CommentSubmitPayload = {
       user: currentUser
         ? { name: currentUser.name, iconUrl: currentUser.iconUrl }
@@ -117,6 +119,9 @@ export default function CommentInputModal({
     onCommentSubmit(cardId, payload);
     setValue("");
     onClose();
+    window.setTimeout(() => {
+      submittingRef.current = false;
+    }, 600);
   };
 
   const modalTitle = replyToUserName ? "リプライを入力" : "コメントを入力";
