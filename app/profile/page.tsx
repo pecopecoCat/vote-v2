@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import BottomNav from "../components/BottomNav";
 import VoteCard from "../components/VoteCard";
+import { VoteCardList } from "../components/VoteCardList";
 import { getCreatedVotes, deleteCreatedVote, getCreatedVotesUpdatedEventName } from "../data/createdVotes";
 import { voteCardsData, CARD_BACKGROUND_IMAGES, resolveStableVoteCardId } from "../data/voteCards";
 import {
@@ -648,9 +649,9 @@ function ProfileContent() {
         </div>
         <div className="mt-4">
           <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1 text-sm font-bold text-gray-900">
+            <span className="flex items-center gap-1 text-sm font-bold text-[#191919]">
               <img
-                src={favoriteTags.length > 0 ? "/icons/icon_heart_on_gray.svg" : "/icons/icon_heart.svg"}
+                src={favoriteTags.length > 0 ? "/icons/icon_heart_on_dark.svg" : "/icons/icon_heart.svg"}
                 alt=""
                 className="h-4 w-4"
                 width={18}
@@ -661,7 +662,7 @@ function ProfileContent() {
             {isFavoriteTagsEditMode ? (
               <button
                 type="button"
-                className="text-sm font-bold text-gray-700 no-underline"
+                className="text-sm font-bold text-[#191919] no-underline"
                 onClick={() => setIsFavoriteTagsEditMode(false)}
               >
                 保存
@@ -669,7 +670,7 @@ function ProfileContent() {
             ) : (
               <button
                 type="button"
-                className="text-sm font-bold text-gray-700 no-underline"
+                className="text-sm font-bold text-[#191919] no-underline"
                 onClick={() => setIsFavoriteTagsEditMode(true)}
               >
                 編集
@@ -765,7 +766,7 @@ function ProfileContent() {
                 <p className="text-sm text-gray-500">作ったVOTEがまだありません。</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-[5.333vw]">
+              <VoteCardList>
                 {createdVotes.map((card) => {
                   const cardId = resolveStableVoteCardId(card);
                   const act = activity[cardId];
@@ -818,7 +819,7 @@ function ProfileContent() {
                     </div>
                   );
                 })}
-              </div>
+              </VoteCardList>
             )}
           </>
         )}
@@ -837,7 +838,7 @@ function ProfileContent() {
                 <p className="text-sm text-gray-500">投票したVOTEがここに表示されます。</p>
               </div>
             ) : (
-              <div className="mt-4 flex flex-col gap-[5.333vw]">
+              <VoteCardList className="mt-4">
                 {votedCards.map((card) => {
                   const cardId = resolveStableVoteCardId(card);
                   const act = activity[cardId];
@@ -875,7 +876,7 @@ function ProfileContent() {
                     />
                   );
                 })}
-              </div>
+              </VoteCardList>
             )}
           </>
         )}
@@ -971,7 +972,7 @@ function ProfileContent() {
                     );
                   }
                   return (
-                    <div className="flex flex-col gap-[5.333vw]">
+                    <VoteCardList>
                       {bookmarkListViewModels.map(({ card, cardId, merged, bgUrl, initialSelectedOption }) => {
                         return (
                           <VoteCard
@@ -1004,7 +1005,7 @@ function ProfileContent() {
                           />
                         );
                       })}
-                    </div>
+                    </VoteCardList>
                   );
                 })()}
               </>
@@ -1058,7 +1059,6 @@ function ProfileContent() {
                         href={threadHref}
                         className="block transition-opacity active:opacity-90"
                       >
-                        <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
                           <VoteCardMini
                             backgroundImageUrl={backgroundForCard(card, cardId)}
                             patternType={card.patternType ?? "yellow-loops"}
@@ -1074,10 +1074,8 @@ function ProfileContent() {
                             periodStart={card.periodStart}
                             periodEnd={card.periodEnd}
                             expandMiniForCommentsPage
-                            flatOuterShadow
                             hideFooterIconRow
                           />
-                        </div>
                       </Link>
                       <div className="bg-[#F1F1F1] pt-3 pb-1">
                         <div className={PROFILE_COMMENT_CONTENT_WIDTH_CLASS}>

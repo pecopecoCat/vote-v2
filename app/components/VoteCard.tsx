@@ -244,7 +244,7 @@ function VoteCard({
   };
 
   return (
-    <article className="relative w-full overflow-visible rounded-[18px] bg-white shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]">
+    <article className="vote-card-outer">
       {visibility === "private" && (
         <span className="absolute right-5 top-5 z-10 rounded-full bg-gray-800/80 px-2.5 py-1 text-xs font-medium text-white">
           非公開

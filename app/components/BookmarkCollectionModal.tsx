@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   getCollections,
   toggleCardInCollection,
@@ -12,9 +13,8 @@ import {
 import { addBookmark, isCardBookmarked, getBookmarksUpdatedEventName } from "../data/bookmarks";
 import { removeBookmarkFully } from "../data/bookmarkRemove";
 import { showAppToast } from "../lib/appToast";
-import { getCollectionGradientStyle, type CollectionGradient } from "../data/search";
+import { type CollectionGradient } from "../data/search";
 import { useSharedData } from "../context/SharedDataContext";
-import { useEffect, useState } from "react";
 import Button from "./Button";
 import CollectionSettingsModal from "./CollectionSettingsModal";
 
@@ -24,6 +24,79 @@ interface BookmarkCollectionModalProps {
   onCollectionsUpdated?: () => void;
   /** 関係図: コレクションはログイン後のユーザーが作る。未ログイン時はログイン促進を表示 */
   isLoggedIn?: boolean;
+}
+
+function BookmarkModalDivider() {
+  return <div className="h-px w-full bg-[#DADADA]" aria-hidden />;
+}
+
+function CollectionToggleIcon({ selected }: { selected: boolean }) {
+  if (selected) {
+    return (
+      <span
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FFE100]"
+        aria-hidden
+      >
+        <svg className="h-3.5 w-3.5" fill="#191919" viewBox="0 0 24 24">
+          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+        </svg>
+      </span>
+    );
+  }
+  return (
+    <span
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#E5E7EB]"
+      aria-hidden
+    >
+      <img src="/icons/icon_plus.svg" alt="" className="h-2.5 w-2.5" width={10} height={10} />
+    </span>
+  );
+}
+
+function BookmarkModalShell({
+  children,
+  footer,
+  onComplete,
+}: {
+  children: ReactNode;
+  footer?: ReactNode;
+  onComplete: () => void;
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-[60] bg-black/50" aria-hidden onClick={onComplete} />
+      <div
+        className="fixed inset-x-0 bottom-0 z-[70] flex max-h-[85vh] flex-col overflow-hidden rounded-t-[30px] bg-white shadow-lg"
+        role="dialog"
+        aria-labelledby="bookmark-modal-title"
+      >
+        <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-[#DADADA] px-5 py-3">
+          <div />
+          <h2 id="bookmark-modal-title" className="text-lg font-bold text-[#191919]">
+            Bookmark
+          </h2>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className="text-sm font-bold text-[#0779F1]"
+              aria-label="完了"
+              onClick={onComplete}
+            >
+              完了
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+
+        {footer ? (
+          <div className="shrink-0 space-y-3 border-t border-[#DADADA] px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] pt-4">
+            {footer}
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
 }
 
 export default function BookmarkCollectionModal({
@@ -72,7 +145,11 @@ export default function BookmarkCollectionModal({
     onCollectionsUpdated?.();
   };
 
-  const handleSaveNewCollection = (name: string, gradient: CollectionGradient, visibility: "public" | "private" | "member") => {
+  const handleSaveNewCollection = (
+    name: string,
+    gradient: CollectionGradient,
+    visibility: "public" | "private" | "member"
+  ) => {
     createCollection(name, { gradient, visibility });
     setCollections(getCollections());
     onCollectionsUpdated?.();
@@ -81,37 +158,30 @@ export default function BookmarkCollectionModal({
 
   if (cardId == null) return null;
 
+  const handleComplete = () => {
+    showAppToast("Bookmarkしました");
+    onClose();
+  };
+
   /** 関係図: ログイン後のユーザーがコレクションを作成・管理。未ログイン時はログイン促進 */
   if (!isLoggedIn) {
     return (
-      <>
-        <div className="fixed inset-0 z-[60] bg-black/50" aria-hidden onClick={onClose} />
-        <div className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
-            <div />
-            <span className="text-lg font-bold text-gray-900">Bookmark</span>
-            <div className="flex justify-end">
-              <button type="button" className="flex h-10 items-center justify-center px-2 text-blue-600 text-sm" aria-label="完了" onClick={onClose}>
-                完了
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-col items-center justify-center gap-4 px-5 py-10 text-center">
-            <p className="text-sm font-bold text-gray-700">
-              ブックマーク・コレクションを使うには
-              <br />
-              ログインしてください。
-            </p>
-            <Link
-              href="/profile/login"
-              className="rounded-xl bg-gray-900 px-6 py-3 text-center text-sm font-bold text-white hover:opacity-90"
-              onClick={onClose}
-            >
-              ログインする
-            </Link>
-          </div>
+      <BookmarkModalShell onComplete={onClose}>
+        <div className="flex flex-col items-center justify-center gap-4 px-5 py-10 text-center">
+          <p className="text-sm font-bold text-[#191919]">
+            ブックマーク・コレクションを使うには
+            <br />
+            ログインしてください。
+          </p>
+          <Link
+            href="/profile/login"
+            className="rounded-xl bg-[#191919] px-6 py-3 text-center text-sm font-bold text-white hover:opacity-90"
+            onClick={onClose}
+          >
+            ログインする
+          </Link>
         </div>
-      </>
+      </BookmarkModalShell>
     );
   }
 
@@ -142,110 +212,68 @@ export default function BookmarkCollectionModal({
     onClose();
   };
 
-  const handleComplete = () => {
-    showAppToast("Bookmarkしました");
-    onClose();
-  };
+  /** 行の上下余白：従来 min-h 52px 相当の内側余白 16px → 150% = 24px */
+  const listRowClass =
+    "flex w-full items-center justify-between px-5 py-6 text-left text-[#191919] transition-colors active:bg-gray-50";
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-[60] bg-black/50"
-        aria-hidden
-        onClick={onClose}
-      />
-      <div className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
-          <div />
-          <span className="text-lg font-bold text-gray-900">Bookmark</span>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="flex h-10 items-center justify-center px-2 text-blue-600 text-sm"
-              aria-label="完了"
-              onClick={handleComplete}
-            >
-              完了
-            </button>
-          </div>
-        </div>
-        <div className="max-h-[calc(85vh-120px)] overflow-y-auto px-5">
-          <p className="py-2 text-xs font-bold text-gray-500">
-            Bookmarkに登録済み。まとめたいものをコレクションに追加できます。
-          </p>
-          {/* ALL（どのコレクションにも入れない＝ALLリストにだけ表示） */}
-          <ul className="divide-y divide-gray-100">
-            <li>
+      <BookmarkModalShell
+        onComplete={handleComplete}
+        footer={
+          <>
+            <Button variant="outline" className="w-full" onClick={() => setShowSettingsModal(true)}>
+              新しいコレクションを追加
+            </Button>
+            {bookmarked ? (
               <button
                 type="button"
-                className="flex w-full items-center justify-between py-3 text-left text-gray-900"
-                onClick={handleSelectAll}
+                className="mx-auto flex min-h-[44px] w-full max-w-[280px] items-center justify-center gap-2 rounded-full border border-[#DADADA] bg-white px-6 text-sm font-bold text-[#191919] active:bg-gray-50"
+                onClick={handleRemoveFromBookmark}
               >
-                <span className="text-sm">ALL</span>
-                {isInAll ? (
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FFE100]" aria-hidden>
-                    <svg className="h-3.5 w-3.5" fill="#191919" viewBox="0 0 24 24">
-                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                    </svg>
-                  </span>
-                ) : (
-                  <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full bg-gray-200" aria-hidden>
-                    <img src="/icons/icon_plus.svg" alt="" className="h-[10px] w-[10px]" width={10} height={10} />
-                  </span>
-                )}
+                <img
+                  src="/icons/icon_bookmark_remove.png"
+                  alt=""
+                  className="h-5 w-5 shrink-0 object-contain"
+                  width={20}
+                  height={20}
+                />
+                Bookmark削除
+              </button>
+            ) : null}
+          </>
+        }
+      >
+        <ul>
+          <li>
+            <button type="button" className={listRowClass} onClick={handleSelectAll}>
+              <span className="text-sm font-bold">ALL</span>
+              <CollectionToggleIcon selected={isInAll} />
+            </button>
+          </li>
+        </ul>
+
+        <BookmarkModalDivider />
+
+        <div className="bg-[#F5F5F5] px-5 py-2">
+          <span className="text-xs font-bold text-[#787878]">コレクション</span>
+        </div>
+
+        <ul className="divide-y divide-[#DADADA]">
+          {manageableCollections.map((col) => (
+            <li key={col.id}>
+              <button
+                type="button"
+                className={listRowClass}
+                onClick={() => handleToggle(col.id)}
+              >
+                <span className="min-w-0 flex-1 truncate pr-3 text-sm font-bold">{col.name}</span>
+                <CollectionToggleIcon selected={isInCollection(col)} />
               </button>
             </li>
-          </ul>
-          {/* コレクション一覧 */}
-          <div className="border-b border-gray-100 bg-gray-50 px-0 py-2">
-            <span className="text-sm text-gray-600">コレクション</span>
-          </div>
-          <ul className="divide-y divide-gray-100">
-            {manageableCollections.map((col) => (
-              <li key={col.id}>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between py-3 text-left text-gray-900"
-                  onClick={() => handleToggle(col.id)}
-                >
-                  <span className="flex items-center gap-2">
-                    <span
-                      className="h-8 w-8 shrink-0 rounded-full"
-                      style={getCollectionGradientStyle(col.gradient, col.color)}
-                    />
-                    <span className="text-sm">{col.name}</span>
-                  </span>
-                  {isInCollection(col) ? (
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FFE100]" aria-hidden>
-                      <svg className="h-3.5 w-3.5" fill="#191919" viewBox="0 0 24 24">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                      </svg>
-                    </span>
-                  ) : (
-                    <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full bg-gray-200" aria-hidden>
-                      <img src="/icons/icon_plus.svg" alt="" className="h-[10px] w-[10px]" width={10} height={10} />
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="border-t border-gray-100 p-5 space-y-2">
-          <Button variant="outline" className="w-full" onClick={() => setShowSettingsModal(true)}>
-            新しいコレクションを追加
-          </Button>
-          {bookmarked && (
-            <button
-              type="button"
-              className="w-full py-2.5 text-sm text-gray-500 hover:text-gray-700"
-              onClick={handleRemoveFromBookmark}
-            >
-              Bookmarkから外す
-            </button>
-          )}
-        </div>
-      </div>
+          ))}
+        </ul>
+      </BookmarkModalShell>
 
       {showSettingsModal && (
         <CollectionSettingsModal

@@ -16,6 +16,7 @@ import AppHeader from "../components/AppHeader";
 import CollectionCard from "../components/CollectionCard";
 import RecommendedTags from "../components/RecommendedTags";
 import VoteCard from "../components/VoteCard";
+import { VoteCardList } from "../components/VoteCardList";
 import CardOptionsModal from "../components/CardOptionsModal";
 import ReportViolationModal from "../components/ReportViolationModal";
 import BookmarkCollectionModal from "../components/BookmarkCollectionModal";
@@ -788,7 +789,7 @@ function SearchContent() {
             />
           </div>
           <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-6">
-            <div className="flex flex-col gap-[5.333vw]">
+            <VoteCardList>
               {cardsToShow.length === 0 ? (
                 <EmptyStatePanel>
                   <p className="text-sm text-gray-600">
@@ -842,7 +843,7 @@ function SearchContent() {
                   label="コレクション"
                 />
               )}
-            </div>
+            </VoteCardList>
           </main>
           <BottomNav activeId="search" />
         </>
@@ -1089,7 +1090,7 @@ function SearchContent() {
               /* 2回目 Enter 後：一致する VOTE のみ（URL は vote=1） */
               <section className="border-b border-gray-200">
                 <SectionHeader>「{committedVoteQuery}」に一致するVOTE</SectionHeader>
-                <div className="flex flex-col gap-[5.333vw] px-[5.333vw] py-4">
+                <VoteCardList className="px-[5.333vw] py-4">
                   {matchedVoteCardsFull.length === 0 ? (
                     <p className="py-6 text-center text-sm text-gray-500">一致するVOTEはありません。</p>
                   ) : (
@@ -1104,11 +1105,8 @@ function SearchContent() {
                           act ?? { countA: 0, countB: 0, comments: [] }
                         );
                         return (
-                          <div
-                            key={cardId}
-                            className="[content-visibility:auto] [contain-intrinsic-size:auto_380px]"
-                          >
                             <VoteCard
+                              key={cardId}
                               backgroundImageUrl={backgroundForSearchCard(card, cardId)}
                               patternType={card.patternType}
                               question={card.question}
@@ -1135,7 +1133,6 @@ function SearchContent() {
                               periodEnd={card.periodEnd}
                               commentsDisabled={card.commentsDisabled === true}
                             />
-                          </div>
                         );
                       })}
                       {matchedVoteCardsFull.length > voteSearchVisibleCount ? (
@@ -1143,7 +1140,7 @@ function SearchContent() {
                       ) : null}
                     </>
                   )}
-                </div>
+                </VoteCardList>
               </section>
             )}
           </>

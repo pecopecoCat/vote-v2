@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMemo, useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import VoteCard from "../../components/VoteCard";
+import { VoteCardList } from "../../components/VoteCardList";
 import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
@@ -845,14 +846,11 @@ export default function CollectionPage() {
             </p>
           </div>
         ) : (
-          <div className="mt-4 flex flex-col gap-[5.333vw]">
+          <VoteCardList className="mt-4">
             {voteCardViewModels.map(({ card, cardId, merged, initialSelectedOption, backgroundImageUrl }) => {
               return (
-                <div
-                  key={cardId}
-                  className="[content-visibility:auto] [contain-intrinsic-size:auto_380px]"
-                >
                 <VoteCard
+                  key={cardId}
                   backgroundImageUrl={backgroundImageUrl}
                   patternType={card.patternType ?? "yellow-loops"}
                   question={card.question}
@@ -884,10 +882,9 @@ export default function CollectionPage() {
                   periodEnd={card.periodEnd}
                   commentsDisabled={card.commentsDisabled === true}
                 />
-                </div>
               );
             })}
-          </div>
+          </VoteCardList>
         )}
       </main>
 

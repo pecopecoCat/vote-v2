@@ -105,11 +105,8 @@ export default function VoteCardCompact({
   const expandMini = isMini && expandMiniForCommentsPage;
 
   return (
-    <article
-      className={`w-full overflow-hidden rounded-[18px] bg-white ${
-        flatOuterShadow ? "" : "shadow-[0_2px_1px_0_rgba(51,51,51,0.1)]"
-      }`}
-    >
+    <article className={flatOuterShadow ? "w-full" : "vote-card-outer"}>
+      <div className="vote-card-outer__inner">
       <div
         className={`relative rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat px-5 pb-3 pt-5 ${expandMini ? "min-h-0" : "min-h-[72px]"} ${!useImage ? patternClass : ""}`}
         style={
@@ -343,10 +340,6 @@ export default function VoteCardCompact({
         </div>
       )}
 
-      {shareSheetOpen && cardId != null && (
-        <VoteCardShareSheet open={shareSheetOpen} onClose={() => setShareSheetOpen(false)} cardId={cardId} />
-      )}
-
       {!hideTags && tags.length > 0 && (
         <div className="vote-card-tags-margin-top flex flex-wrap gap-1.5 px-5 pb-2">
           {tags.map((tag) => (
@@ -368,6 +361,11 @@ export default function VoteCardCompact({
           {periodStatusText}
         </div>
       ) : null}
+      </div>
+
+      {shareSheetOpen && cardId != null && (
+        <VoteCardShareSheet open={shareSheetOpen} onClose={() => setShareSheetOpen(false)} cardId={cardId} />
+      )}
     </article>
   );
 }

@@ -6,6 +6,7 @@ import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import AppHeader from "../../components/AppHeader";
 import VoteCard from "../../components/VoteCard";
 import VoteCardMini from "../../components/VoteCardMini";
+import { VoteCardList } from "../../components/VoteCardList";
 import CollectionCard from "../../components/CollectionCard";
 import BottomNav from "../../components/BottomNav";
 import CardOptionsModal from "../../components/CardOptionsModal";
@@ -495,13 +496,13 @@ export default function CommentsPage() {
         {relatedBottomCards.length > 0 && (
           <section className="-mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6">
             <h2 className="mb-3 text-base font-bold text-gray-900">関連VOTE</h2>
-            <div className="flex flex-col gap-[5.333vw]">{mapBottomVoteList(relatedBottomCards)}</div>
+            <VoteCardList>{mapBottomVoteList(relatedBottomCards)}</VoteCardList>
           </section>
         )}
         {newestBottomCards.length > 0 && (
           <section className="-mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6">
             <h2 className="mb-3 text-base font-bold text-gray-900">新着VOTE</h2>
-            <div className="flex flex-col gap-[5.333vw]">{mapBottomVoteList(newestBottomCards)}</div>
+            <VoteCardList>{mapBottomVoteList(newestBottomCards)}</VoteCardList>
           </section>
         )}
       </main>

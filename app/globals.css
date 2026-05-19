@@ -29,6 +29,10 @@
   --color-text-soft-black: #333333; /* Soft black */
   --color-text-link: #0779F1;     /* Text Link */
   --color-text-error: #F2063C;    /* Error Message */
+
+  /* VOTE CARD 外枠（一覧・検索・マイページ・mini で共通） */
+  --vote-card-outer-radius: 18px;
+  --vote-card-outer-shadow: 0 2px 1px 0 rgba(51, 51, 51, 0.1);
 }
 
 @theme inline {
@@ -239,6 +243,30 @@ select {
 .card-options-modal-item-label {
   font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
   font-weight: 400;
+}
+
+/* VOTE CARD 外枠（一覧・検索・マイページ・mini で共通） */
+.vote-card-outer {
+  position: relative;
+  width: 100%;
+  border-radius: var(--vote-card-outer-radius);
+  background-color: #fff;
+  overflow: visible;
+  box-shadow: var(--vote-card-outer-shadow);
+}
+
+/* 角丸クリップ用（外枠は overflow:visible のままシャドウを出す） */
+.vote-card-outer__inner {
+  overflow: hidden;
+  border-radius: var(--vote-card-outer-radius);
+  background-color: #fff;
+}
+
+/* VOTEカード一覧の縦余白（画面ごとに gap を変えない） */
+.vote-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5.333vw;
 }
 
 /* 回答欄ドロップシャドウ：Y1 #000000 25%（既存のシャドウと併用） */
