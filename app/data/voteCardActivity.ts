@@ -6,6 +6,7 @@
  * - 現在ユーザーの投票選択 → vote_card_activity_${userId}（ログイン/ゲスト別）
  */
 
+import { normalizeCardIdKey } from "../lib/normalize";
 import { getAuth, getCurrentActivityUserId } from "./auth";
 
 /** コメント1件：コメントしたユーザー・日付・テキスト・いいね数・返信先 */
@@ -431,6 +432,57 @@ export function resetAllVoteCounts(): void {
     };
   }
   saveGlobal(next);
+}
+
+/** コメント一覧を ID でマージ（新しい方を優先） */
+export function mergeVoteComments(
+  prev: VoteComment[] | undefined,
+  next: VoteComment[] | undefined
+): VoteComment[] {
+  const p = Array.isArray(prev) ? prev : [];
+  const n = Array.isArray(next) ? next : [];
+  if (p.length === 0) return n;
+  if (n.length === 0) return p;
+  const byId = new Map<string, VoteComment>();
+  for (const c of p) {
+    if (c && typeof c.id === "string") byId.set(c.id, c);
+  }
+  for (const c of n) {
+    if (c && typeof c.id === "string") byId.set(c.id, c);
+  }
+  const merged = Array.from(byId.values());
+  merged.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  return merged;
+}
+
+/**
+ * `activity["3"]` と `activity["seed-3"]` のようにキーが分かれていても表示用に統合する。
+ */
+export function resolveActivityForCard(
+  activity: Record<string, CardActivity>,
+  cardId: string
+): CardActivity {
+  const nk = normalizeCardIdKey(cardId);
+  const keys = nk === cardId ? [nk] : [nk, cardId];
+  let countA = 0;
+  let countB = 0;
+  let comments: VoteComment[] = [];
+  let userSelectedOption: "A" | "B" | undefined;
+  let userVotedAt: string | undefined;
+  for (const key of keys) {
+    const a = activity[key];
+    if (!a) continue;
+    countA = Math.max(countA, a.countA ?? 0);
+    countB = Math.max(countB, a.countB ?? 0);
+    comments = mergeVoteComments(comments, a.comments);
+    if (a.userSelectedOption === "A" || a.userSelectedOption === "B") {
+      userSelectedOption = a.userSelectedOption;
+    }
+    if (typeof a.userVotedAt === "string" && a.userVotedAt) {
+      userVotedAt = a.userVotedAt;
+    }
+  }
+  return { countA, countB, comments, userSelectedOption, userVotedAt };
 }
 
 /** ベースカードと活動をマージした表示用の countA, countB, commentCount を返す */

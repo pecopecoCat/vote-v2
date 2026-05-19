@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
+import {
+  pickGlobalCardFromStore,
+  writeGlobalCardToStore,
+  writeUserSelectionToStore,
+} from "../../lib/activityGlobalMerge";
 import { getKV } from "../../lib/kv";
 import type { MemberJoinOwnerEvent } from "../../lib/memberJoinOwnerNotifications";
+import { normalizeCardIdKey } from "../../lib/normalize";
 import {
   readActivityGetPayload,
   KV_ACTIVITY_GLOBAL,
@@ -73,27 +79,28 @@ export async function POST(
 
     if (type === "vote") {
       const userId = body.userId as string;
-      const cardId = body.cardId as string;
+      const cardId = normalizeCardIdKey(body.cardId as string);
       const option = body.option as "A" | "B";
       if (!userId || !cardId || (option !== "A" && option !== "B")) {
         return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
       }
       const global = (await kv.get<Record<string, GlobalCardData>>(KV_ACTIVITY_GLOBAL)) ?? {};
-      const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
-      const nextGlobal = {
-        ...global,
-        [cardId]: {
-          countA: current.countA + (option === "A" ? 1 : 0),
-          countB: current.countB + (option === "B" ? 1 : 0),
-          comments: current.comments ?? [],
-        },
+      const current = pickGlobalCardFromStore(global, cardId);
+      const nextCard: GlobalCardData = {
+        countA: current.countA + (option === "A" ? 1 : 0),
+        countB: current.countB + (option === "B" ? 1 : 0),
+        comments: current.comments ?? [],
       };
+      const nextGlobal = writeGlobalCardToStore(global, cardId, nextCard);
       await kv.set(KV_ACTIVITY_GLOBAL, nextGlobal);
       const userKey = KV_ACTIVITY_USER_PREFIX + userId;
       const userData =
         (await kv.get<Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>>(userKey)) ?? {};
       const votedAt = new Date().toISOString();
-      await kv.set(userKey, { ...userData, [cardId]: { userSelectedOption: option, votedAt } });
+      await kv.set(
+        userKey,
+        writeUserSelectionToStore(userData, cardId, { userSelectedOption: option, votedAt })
+      );
       const events = (await kv.get<VoteEvent[]>(KV_VOTE_EVENTS)) ?? [];
       const voteEvent: VoteEvent = { cardId, date: votedAt, option };
       events.push(voteEvent);
@@ -103,7 +110,7 @@ export async function POST(
         sync: {
           type: "vote" as const,
           cardId,
-          card: nextGlobal[cardId],
+          card: nextCard,
           userSelection: { userSelectedOption: option, votedAt },
           voteEvent,
         },
@@ -111,7 +118,7 @@ export async function POST(
     }
 
     if (type === "comment") {
-      const cardId = body.cardId as string;
+      const cardId = normalizeCardIdKey(body.cardId as string);
       const comment = body.comment as { user?: { name: string; iconUrl?: string }; text?: string };
       const authorUserId = typeof body.userId === "string" && body.userId.length > 0 ? body.userId : undefined;
       const parentCommentId = body.parentCommentId as string | undefined;
@@ -121,7 +128,7 @@ export async function POST(
         return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
       }
       const global = (await kv.get<Record<string, GlobalCardData>>(KV_ACTIVITY_GLOBAL)) ?? {};
-      const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
+      const current = pickGlobalCardFromStore(global, cardId);
       const comments = Array.isArray(current.comments) ? current.comments : [];
       let nextComments: GlobalCardData["comments"] = [
         ...comments,
@@ -148,10 +155,7 @@ export async function POST(
         countB: current.countB,
         comments: nextComments,
       };
-      await kv.set(KV_ACTIVITY_GLOBAL, {
-        ...global,
-        [cardId]: nextCard,
-      });
+      await kv.set(KV_ACTIVITY_GLOBAL, writeGlobalCardToStore(global, cardId, nextCard));
       return NextResponse.json({
         ok: true,
         sync: { type: "comment" as const, cardId, card: nextCard },
@@ -159,14 +163,14 @@ export async function POST(
     }
 
     if (type === "delete_comment") {
-      const cardId = body.cardId as string;
+      const cardId = normalizeCardIdKey(body.cardId as string);
       const commentId = body.commentId as string;
       const authorName = typeof body.authorName === "string" ? body.authorName.trim() : "";
       if (!cardId || !commentId || !authorName) {
         return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
       }
       const global = (await kv.get<Record<string, GlobalCardData>>(KV_ACTIVITY_GLOBAL)) ?? {};
-      const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
+      const current = pickGlobalCardFromStore(global, cardId);
       const comments = Array.isArray(current.comments) ? current.comments : [];
       const target = comments.find((c) => c.id === commentId);
       if (!target || target.user?.name !== authorName) {
@@ -189,10 +193,7 @@ export async function POST(
         countB: current.countB,
         comments: nextComments,
       };
-      await kv.set(KV_ACTIVITY_GLOBAL, {
-        ...global,
-        [cardId]: nextCard,
-      });
+      await kv.set(KV_ACTIVITY_GLOBAL, writeGlobalCardToStore(global, cardId, nextCard));
       return NextResponse.json({
         ok: true,
         sync: { type: "delete_comment" as const, cardId, card: nextCard },
@@ -200,7 +201,7 @@ export async function POST(
     }
 
     if (type === "bookmark") {
-      const cardId = body.cardId as string;
+      const cardId = normalizeCardIdKey(body.cardId as string);
       if (!cardId || typeof cardId !== "string") {
         return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
       }

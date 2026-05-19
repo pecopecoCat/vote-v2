@@ -48,6 +48,7 @@ import { addHiddenUser } from "../../data/hiddenUsers";
 import { addHiddenCard } from "../../data/hiddenCards";
 import type { VoteCardData } from "../../data/voteCards";
 import { normalizeCardIdKey } from "../../lib/normalize";
+import { resolveActivityForCard } from "../../data/voteCardActivity";
 
 /** stableId (seed-N / created-xxx / 0,1,...) からカードを取得 */
 function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
@@ -89,7 +90,10 @@ export default function CommentsPage() {
     addComment: sharedAddComment,
     removeComment: sharedRemoveComment,
   } = shared;
-  const activityRaw = sharedActivity[stableId] ?? sharedActivity[id] ?? emptyActivity;
+  const activityRaw = useMemo(
+    () => resolveActivityForCard(sharedActivity, stableId),
+    [sharedActivity, stableId]
+  );
   const activity = useMemo(() => {
     const list = Array.isArray(activityRaw.comments) ? activityRaw.comments : [];
     if (!collectionIdFromUrl) {
@@ -515,7 +519,7 @@ export default function CommentsPage() {
           setIsCommentModalOpen(false);
           setReplyingToCommentId(null);
         }}
-        cardId={id}
+        cardId={stableId}
         onCommentSubmit={(cardId, payload) => handleCommentSubmit(cardId, payload, replyingToCommentId ?? undefined)}
         disabled={commentsDisabled || !isLoggedIn || effectiveSelectedOption == null}
         disabledPlaceholder={!isLoggedIn ? "ログインするとコメントできます" : undefined}

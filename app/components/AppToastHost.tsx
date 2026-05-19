@@ -44,9 +44,9 @@ export default function AppToastHost() {
   const { message, kind } = toast;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[200] flex justify-center px-[10px]">
+    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[200] flex justify-center">
       <div
-        className="box-border flex w-[min(335px,calc(100vw*335/375))] items-center justify-center gap-2 rounded-[10px] bg-[#191919] px-4 py-3.5 text-[14px] font-bold leading-snug text-white shadow-[0_2px_10px_rgba(0,0,0,0.16)]"
+        className="app-toast-bar box-border flex items-center justify-center gap-2 rounded-[10px] bg-[#191919] px-4 py-3.5 text-[14px] font-bold leading-snug text-white shadow-[0_2px_10px_rgba(0,0,0,0.16)]"
         role="status"
       >
         {kind === "success" ? <ToastVoteIcon className="h-[18px] w-[18px] shrink-0" /> : null}

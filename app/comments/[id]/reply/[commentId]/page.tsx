@@ -15,10 +15,12 @@ import {
   addCommentLike,
   getCommentIdsLikedByCurrentUser,
   isCommentAuthoredByCurrentUser,
+  resolveActivityForCard,
   COMMENT_LIKES_BY_ME_UPDATED_EVENT,
   type VoteComment,
 } from "../../../../data/voteCardActivity";
 import { useSharedData } from "../../../../context/SharedDataContext";
+import { normalizeCardIdKey } from "../../../../lib/normalize";
 import { getAuth, getAuthUpdatedEventName } from "../../../../data/auth";
 import type { VoteCardData } from "../../../../data/voteCards";
 
@@ -42,6 +44,7 @@ export default function CommentReplyThreadPage() {
   const params = useParams();
   const router = useRouter();
   const id = typeof params.id === "string" ? params.id : "0";
+  const stableId = normalizeCardIdKey(id);
   const commentId = typeof params.commentId === "string" ? params.commentId : "";
   const shared = useSharedData();
   const {
@@ -51,7 +54,7 @@ export default function CommentReplyThreadPage() {
     addComment: sharedAddComment,
     removeComment: sharedRemoveComment,
   } = shared;
-  const activity = sharedActivity[id] ?? emptyActivity;
+  const activity = resolveActivityForCard(sharedActivity, stableId);
 
   const card = useMemo(
     () => getCardByStableId(id, createdVotesForTimeline),
@@ -59,7 +62,7 @@ export default function CommentReplyThreadPage() {
   );
   const [auth, setAuth] = useState(() => getAuth());
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
-  const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(id));
+  const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(stableId));
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
   const [commentMenuTarget, setCommentMenuTarget] = useState<VoteComment | null>(null);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
@@ -69,10 +72,10 @@ export default function CommentReplyThreadPage() {
   const canOpenPostModal = !commentsDisabled && (!isLoggedIn || canPostByVote);
 
   useEffect(() => {
-    const handler = () => setLikedCommentIds(getCommentIdsLikedByCurrentUser(id));
+    const handler = () => setLikedCommentIds(getCommentIdsLikedByCurrentUser(stableId));
     window.addEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
     return () => window.removeEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
-  }, [id]);
+  }, [stableId]);
 
   useEffect(() => {
     const handler = () => setAuth(getAuth());
@@ -163,7 +166,7 @@ export default function CommentReplyThreadPage() {
             <div className="min-w-0 flex-1">
               <CommentBody
                 comment={parent}
-                onLike={() => addCommentLike(id, parent.id, currentCard)}
+                onLike={() => addCommentLike(stableId, parent.id, currentCard)}
                 isLikedByMe={likedCommentIds.includes(parent.id)}
                 replyCountOverride={0}
                 onCommentMore={() => setCommentMenuTarget(parent)}
@@ -187,7 +190,7 @@ export default function CommentReplyThreadPage() {
                 <CommentAvatar comment={r} />
                 <CommentBody
                   comment={r}
-                  onLike={() => addCommentLike(id, r.id, currentCard)}
+                  onLike={() => addCommentLike(stableId, r.id, currentCard)}
                   isLikedByMe={likedCommentIds.includes(r.id)}
                   replyCountOverride={0}
                   onCommentMore={() => setCommentMenuTarget(r)}
@@ -204,7 +207,7 @@ export default function CommentReplyThreadPage() {
           setIsReplyModalOpen(false);
           setReplyingToCommentId(null);
         }}
-        cardId={id}
+        cardId={stableId}
         onCommentSubmit={(cardId, payload) => handleCommentSubmit(cardId, payload, replyingToCommentId ?? parent.id)}
         disabled={commentsDisabled || !isLoggedIn || activity.userSelectedOption == null}
         disabledPlaceholder={!isLoggedIn ? "ログインするとコメントできます" : undefined}

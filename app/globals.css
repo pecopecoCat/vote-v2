@@ -214,6 +214,12 @@ select {
   background-color: var(--color-brand-logo);
 }
 
+/* トースト：375px時 335px幅・相対（335/375） */
+.app-toast-bar {
+  width: calc(100vw * 335 / 375);
+  max-width: 335px;
+}
+
 /* 閉じる（×）アイコン：375px時 14×14px・相対 */
 .icon-close-responsive {
   width: calc(100vw * 14 / 375);

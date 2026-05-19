@@ -24,6 +24,8 @@ import {
   addVote as addVoteLocal,
   addComment as addCommentLocal,
   removeComment as removeCommentLocal,
+  mergeVoteComments,
+  resolveActivityForCard,
   ACTIVITY_GLOBAL_UPDATED_EVENT,
 } from "../data/voteCardActivity";
 import {
@@ -40,7 +42,11 @@ import {
 } from "../data/collections";
 import { hydrateBookmarksFromRemote } from "../data/bookmarks";
 import type { MemberJoinOwnerEvent } from "../lib/memberJoinOwnerNotifications";
-import { normalizeCardIdKey, normalizeKeyedRows } from "../lib/normalize";
+import {
+  normalizeKeyedGlobalRows,
+  normalizeKeyedUserSelections,
+} from "../lib/activityGlobalMerge";
+import { normalizeCardIdKey } from "../lib/normalize";
 
 export type { MemberJoinOwnerEvent };
 
@@ -105,49 +111,45 @@ function normalizeCardFromApi(raw: { userId?: string; card?: unknown }): VoteCar
   };
 }
 
-function mergeCommentsPreferNewest(
-  prev: CardActivity["comments"] | undefined,
-  next: CardActivity["comments"] | undefined
-): CardActivity["comments"] {
-  const p = Array.isArray(prev) ? prev : [];
-  const n = Array.isArray(next) ? next : [];
-  if (p.length === 0) return n;
-  if (n.length === 0) return p;
-
-  const byId = new Map<string, CardActivity["comments"][number]>();
-  for (const c of p) {
-    if (c && typeof c.id === "string") byId.set(c.id, c);
+/** React state 上の `3` / `seed-3` など重複キーを1つにまとめる */
+function collapseActivityByCardId(activity: Record<string, CardActivity>): Record<string, CardActivity> {
+  const out: Record<string, CardActivity> = {};
+  for (const [rawId, row] of Object.entries(activity)) {
+    const nk = normalizeCardIdKey(rawId);
+    const existing = out[nk];
+    if (!existing) {
+      out[nk] = row;
+      continue;
+    }
+    out[nk] = {
+      countA: Math.max(existing.countA, row.countA),
+      countB: Math.max(existing.countB, row.countB),
+      comments: mergeVoteComments(existing.comments, row.comments),
+      userSelectedOption: existing.userSelectedOption ?? row.userSelectedOption,
+      userVotedAt: existing.userVotedAt ?? row.userVotedAt,
+    };
   }
-  for (const c of n) {
-    if (c && typeof c.id === "string") byId.set(c.id, c);
-  }
-  const merged = Array.from(byId.values());
-  merged.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-  return merged;
+  return out;
 }
 
 function buildActivityFromApi(
   global: Record<string, { countA?: number; countB?: number; comments?: CardActivity["comments"] }>,
   userSelections: Record<string, unknown>
 ): Record<string, CardActivity> {
-  const globalN = normalizeKeyedRows(global);
-  const userN = normalizeKeyedRows(userSelections);
+  const globalN = normalizeKeyedGlobalRows(
+    global as Record<string, { countA: number; countB: number; comments: CardActivity["comments"] }>
+  );
+  const userN = normalizeKeyedUserSelections(userSelections);
   const cardIds = new Set([...Object.keys(globalN), ...Object.keys(userN)]);
   const result: Record<string, CardActivity> = {};
   for (const id of cardIds) {
     const g = globalN[id];
     const raw = userN[id];
-    let userSelectedOption: "A" | "B" | undefined;
-    let userVotedAt: string | undefined;
-    if (raw === "A" || raw === "B") {
-      userSelectedOption = raw;
-    } else if (raw && typeof raw === "object") {
-      const o = raw as { userSelectedOption?: string; votedAt?: string };
-      if (o.userSelectedOption === "A" || o.userSelectedOption === "B") {
-        userSelectedOption = o.userSelectedOption;
-      }
-      if (typeof o.votedAt === "string" && o.votedAt) userVotedAt = o.votedAt;
-    }
+    const userSelectedOption =
+      raw?.userSelectedOption === "A" || raw?.userSelectedOption === "B"
+        ? raw.userSelectedOption
+        : undefined;
+    const userVotedAt = typeof raw?.votedAt === "string" && raw.votedAt ? raw.votedAt : undefined;
     result[id] = {
       countA: g && typeof g.countA === "number" ? g.countA : 0,
       countB: g && typeof g.countB === "number" ? g.countB : 0,
@@ -156,7 +158,7 @@ function buildActivityFromApi(
       userVotedAt,
     };
   }
-  return result;
+  return collapseActivityByCardId(result);
 }
 
 /** GET が POST 直後に古い userSelections を返すと投票済みが消えるため、サーバー優先だが欠けたら直前の React 状態を残す */
@@ -167,25 +169,32 @@ function mergeActivityFromApiFetch(
 ): Record<string, CardActivity> {
   const built = buildActivityFromApi(global, userSelections);
   const merged: Record<string, CardActivity> = {};
-  const allIds = new Set([...Object.keys(built), ...Object.keys(prev)]);
+  const allIds = new Set<string>();
+  for (const k of Object.keys(built)) allIds.add(normalizeCardIdKey(k));
+  for (const k of Object.keys(prev)) allIds.add(normalizeCardIdKey(k));
   for (const cardId of allIds) {
     const b = built[cardId];
-    const p = prev[cardId];
-    if (b && p) {
+    const p = resolveActivityForCard(prev, cardId);
+    const hasP =
+      (p.countA ?? 0) > 0 ||
+      (p.countB ?? 0) > 0 ||
+      (p.comments?.length ?? 0) > 0 ||
+      p.userSelectedOption != null;
+    if (b && hasP) {
       merged[cardId] = {
         ...b,
         // GETが古いcommentsを返しても、送信直後のローカル分が消えないようにマージする
-        comments: mergeCommentsPreferNewest(p.comments, b.comments),
+        comments: mergeVoteComments(p.comments, b.comments),
         userSelectedOption: b.userSelectedOption ?? p.userSelectedOption,
         userVotedAt: b.userVotedAt ?? p.userVotedAt,
       };
     } else if (b) {
       merged[cardId] = b;
-    } else if (p) {
+    } else if (hasP) {
       merged[cardId] = p;
     }
   }
-  return merged;
+  return collapseActivityByCardId(merged);
 }
 
 /** 作成者向け通知用（API から取得） */
@@ -381,7 +390,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       bookmarkEvent?: BookmarkEvent;
     };
     if (s.type === "vote" && s.cardId && s.card && s.userSelection && s.voteEvent) {
-      const cardId = s.cardId;
+      const cardId = normalizeCardIdKey(s.cardId);
       const g = s.card;
       const countA = typeof g.countA === "number" ? g.countA : 0;
       const countB = typeof g.countB === "number" ? g.countB : 0;
@@ -390,18 +399,18 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       const votedAt = typeof s.userSelection.votedAt === "string" ? s.userSelection.votedAt : undefined;
       if (opt !== "A" && opt !== "B") return false;
       setActivity((prev) => {
-        const p = prev[cardId];
-        return {
+        const p = resolveActivityForCard(prev, cardId);
+        return collapseActivityByCardId({
           ...prev,
           [cardId]: {
-            ...(p ?? { countA: 0, countB: 0, comments: [] }),
+            ...p,
             countA,
             countB,
-            comments: mergeCommentsPreferNewest(p?.comments, comments),
+            comments: mergeVoteComments(p.comments, comments),
             userSelectedOption: opt,
-            userVotedAt: votedAt ?? p?.userVotedAt,
+            userVotedAt: votedAt ?? p.userVotedAt,
           },
-        };
+        });
       });
       setVoteEvents((prev) => [...prev, s.voteEvent!].slice(-200));
       return true;
@@ -413,22 +422,23 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       typeof s.card.countA === "number" &&
       typeof s.card.countB === "number"
     ) {
-      const cardId = s.cardId;
+      const cardId = normalizeCardIdKey(s.cardId);
       const comments = Array.isArray(s.card.comments) ? s.card.comments : [];
       setActivity((prev) => {
-        const p = prev[cardId] ?? { countA: 0, countB: 0, comments: [] };
-        return {
+        const p =
+          resolveActivityForCard(prev, cardId) ?? { countA: 0, countB: 0, comments: [] };
+        const nextState = {
           ...prev,
           [cardId]: {
             ...p,
             countA: s.card!.countA!,
             countB: s.card!.countB!,
-            // サーバー確定一覧（楽観コメントの local-* と二重にならないようマージしない）
-            comments,
+            comments: mergeVoteComments(p.comments, comments),
             userSelectedOption: p.userSelectedOption,
             userVotedAt: p.userVotedAt,
           },
         };
+        return collapseActivityByCardId(nextState);
       });
       return true;
     }
@@ -529,7 +539,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           const p = prev[cardId];
           merged[cardId] = {
             ...(p ?? a),
-            ...a,
+            countA: a.countA,
+            countB: a.countB,
+            comments: mergeVoteComments(p?.comments, a.comments),
             // remote(KV) の userSelectedOption を localStorage(=undefined) で上書きしない
             userSelectedOption: p?.userSelectedOption ?? a.userSelectedOption,
             userVotedAt: a.userVotedAt ?? p?.userVotedAt,
@@ -629,7 +641,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   );
 
   const addVote = useCallback(
-    async (cardId: string, option: "A" | "B") => {
+    async (rawCardId: string, option: "A" | "B") => {
+      const cardId = normalizeCardIdKey(rawCardId);
       const userId = getCurrentActivityUserId();
       const timeline = isRemote
         ? createdVotesForTimelineRef.current
@@ -691,12 +704,13 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   const addComment = useCallback(
     async (
-      cardId: string,
+      rawCardId: string,
       comment: { user: { name: string; iconUrl?: string }; text: string },
       parentCommentId?: string,
       commenterVoteOption?: "A" | "B",
       collectionId?: string
     ) => {
+      const cardId = normalizeCardIdKey(rawCardId);
       const timeline = isRemote
         ? createdVotesForTimelineRef.current
         : getCreatedVotesForTimeline();
@@ -776,10 +790,11 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   const removeComment = useCallback(
     async (
-      cardId: string,
+      rawCardId: string,
       commentId: string,
       currentCard?: Pick<CardActivity, "countA" | "countB" | "comments">
     ) => {
+      const cardId = normalizeCardIdKey(rawCardId);
       if (isRemote) {
         const auth = getAuth();
         const authorName =

@@ -1,4 +1,5 @@
 import type { KVClient } from "./kv";
+import { normalizeKeyedGlobalRows } from "./activityGlobalMerge";
 import { readMemberJoinOwnerEvents, type MemberJoinOwnerEvent } from "./memberJoinOwnerNotifications";
 
 export const KV_CREATED_VOTES = "vote_created_votes";
@@ -51,7 +52,8 @@ export async function readActivityGetPayload(kv: KVClient, userId: string): Prom
     kv.get<BookmarkEvent[]>(KV_BOOKMARK_EVENTS),
     userId ? readMemberJoinOwnerEvents(kv, userId) : Promise.resolve([] as MemberJoinOwnerEvent[]),
   ]);
-  const globalData = global && typeof global === "object" ? global : {};
+  const globalData =
+    global && typeof global === "object" ? normalizeKeyedGlobalRows(global) : {};
   const userSelections: Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }> = {};
   if (userRaw && typeof userRaw === "object") {
     type UserSelection = { userSelectedOption?: "A" | "B"; votedAt?: string };
