@@ -35,6 +35,8 @@ export type MemberVotesBundle = {
   participants: Record<string, { name: string; iconUrl?: string; lastVotedAt: string }>;
   /** 参加APIで保存したプロフィール（投票前でも参加者一覧に反映） */
   joinProfiles: Record<string, { name: string; iconUrl?: string; joinedAt: string }>;
+  /** 参加登録インデックス（member-collections POST で追加された userId） */
+  memberUserIds?: string[];
 };
 
 export async function GET(

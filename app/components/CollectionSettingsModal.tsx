@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react";
 import type { Collection, CollectionVisibility } from "../data/collections";
 import { COLLECTION_GRADIENT_OPTIONS, type CollectionGradient } from "../data/search";
-import Button from "./Button";
-
 const VISIBILITY_OPTIONS: { value: CollectionVisibility; label: string }[] = [
   { value: "public", label: "公開" },
   { value: "private", label: "非公開" },
@@ -151,9 +149,13 @@ export default function CollectionSettingsModal({ onClose, onSave, editingCollec
           >
             キャンセル
           </button>
-          <Button type="button" variant="createVote" onClick={handleSave} className="flex-1 min-h-[48px] h-auto py-3 text-sm">
+          <button
+            type="button"
+            onClick={handleSave}
+            className="btn-font flex-1 rounded-[9999px] bg-[#FFE100] py-3 text-sm font-bold text-[#191919] hover:opacity-90 active:opacity-95"
+          >
             保存
-          </Button>
+          </button>
         </div>
       </div>
     </>

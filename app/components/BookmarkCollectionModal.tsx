@@ -7,6 +7,7 @@ import {
   toggleCardInCollection,
   removeCardFromCollection,
   createCollection,
+  addCardToCollection,
   getCollectionsUpdatedEventName,
   type Collection,
 } from "../data/collections";
@@ -150,7 +151,8 @@ export default function BookmarkCollectionModal({
     gradient: CollectionGradient,
     visibility: "public" | "private" | "member"
   ) => {
-    createCollection(name, { gradient, visibility });
+    const created = createCollection(name, { gradient, visibility });
+    if (cardId) addCardToCollection(created.id, cardId);
     setCollections(getCollections());
     onCollectionsUpdated?.();
     setShowSettingsModal(false);

@@ -58,6 +58,27 @@ function normalizeEntry(raw: unknown): MemberCollectionEntry | null {
   };
 }
 
+/** 参加リスト用のスナップショットではなく、本体 KV（vote_collection:{id}）の cardIds を正とする */
+async function withCanonicalCardIds(
+  kv: NonNullable<Awaited<ReturnType<typeof getKV>>>,
+  entry: MemberCollectionEntry
+): Promise<MemberCollectionEntry> {
+  const raw = await kv.get<Record<string, unknown>>(COLLECTION_KV_PREFIX + entry.id);
+  if (!raw || typeof raw !== "object" || raw.visibility !== "member") return entry;
+  const canonical = normalizeEntry(raw);
+  if (!canonical) return entry;
+  return {
+    ...entry,
+    name: canonical.name || entry.name,
+    color: canonical.color || entry.color,
+    gradient: canonical.gradient ?? entry.gradient,
+    cardIds: canonical.cardIds,
+    createdByUserId: canonical.createdByUserId ?? entry.createdByUserId,
+    createdByDisplayName: canonical.createdByDisplayName ?? entry.createdByDisplayName,
+    createdByIconUrl: canonical.createdByIconUrl ?? entry.createdByIconUrl,
+  };
+}
+
 /** GET ?userId=xxx → { collections: MemberCollectionEntry[] } */
 export async function GET(request: Request): Promise<NextResponse<Record<string, unknown> | { error: string }>> {
   const kv = await getKV();
@@ -67,7 +88,8 @@ export async function GET(request: Request): Promise<NextResponse<Record<string,
   try {
     const raw = await kv.get<unknown>(key(userId));
     const list = Array.isArray(raw) ? raw : [];
-    const collections = list.map(normalizeEntry).filter((v): v is MemberCollectionEntry => v != null);
+    const normalized = list.map(normalizeEntry).filter((v): v is MemberCollectionEntry => v != null);
+    const collections = await Promise.all(normalized.map((c) => withCanonicalCardIds(kv, c)));
     return NextResponse.json({ collections });
   } catch (e) {
     console.error("[api/member-collections] GET error:", e);
@@ -87,14 +109,20 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
     };
     const userId = typeof body?.userId === "string" ? body.userId : "";
     if (!userId) return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
-    const entry = normalizeEntry(body.collection);
-    if (!entry) return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+    const entryRaw = normalizeEntry(body.collection);
+    if (!entryRaw) return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+    const entry = await withCanonicalCardIds(kv, entryRaw);
 
     const existing = await kv.get<unknown>(key(userId));
     const list = Array.isArray(existing) ? existing : [];
     const normalized = list.map(normalizeEntry).filter((v): v is MemberCollectionEntry => v != null);
     const alreadyInMyList = normalized.some((c) => c.id === entry.id);
-    if (!alreadyInMyList) {
+    if (alreadyInMyList) {
+      const next = await Promise.all(
+        normalized.map((c) => (c.id === entry.id ? entry : withCanonicalCardIds(kv, c)))
+      );
+      await kv.set(key(userId), next);
+    } else {
       await kv.set(key(userId), [...normalized, entry]);
     }
 

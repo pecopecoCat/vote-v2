@@ -150,7 +150,9 @@ export default function UnderlineTabBar<T extends string>({
         aria-current={active ? "page" : undefined}
       >
         {item.icon ? <TabIcon icon={item.icon} active={active} /> : null}
-        <span className="truncate">{item.label}</span>
+        <span className={layout === "scroll" ? "whitespace-nowrap" : "min-w-0 truncate"}>
+          {item.label}
+        </span>
         {active ? <span className={indicator} aria-hidden /> : null}
       </button>
     );
@@ -161,11 +163,12 @@ export default function UnderlineTabBar<T extends string>({
       <div
         className={`w-full overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${bg} ${className}`}
       >
-        <div className="flex w-max min-w-full justify-center">
-          <nav className="flex flex-nowrap items-stretch gap-5 px-[5.333vw]" aria-label={ariaLabel}>
-            {items.map(renderButton)}
-          </nav>
-        </div>
+        <nav
+          className="flex w-max min-w-full shrink-0 flex-nowrap items-stretch justify-center gap-5 px-[5.333vw]"
+          aria-label={ariaLabel}
+        >
+          {items.map(renderButton)}
+        </nav>
       </div>
     );
   }

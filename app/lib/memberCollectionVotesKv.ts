@@ -233,6 +233,50 @@ export async function upsertParticipantInKv(
   await kv.set(legacyKey, { ...parts, [userId]: row });
 }
 
+/** 参加登録 API で積まれる「このコレに参加した userId」一覧 */
+export async function readMemberCollectionMemberIds(
+  kv: KVClient,
+  collectionId: string
+): Promise<string[]> {
+  const raw = await kv.get<unknown>(memberCollectionMembersKey(collectionId));
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === "string" && v.length > 0);
+}
+
+/** 投票者・参加プロフィール・参加インデックスを突き合わせ、一覧に漏れが出ないようにする */
+function enrichMemberMapsFromIndex(
+  participants: MemberPartsMap,
+  joinProfiles: Record<string, MemberJoinProfileRow>,
+  memberIds: string[]
+): { participants: MemberPartsMap; joinProfiles: Record<string, MemberJoinProfileRow> } {
+  const parts = { ...participants };
+  const jp = { ...joinProfiles };
+  const epoch = new Date(0).toISOString();
+  for (const uid of memberIds) {
+    if (parts[uid] && jp[uid]) continue;
+    if (parts[uid] && !jp[uid]) {
+      jp[uid] = {
+        name: parts[uid].name,
+        iconUrl: parts[uid].iconUrl,
+        joinedAt: parts[uid].lastVotedAt,
+      };
+      continue;
+    }
+    if (jp[uid] && !parts[uid]) {
+      parts[uid] = {
+        name: jp[uid].name,
+        iconUrl: jp[uid].iconUrl,
+        lastVotedAt: jp[uid].joinedAt,
+      };
+      continue;
+    }
+    if (!jp[uid]) {
+      jp[uid] = { name: uid, joinedAt: epoch };
+    }
+  }
+  return { participants: parts, joinProfiles: jp };
+}
+
 /** メンバー限定の集計・ユーザー選択・参加者（コレKVの有効確認後に呼ぶ想定） */
 export async function readMemberVotesMaps(
   kv: KVClient,
@@ -243,14 +287,23 @@ export async function readMemberVotesMaps(
   userSelections: MemberUserMap;
   participants: MemberPartsMap;
   joinProfiles: Record<string, MemberJoinProfileRow>;
+  memberUserIds: string[];
 }> {
-  const [gRaw, uRaw, participants, joinProfiles] = await Promise.all([
+  const [gRaw, uRaw, participants, joinProfiles, memberUserIds] = await Promise.all([
     kv.get<MemberGlobalMap>(memberGlobalKey(collectionId)),
     userId ? kv.get<MemberUserMap>(memberUserKey(collectionId, userId)) : Promise.resolve(null),
     readParticipantsMerged(kv, collectionId),
     readJoinProfilesMap(kv, collectionId),
+    readMemberCollectionMemberIds(kv, collectionId),
   ]);
   const global = gRaw && typeof gRaw === "object" ? gRaw : {};
   const userSelections: MemberUserMap = uRaw && typeof uRaw === "object" ? uRaw : {};
-  return { global, userSelections, participants, joinProfiles };
+  const enriched = enrichMemberMapsFromIndex(participants, joinProfiles, memberUserIds);
+  return {
+    global,
+    userSelections,
+    participants: enriched.participants,
+    joinProfiles: enriched.joinProfiles,
+    memberUserIds,
+  };
 }

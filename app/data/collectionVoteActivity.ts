@@ -3,7 +3,7 @@
  * KV 設定時は /api/collection/[id]/votes で他ユーザーと共有、未設定時は localStorage のみ。
  */
 
-import { getAuth, getCurrentActivityUserId } from "./auth";
+import { DEMO_USER_IDS, getAuth, getCurrentActivityUserId, getDisplayUserForDemo, type DemoUserId } from "./auth";
 import type { CardActivity } from "./voteCardActivity";
 import { normalizeCardIdKey } from "../lib/normalize";
 
@@ -18,6 +18,7 @@ const GLOBAL_KEY_PREFIX = "vote_collection_scoped_global_";
 const USER_KEY_PREFIX = "vote_collection_scoped_user_";
 const PARTICIPANTS_KEY_PREFIX = "vote_collection_scoped_participants_";
 const JOIN_PROFILES_KEY_PREFIX = "vote_collection_scoped_join_prof_";
+const MEMBER_IDS_KEY_PREFIX = "vote_collection_scoped_member_ids_";
 
 /** メンバー限定コレクション内で投票したユーザー（同一ブラウザで記録された分） */
 export interface CollectionScopedParticipant {
@@ -37,6 +38,7 @@ export function clearCollectionScopedLocalData(collectionId: string): void {
     window.localStorage.removeItem(userKey(collectionId));
     window.localStorage.removeItem(PARTICIPANTS_KEY_PREFIX + collectionId);
     window.localStorage.removeItem(JOIN_PROFILES_KEY_PREFIX + collectionId);
+    window.localStorage.removeItem(MEMBER_IDS_KEY_PREFIX + collectionId);
   } catch {
     // ignore
   }
@@ -59,6 +61,8 @@ export type MemberCollectionVotesSnapshot = {
   userSelections: Record<string, UserSelectionRow>;
   participants: Record<string, Omit<CollectionScopedParticipant, "userId">>;
   joinProfiles: Record<string, MemberCollectionJoinProfile>;
+  /** 参加登録インデックス（KV）。クライアント表示の漏れ防止用 */
+  memberUserIds?: string[];
 };
 
 function normalizeSnapshotKeys(snap: MemberCollectionVotesSnapshot): MemberCollectionVotesSnapshot {
@@ -159,6 +163,50 @@ function participantsKey(collectionId: string): string {
 
 function joinProfilesKey(collectionId: string): string {
   return JOIN_PROFILES_KEY_PREFIX + collectionId;
+}
+
+function memberIdsKey(collectionId: string): string {
+  return MEMBER_IDS_KEY_PREFIX + collectionId;
+}
+
+function loadMemberUserIds(collectionId: string): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(memberIdsKey(collectionId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((v): v is string => typeof v === "string" && v.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function saveMemberUserIds(collectionId: string, ids: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(memberIdsKey(collectionId), JSON.stringify(ids));
+  } catch {
+    // ignore
+  }
+}
+
+/** デモ userId なら表示名を補完（KV に名前が無い古いデータ向け） */
+function resolveMemberDisplayName(userId: string, fallback?: string): string {
+  const trimmed = typeof fallback === "string" ? fallback.trim() : "";
+  if (trimmed && trimmed !== "ゲスト" && trimmed !== userId) return trimmed;
+  if ((DEMO_USER_IDS as readonly string[]).includes(userId)) {
+    return getDisplayUserForDemo(userId as DemoUserId).name;
+  }
+  return trimmed || "メンバー";
+}
+
+function resolveMemberIconUrl(userId: string, fallback?: string): string | undefined {
+  if (typeof fallback === "string" && fallback.length > 0) return fallback;
+  if ((DEMO_USER_IDS as readonly string[]).includes(userId)) {
+    return getDisplayUserForDemo(userId as DemoUserId).iconUrl;
+  }
+  return undefined;
 }
 
 function loadJoinProfilesMap(collectionId: string): Record<string, MemberCollectionJoinProfile> {
@@ -285,7 +333,10 @@ function normalizeSnapshot(raw: unknown): MemberCollectionVotesSnapshot | null {
       joinProfiles[uid] = iconUrl ? { name, iconUrl, joinedAt } : { name, joinedAt };
     }
   }
-  return { global, userSelections, participants, joinProfiles };
+  const memberUserIds = Array.isArray(o.memberUserIds)
+    ? o.memberUserIds.filter((v): v is string => typeof v === "string" && v.length > 0)
+    : [];
+  return { global, userSelections, participants, joinProfiles, memberUserIds };
 }
 
 type ParticipantRow = Omit<CollectionScopedParticipant, "userId">;
@@ -455,18 +506,22 @@ export function hydrateCollectionScopedFromSnapshot(
   const mergedUser = mergeScopedUserSelectionsMaps(loadScopedUserSelections(collectionId), normalized.userSelections);
   saveScopedUserSelections(collectionId, mergedUser);
   const uid = getCurrentActivityUserId();
-  const mergedParticipants = mergeParticipantMapsPreferServer(
-    loadParticipantsMap(collectionId),
-    normalized.participants,
-    uid
-  );
-  saveParticipantsMap(collectionId, mergedParticipants);
   const mergedJoin = mergeJoinProfileMapsPreferServer(
     loadJoinProfilesMap(collectionId),
     normalized.joinProfiles ?? {},
     uid
   );
   saveJoinProfilesMap(collectionId, mergedJoin);
+  const mergedParticipants = mergeParticipantMapsPreferServer(
+    loadParticipantsMap(collectionId),
+    normalized.participants,
+    uid
+  );
+  const mergedForDisplay = mergeParticipantsWithJoinProfiles(mergedParticipants, mergedJoin);
+  saveParticipantsMap(collectionId, mergedForDisplay);
+  if (Array.isArray(normalized.memberUserIds) && normalized.memberUserIds.length > 0) {
+    saveMemberUserIds(collectionId, normalized.memberUserIds);
+  }
   notifyCollectionScopedUpdated(collectionId);
 }
 
@@ -558,13 +613,67 @@ function upsertParticipantFromCurrentAuth(collectionId: string): void {
   });
 }
 
-/** メンバー限定コレクションで投票したメンバー一覧（新しい投票順） */
+/**
+ * 投票者マップと参加プロフィール（投票前の参加登録）を合成して一覧化する。
+ * API の joinProfiles は hydrate でローカルに保存されるが、表示はここで participants と合わせる。
+ */
+function mergeParticipantsWithJoinProfiles(
+  voters: Record<string, Omit<CollectionScopedParticipant, "userId">>,
+  joinProfiles: Record<string, MemberCollectionJoinProfile>
+): Record<string, Omit<CollectionScopedParticipant, "userId">> {
+  const merged: Record<string, Omit<CollectionScopedParticipant, "userId">> = { ...voters };
+  for (const [userId, jp] of Object.entries(joinProfiles)) {
+    if (merged[userId]) continue;
+    merged[userId] = {
+      name: jp.name,
+      iconUrl: jp.iconUrl,
+      lastVotedAt: jp.joinedAt,
+    };
+  }
+  return merged;
+}
+
+/** 参加API用：投票前でも自分をローカル一覧に載せる（KV 反映待ちの間） */
+export function upsertLocalJoinProfileFromAuth(collectionId: string): void {
+  const auth = getAuth();
+  if (!auth.isLoggedIn) return;
+  const userId = getCurrentActivityUserId();
+  const name =
+    typeof auth.user?.name === "string" && auth.user.name.trim() ? auth.user.name.trim() : "ゲスト";
+  const iconUrl =
+    typeof auth.user?.iconUrl === "string" && auth.user.iconUrl.length > 0 ? auth.user.iconUrl : undefined;
+  const joinedAt = new Date().toISOString();
+  const map = loadJoinProfilesMap(collectionId);
+  const prev = map[userId];
+  const row: MemberCollectionJoinProfile = {
+    name,
+    ...(iconUrl ? { iconUrl } : {}),
+    joinedAt:
+      prev?.joinedAt && prev.joinedAt > "1970-01-02T00:00:00.000Z" ? prev.joinedAt : joinedAt,
+  };
+  saveJoinProfilesMap(collectionId, { ...map, [userId]: row });
+  notifyCollectionScopedUpdated(collectionId);
+}
+
+/** メンバー限定コレクションの参加者一覧（投票済み＋参加登録＋参加インデックス・新しい活動順） */
 export function getCollectionScopedParticipants(collectionId: string): CollectionScopedParticipant[] {
-  const map = loadParticipantsMap(collectionId);
-  const list: CollectionScopedParticipant[] = Object.entries(map).map(([userId, row]) => ({
+  const merged = mergeParticipantsWithJoinProfiles(
+    loadParticipantsMap(collectionId),
+    loadJoinProfilesMap(collectionId)
+  );
+  const epoch = new Date(0).toISOString();
+  for (const userId of loadMemberUserIds(collectionId)) {
+    if (merged[userId]) continue;
+    merged[userId] = {
+      name: resolveMemberDisplayName(userId),
+      iconUrl: resolveMemberIconUrl(userId),
+      lastVotedAt: epoch,
+    };
+  }
+  const list: CollectionScopedParticipant[] = Object.entries(merged).map(([userId, row]) => ({
     userId,
-    name: row.name,
-    iconUrl: row.iconUrl,
+    name: resolveMemberDisplayName(userId, row.name),
+    iconUrl: row.iconUrl ?? resolveMemberIconUrl(userId, row.iconUrl),
     lastVotedAt: row.lastVotedAt,
   }));
   list.sort((a, b) => (b.lastVotedAt || "").localeCompare(a.lastVotedAt || ""));

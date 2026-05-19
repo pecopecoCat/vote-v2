@@ -21,8 +21,10 @@ import {
   getCollections,
   getCollectionsUpdatedEventName,
   getPinnedCollectionIds,
+  mergeMemberCollectionForDisplay,
   PINNED_UPDATED_EVENT,
   isOtherUsersCollection,
+  syncJoinedMemberCollectionCardIdsFromCanonical,
   togglePinnedCollection,
   type Collection,
   type CollectionVisibility,
@@ -262,9 +264,15 @@ export default function CollectionPage() {
   /** API 取得が続くときだけ表示（一瞬で終わるときは出さない） */
   const [showPatientLoadHint, setShowPatientLoadHint] = useState(false);
 
-  /** 共有リンク等でローカルに無いときは paint 前に fetch を開始し、体感待ちを短くする */
+  /** メンバー限定は参加者ローカルと本体 KV で cardIds がずれうるため、常に本体を GET する */
+  const needsCanonicalCollectionFetch =
+    Boolean(id) &&
+    (!localCollection ||
+      localCollection.visibility === "member" ||
+      Boolean(localCollection.joinedParticipation));
+
   useLayoutEffect(() => {
-    if (!id || localCollection) {
+    if (!needsCanonicalCollectionFetch) {
       setCollectionFromApi(null);
       setApiFetchFailed(false);
       setMemberShareNeedsLogin(false);
@@ -327,13 +335,14 @@ export default function CollectionPage() {
               setScopedVotesVersion((v) => v + 1);
             }
           }
-          setCollectionFromApi({
+          const canonicalCardIds = Array.isArray(data.cardIds) ? data.cardIds : [];
+          const fromApi: Collection = {
             id: data.id,
             name: String(data.name ?? ""),
             color: String(data.color ?? "#E5E7EB"),
             gradient,
             visibility,
-            cardIds: Array.isArray(data.cardIds) ? data.cardIds : [],
+            cardIds: canonicalCardIds,
             createdByUserId:
               typeof (data as { createdByUserId?: string }).createdByUserId === "string"
                 ? (data as { createdByUserId: string }).createdByUserId
@@ -346,6 +355,27 @@ export default function CollectionPage() {
               typeof data.createdByIconUrl === "string" && data.createdByIconUrl.length > 0
                 ? data.createdByIconUrl
                 : undefined,
+          };
+          if (visibility === "member") {
+            syncJoinedMemberCollectionCardIdsFromCanonical(data.id, canonicalCardIds);
+          }
+          setCollectionFromApi((prev) => {
+            if (
+              prev &&
+              prev.id === fromApi.id &&
+              prev.name === fromApi.name &&
+              prev.color === fromApi.color &&
+              prev.gradient === fromApi.gradient &&
+              prev.visibility === fromApi.visibility &&
+              prev.createdByUserId === fromApi.createdByUserId &&
+              prev.createdByDisplayName === fromApi.createdByDisplayName &&
+              prev.createdByIconUrl === fromApi.createdByIconUrl &&
+              prev.cardIds.length === fromApi.cardIds.length &&
+              prev.cardIds.every((cid, i) => cid === fromApi.cardIds[i])
+            ) {
+              return prev;
+            }
+            return fromApi;
           });
         }
       )
@@ -358,9 +388,12 @@ export default function CollectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, localCollection, activityUserId]);
+  }, [id, needsCanonicalCollectionFetch, activityUserId]);
 
-  const collection = localCollection ?? collectionFromApi;
+  const collection = useMemo(
+    () => mergeMemberCollectionForDisplay(localCollection, collectionFromApi),
+    [localCollection, collectionFromApi]
+  );
   const isFromApi = !!collectionFromApi && !localCollection;
   const isMemberCollection = collection?.visibility === "member";
 
@@ -539,6 +572,12 @@ export default function CollectionPage() {
     );
   }, [collection, memberParticipants, cardsInCollection, viewerAsOwnerProfile]);
 
+  /** 参加登録 effect 用：cardIds は merge のたびに新配列になるため内容で比較する */
+  const participateCardIdsKey = useMemo(
+    () => (collection?.cardIds ?? []).join("\0"),
+    [collection?.cardIds]
+  );
+
   /** メンバー限定を開いただけでもマイページのコレクション一覧に載せる（投票前でも可） */
   useEffect(() => {
     if (!collection || collection.visibility !== "member") return;
@@ -549,12 +588,7 @@ export default function CollectionPage() {
     collection?.id,
     collection?.visibility,
     collection?.createdByUserId,
-    collection?.name,
-    collection?.color,
-    collection?.gradient,
-    collection?.cardIds,
-    collection?.createdByDisplayName,
-    collection?.createdByIconUrl,
+    participateCardIdsKey,
     auth.isLoggedIn,
   ]);
 
@@ -573,13 +607,13 @@ export default function CollectionPage() {
         const scopedAct = scopedActivityMap[cardId];
         const globalComments = Array.isArray(act?.comments) ? act.comments : [];
         const comments = isMemberCollection
-          ? globalComments.filter((c) => (c as { collectionId?: unknown }).collectionId === collection?.id)
+          ? []
           : globalComments.filter((c) => (c as { collectionId?: unknown }).collectionId == null);
         const voteActivity: CardActivity = isMemberCollection
           ? {
               countA: scopedAct?.countA ?? 0,
               countB: scopedAct?.countB ?? 0,
-              comments,
+              comments: [],
               userSelectedOption: scopedAct?.userSelectedOption,
               userVotedAt: scopedAct?.userVotedAt,
             }
@@ -587,7 +621,7 @@ export default function CollectionPage() {
         const merged = getMergedCounts(
           isMemberCollection ? 0 : (card.countA ?? 0),
           isMemberCollection ? 0 : (card.countB ?? 0),
-          card.commentCount ?? 0,
+          isMemberCollection ? 0 : (card.commentCount ?? 0),
           voteActivity
         );
         return {
@@ -745,8 +779,12 @@ export default function CollectionPage() {
         {/* メンバー参加者アイコン＋名（メンバー限定のみ）。Safari では overflow 内の img が描画されない事例があるため縦スクロールは付けない */}
         {collection.visibility === "member" && (
           <div className="mt-2 pr-0.5">
-            {memberParticipantsForDisplay.length === 0 ? (
+            {memberParticipantsForDisplay.length === 0 &&
+            !collection.createdByUserId &&
+            !collection.createdByDisplayName?.trim() ? (
               <p className="text-[11px] leading-tight text-gray-500">参加者を読み込み中…</p>
+            ) : memberParticipantsForDisplay.length === 0 ? (
+              <p className="text-[11px] leading-tight text-gray-500">まだ参加者はいません</p>
             ) : (
               <ul className="flex flex-wrap gap-x-2.5 gap-y-1.5">
                 {memberParticipantsForDisplay.map((p) => {
@@ -834,19 +872,14 @@ export default function CollectionPage() {
                   optionB={card.optionB}
                   countA={merged.countA}
                   countB={merged.countB}
-                  commentCount={merged.commentCount}
+                  commentCount={isMemberCollection ? 0 : merged.commentCount}
                   tags={card.tags}
                   readMoreText={card.readMoreText}
                   creator={card.creator}
                   currentUser={currentUser}
                   cardId={cardId}
-                  commentsHref={
-                    isMemberCollection && collection?.id
-                      ? `/comments/${cardId}?collectionId=${encodeURIComponent(collection.id)}`
-                      : undefined
-                  }
                   bookmarked={isCardBookmarked(cardId)}
-                  hasCommented={commentedCardIdSet.has(cardId)}
+                  hasCommented={false}
                   initialSelectedOption={initialSelectedOption}
                   onVote={handleCollectionVote}
                   onBookmarkClick={setModalCardId}
@@ -856,7 +889,7 @@ export default function CollectionPage() {
                   optionBImageUrl={card.optionBImageUrl}
                   periodStart={card.periodStart}
                   periodEnd={card.periodEnd}
-                  commentsDisabled={card.commentsDisabled === true}
+                  commentsDisabled={isMemberCollection || card.commentsDisabled === true}
                 />
               );
             })}

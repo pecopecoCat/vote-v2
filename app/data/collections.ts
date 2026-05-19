@@ -8,7 +8,7 @@
 
 import type { CollectionGradient } from "./search";
 import { getAuth, getCurrentActivityUserId } from "./auth";
-import { clearCollectionScopedLocalData } from "./collectionVoteActivity";
+import { clearCollectionScopedLocalData, upsertLocalJoinProfileFromAuth } from "./collectionVoteActivity";
 import { removeLocalCommentsForCollection } from "./voteCardActivity";
 import { addBookmark, removeBookmark } from "./bookmarks";
 import { showAppToast } from "../lib/appToast";
@@ -94,7 +94,19 @@ function load(userId: string): Collection[] {
   }
 }
 
-function save(userId: string, collections: Collection[], opts?: { skipRemotePush?: boolean }): void {
+/** hydrate と create の競合で一覧が消えるのを防ぐ（SharedDataContext 側の直列化と併用） */
+let collectionsWriteChain: Promise<void> = Promise.resolve();
+
+function withCollectionsWriteLock<T>(work: () => T | Promise<T>): Promise<T> {
+  const run = collectionsWriteChain.then(() => work());
+  collectionsWriteChain = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
+function saveUnlocked(userId: string, collections: Collection[]): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(collections));
@@ -102,24 +114,26 @@ function save(userId: string, collections: Collection[], opts?: { skipRemotePush
   } catch {
     // ignore
   }
-  if (!opts?.skipRemotePush) {
-    void pushUserOwnedCollectionsToRemoteIfLoggedIn(userId, collections);
-  }
+}
+
+function save(userId: string, collections: Collection[], opts?: { skipRemotePush?: boolean }): void {
+  saveUnlocked(userId, collections);
+  if (opts?.skipRemotePush) return;
+  void withCollectionsWriteLock(() => pushUserOwnedCollectionsToRemoteIfLoggedIn(userId, collections));
 }
 
 /** 作成したコレのみ（参加中のメンバー限定は除外）を KV に同期 */
 async function pushUserOwnedCollectionsToRemoteIfLoggedIn(userId: string, allCollections: Collection[]): Promise<void> {
   const auth = getAuth();
   if (!auth.isLoggedIn) return;
-  // LINEログイン（デモ userId 無し）は getCurrentActivityUserId() が "line" を返すため、それを userId として扱う
-  const authKey = auth.userId ?? getCurrentActivityUserId();
-  if (authKey !== userId) return;
+  const remoteUserId = auth.userId ?? getCurrentActivityUserId();
+  if (!remoteUserId || remoteUserId !== userId) return;
   const owned = allCollections.filter((c) => !c.joinedParticipation);
   try {
     const res = await fetch("/api/user-collections", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: auth.userId, collections: owned }),
+      body: JSON.stringify({ userId: remoteUserId, collections: owned }),
     });
     if (!res.ok) {
       let message = "コレクションのサーバー同期に失敗しました。";
@@ -158,24 +172,26 @@ export async function hydrateUserOwnedCollectionsFromRemote(): Promise<void> {
       ownedServer.push(normalizeCollection(raw as Record<string, unknown>));
     }
 
-    const local = load(uid);
-    const joined = local.filter((c) => c.joinedParticipation);
-    const ownedLocal = local.filter((c) => !c.joinedParticipation);
+    await withCollectionsWriteLock(async () => {
+      const local = load(uid);
+      const joined = local.filter((c) => c.joinedParticipation);
+      const ownedLocal = local.filter((c) => !c.joinedParticipation);
 
-    if (ownedServer.length === 0 && ownedLocal.length > 0) {
-      await pushUserOwnedCollectionsToRemoteIfLoggedIn(uid, local);
-      return;
-    }
+      if (ownedServer.length === 0 && ownedLocal.length > 0) {
+        await pushUserOwnedCollectionsToRemoteIfLoggedIn(uid, local);
+        return;
+      }
 
-    // PUT 完了前に GET が走るとサーバー側にまだ無い作成コレが消えるため、サーバー優先＋ローカルのみの id を残す
-    const serverIds = new Set(ownedServer.map((c) => c.id));
-    const mergedOwned = [...ownedServer];
-    for (const c of ownedLocal) {
-      if (serverIds.has(c.id)) continue;
-      mergedOwned.push(c);
-    }
-    const merged = [...mergedOwned, ...joined];
-    save(uid, merged, { skipRemotePush: true });
+      // PUT 完了前に GET が走るとサーバー側にまだ無い作成コレが消えるため、サーバー優先＋ローカルのみの id を残す
+      const serverIds = new Set(ownedServer.map((c) => c.id));
+      const mergedOwned = [...ownedServer];
+      for (const c of ownedLocal) {
+        if (serverIds.has(c.id)) continue;
+        mergedOwned.push(c);
+      }
+      const merged = [...mergedOwned, ...joined];
+      saveUnlocked(uid, merged);
+    });
   } catch {
     // ignore
   }
@@ -200,7 +216,7 @@ export function ensureSeedPapaWarningCollection(): void {
   const cols = load(uid);
   const existingIndex = cols.findIndex((c) => c.id === SEED_PAPA_WARNING_COLLECTION_ID);
   if (existingIndex >= 0) {
-    const existing = cols[existingIndex];
+    const existing = cols[existingIndex]!;
     // 既存があっても、作成者表示はデモ要件に合わせて更新（miki固定）
     const next: Collection = {
       ...existing,
@@ -209,8 +225,9 @@ export function ensureSeedPapaWarningCollection(): void {
       createdByDisplayName: "miki",
       createdByIconUrl: DEFAULT_MAMA_AVATAR_URL,
     };
+    if (collectionSnapshotEqual(existing, next)) return;
     cols[existingIndex] = next;
-    save(uid, [...cols]);
+    save(uid, cols);
     return;
   }
 
@@ -263,9 +280,96 @@ export function isOtherUsersCollection(collectionId: string): boolean {
   return OTHER_USERS_COLLECTIONS.some((c) => c.id === collectionId);
 }
 
+/** メンバー限定コレクション（コレ内 VOTE ではコメント機能を使わない） */
+export function isMemberOnlyCollection(collectionId: string | null | undefined): boolean {
+  if (!collectionId) return false;
+  const col = getCollectionById(collectionId);
+  return col?.visibility === "member";
+}
+
 /** 現在のユーザーが作ったコレクション＋参加したメンバー限定（マイページで表示する用） */
 export function getCollections(): Collection[] {
   return load(getCurrentActivityUserId());
+}
+
+function cardIdsEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
+function collectionSnapshotEqual(a: Collection, b: Collection): boolean {
+  return (
+    a.id === b.id &&
+    a.name === b.name &&
+    a.color === b.color &&
+    a.gradient === b.gradient &&
+    a.visibility === b.visibility &&
+    cardIdsEqual(a.cardIds, b.cardIds) &&
+    (a.createdByUserId ?? "") === (b.createdByUserId ?? "") &&
+    (a.createdByDisplayName ?? "") === (b.createdByDisplayName ?? "") &&
+    (a.createdByIconUrl ?? "") === (b.createdByIconUrl ?? "") &&
+    Boolean(a.joinedParticipation) === Boolean(b.joinedParticipation)
+  );
+}
+
+function joinedParticipationRowEqual(a: Collection, b: Collection): boolean {
+  return (
+    a.id === b.id &&
+    a.name === b.name &&
+    a.color === b.color &&
+    a.gradient === b.gradient &&
+    a.visibility === "member" &&
+    Boolean(a.joinedParticipation) &&
+    cardIdsEqual(a.cardIds, b.cardIds) &&
+    (a.createdByUserId ?? "") === (b.createdByUserId ?? "") &&
+    (a.createdByDisplayName ?? "") === (b.createdByDisplayName ?? "") &&
+    (a.createdByIconUrl ?? "") === (b.createdByIconUrl ?? "")
+  );
+}
+
+/**
+ * 参加中メンバー限定のローカルコピーに、本体 KV の cardIds を反映する（マイページ・Bookmark 用）。
+ */
+export function syncJoinedMemberCollectionCardIdsFromCanonical(
+  collectionId: string,
+  canonicalCardIds: string[]
+): void {
+  const uid = getCurrentActivityUserId();
+  const cols = load(uid);
+  const idx = cols.findIndex((c) => c.id === collectionId && c.joinedParticipation);
+  if (idx < 0) return;
+  const row = cols[idx]!;
+  if (cardIdsEqual(row.cardIds, canonicalCardIds)) return;
+  cols[idx] = { ...row, cardIds: [...canonicalCardIds] };
+  save(uid, cols, { skipRemotePush: true });
+}
+
+/**
+ * メンバー限定コレクション画面用：ローカル参加コピーと API（vote_collection 本体）を合成。
+ * cardIds は本体 KV を正とする（参加者ごとの古いスナップショットを表示しない）。
+ */
+export function mergeMemberCollectionForDisplay(
+  local: Collection | null,
+  canonical: Collection | null
+): Collection | null {
+  if (!local && !canonical) return null;
+  if (!local) return canonical;
+  if (!canonical) return local;
+  const useCanonicalCards =
+    local.visibility === "member" ||
+    canonical.visibility === "member" ||
+    Boolean(local.joinedParticipation);
+  return {
+    ...local,
+    name: canonical.name || local.name,
+    color: canonical.color || local.color,
+    gradient: canonical.gradient ?? local.gradient,
+    visibility: canonical.visibility ?? local.visibility,
+    cardIds: useCanonicalCards ? [...canonical.cardIds] : [...local.cardIds],
+    createdByUserId: canonical.createdByUserId ?? local.createdByUserId,
+    createdByDisplayName: canonical.createdByDisplayName ?? local.createdByDisplayName,
+    createdByIconUrl: canonical.createdByIconUrl ?? local.createdByIconUrl,
+    joinedParticipation: local.joinedParticipation,
+  };
 }
 
 /**
@@ -278,19 +382,40 @@ export function addParticipatedMemberCollectionIfNeeded(col: Collection, opts?: 
   const uid = getCurrentActivityUserId();
   if (col.createdByUserId && col.createdByUserId === uid) return;
   const cols = load(uid);
-  if (!cols.some((c) => c.id === col.id)) {
-    cols.push({
-      id: col.id,
-      name: col.name,
-      color: col.color,
-      gradient: col.gradient,
-      visibility: "member",
-      cardIds: Array.isArray(col.cardIds) ? [...col.cardIds] : [],
-      joinedParticipation: true,
-      createdByUserId: col.createdByUserId,
-      createdByDisplayName: col.createdByDisplayName,
-      createdByIconUrl: col.createdByIconUrl,
-    });
+  const cardIds = Array.isArray(col.cardIds) ? [...col.cardIds] : [];
+  const existingIdx = cols.findIndex((c) => c.id === col.id);
+  const nextRow: Collection =
+    existingIdx >= 0
+      ? {
+          ...cols[existingIdx]!,
+          name: col.name,
+          color: col.color,
+          gradient: col.gradient,
+          visibility: "member",
+          cardIds,
+          joinedParticipation: true,
+          createdByUserId: col.createdByUserId ?? cols[existingIdx]!.createdByUserId,
+          createdByDisplayName: col.createdByDisplayName ?? cols[existingIdx]!.createdByDisplayName,
+          createdByIconUrl: col.createdByIconUrl ?? cols[existingIdx]!.createdByIconUrl,
+        }
+      : {
+          id: col.id,
+          name: col.name,
+          color: col.color,
+          gradient: col.gradient,
+          visibility: "member",
+          cardIds,
+          joinedParticipation: true,
+          createdByUserId: col.createdByUserId,
+          createdByDisplayName: col.createdByDisplayName,
+          createdByIconUrl: col.createdByIconUrl,
+        };
+
+  const localChanged =
+    existingIdx < 0 || !joinedParticipationRowEqual(cols[existingIdx]!, nextRow);
+  if (localChanged) {
+    if (existingIdx >= 0) cols[existingIdx] = nextRow;
+    else cols.push(nextRow);
     save(uid, cols);
   }
 
@@ -309,6 +434,11 @@ export function addParticipatedMemberCollectionIfNeeded(col: Collection, opts?: 
             : {}),
         }
       : undefined;
+
+  if (memberProfile) upsertLocalJoinProfileFromAuth(col.id);
+
+  // ローカルが既に最新なら KV POST は省略（参加登録ループ・タブ復帰時の連打を防ぐ）
+  if (!localChanged && existingIdx >= 0) return;
 
   fetch(`/api/member-collections`, {
     method: "POST",

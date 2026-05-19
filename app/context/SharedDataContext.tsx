@@ -41,6 +41,7 @@ import {
   hydrateParticipatedMemberCollectionsFromRemote,
   hydrateUserOwnedCollectionsFromRemote,
   ensureSeedPapaWarningCollection,
+  isMemberOnlyCollection,
 } from "../data/collections";
 import { hydrateBookmarksFromRemote } from "../data/bookmarks";
 import type { MemberJoinOwnerEvent } from "../lib/memberJoinOwnerNotifications";
@@ -530,7 +531,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   // ログイン後: コレクション作成分と参加分はどちらも localStorage を読み書きするため直列にする。
   // 並列だと Safari 等で完了順がずれ、古い load() 結果で save が上書きし一覧が空になる競合が起き得る。
   useEffect(() => {
-    const hydrateAllFromRemote = () => {
+    let hydrateTimer: ReturnType<typeof setTimeout> | null = null;
+    const runHydrate = () => {
       void (async () => {
         await hydrateUserOwnedCollectionsFromRemote();
         ensureSeedPapaWarningCollection();
@@ -538,9 +540,27 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         await hydrateBookmarksFromRemote();
       })();
     };
-    hydrateAllFromRemote();
-    window.addEventListener(getAuthUpdatedEventName(), hydrateAllFromRemote);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), hydrateAllFromRemote);
+    const hydrateAllFromRemote = (immediate = false) => {
+      if (hydrateTimer != null) {
+        clearTimeout(hydrateTimer);
+        hydrateTimer = null;
+      }
+      if (immediate) {
+        runHydrate();
+        return;
+      }
+      hydrateTimer = setTimeout(() => {
+        hydrateTimer = null;
+        runHydrate();
+      }, 400);
+    };
+    hydrateAllFromRemote(true);
+    const onAuthForHydrate = () => hydrateAllFromRemote(false);
+    window.addEventListener(getAuthUpdatedEventName(), onAuthForHydrate);
+    return () => {
+      if (hydrateTimer != null) clearTimeout(hydrateTimer);
+      window.removeEventListener(getAuthUpdatedEventName(), onAuthForHydrate);
+    };
   }, []);
 
   // いいねなどで global だけ更新されたとき、既存の activity を上書きせずマージする（API取得分が消えないように）
@@ -735,6 +755,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         ? createdVotesForTimelineRef.current
         : getCreatedVotesForTimeline();
       if (isCommentsDisabledOnCard(cardId, timeline)) {
+        return;
+      }
+      if (isMemberOnlyCollection(collectionId)) {
         return;
       }
       if (isRemote) {

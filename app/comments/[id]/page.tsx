@@ -12,6 +12,7 @@ import BottomNav from "../../components/BottomNav";
 import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
+import { getCollectionById } from "../../data/collections";
 import RecommendedTags from "../../components/RecommendedTags";
 import NewestOldestSortDropdown from "../../components/NewestOldestSortDropdown";
 import CommentThreadGroup from "../../components/CommentThreadGroup";
@@ -131,7 +132,19 @@ export default function CommentsPage() {
   /** 遷移直後はコメント帯が画面上部に来るようスクロール（固定ヘッダ分は scroll-mt で確保） */
   const commentsSectionRef = useRef<HTMLDivElement>(null);
   const isLoggedIn = auth.isLoggedIn;
-  const commentsDisabled = card?.commentsDisabled === true;
+  const memberCollectionFromUrl = useMemo(() => {
+    if (!collectionIdFromUrl) return null;
+    return getCollectionById(collectionIdFromUrl);
+  }, [collectionIdFromUrl]);
+  const isMemberCollectionComments =
+    Boolean(collectionIdFromUrl) && memberCollectionFromUrl?.visibility === "member";
+  const commentsDisabled = card?.commentsDisabled === true || isMemberCollectionComments;
+
+  useEffect(() => {
+    if (!isMemberCollectionComments || !collectionIdFromUrl) return;
+    router.replace(`/collection/${encodeURIComponent(collectionIdFromUrl)}`);
+  }, [isMemberCollectionComments, collectionIdFromUrl, router]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
