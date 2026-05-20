@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../../../lib/kv";
+import { stripIconForParticipantStorage } from "../../../../data/memberParticipantAvatar";
 import {
   ensureCollectionMemberInKvIndex,
   loadMemberCollectionOrNull,
@@ -67,8 +68,9 @@ export async function POST(
     const participant = body.participant as { name?: string; iconUrl?: string } | undefined;
     const name =
       typeof participant?.name === "string" && participant.name.trim() ? participant.name.trim() : "ゲスト";
-    const iconUrl =
-      typeof participant?.iconUrl === "string" && participant.iconUrl.length > 0 ? participant.iconUrl : undefined;
+    const iconUrl = stripIconForParticipantStorage(
+      typeof participant?.iconUrl === "string" ? participant.iconUrl : undefined
+    );
     const lastVotedAt = new Date().toISOString();
 
     const gKey = memberGlobalKey(collectionId);

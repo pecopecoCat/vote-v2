@@ -26,6 +26,7 @@ import {
   createCollection,
   updateCollection,
   deleteCollection,
+  syncCollectionToApiAndWait,
   type Collection,
   type CollectionVisibility,
 } from "../data/collections";
@@ -50,6 +51,7 @@ import BookmarkCollectionModal from "../components/BookmarkCollectionModal";
 import Button from "../components/Button";
 import CollectionSettingsModal from "../components/CollectionSettingsModal";
 import CollectionOptionsModal from "../components/CollectionOptionsModal";
+import MemberCollectionShareSheet from "../components/MemberCollectionShareSheet";
 import CardOptionsModal from "../components/CardOptionsModal";
 import ReportViolationModal from "../components/ReportViolationModal";
 import NewestOldestSortDropdown from "../components/NewestOldestSortDropdown";
@@ -285,6 +287,17 @@ function ProfileContent() {
       params.delete("bookmark");
     });
   }, [replaceProfileQuery]);
+
+  /** bookmark タブ3点リーダー「シェアする」→ コレ画面の飛行機アイコンと同じ半モーダル */
+  const handleCollectionMenuShare = useCallback(
+    async (collectionId: string) => {
+      const col = collections.find((c) => c.id === collectionId);
+      if (!col || col.visibility !== "member") return;
+      const ok = await syncCollectionToApiAndWait(col);
+      if (ok) setShareSheetCollectionId(collectionId);
+    },
+    [collections]
+  );
   /** ブックマーク先選択モーダルを開くカードID */
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
@@ -298,6 +311,8 @@ function ProfileContent() {
   const [editingCollectionForSettings, setEditingCollectionForSettings] = useState<Collection | null>(null);
   /** 3点リーダーメニューを開いているコレクションID */
   const [collectionMenuOpenId, setCollectionMenuOpenId] = useState<string | null>(null);
+  /** メンバー限定コレのシェア半モーダル（bookmark タブの3点リーダーから） */
+  const [shareSheetCollectionId, setShareSheetCollectionId] = useState<string | null>(null);
   /** myVOTE 編集モード（カード削除用） */
   const [isMyVoteEditMode, setIsMyVoteEditMode] = useState(false);
   /** お気に入りタグ編集モード（タグ削除用） */
@@ -1224,8 +1239,8 @@ function ProfileContent() {
         const menuCol = collections.find((c) => c.id === collectionMenuOpenId);
         return (
         <CollectionOptionsModal
-          collectionId={collectionMenuOpenId}
           showShare={menuCol?.visibility === "member"}
+          onShare={() => void handleCollectionMenuShare(collectionMenuOpenId)}
           hideEdit={Boolean(menuCol?.joinedParticipation)}
           deleteLabel={menuCol?.joinedParticipation ? "マイリストから削除" : "コレクションを削除"}
           onClose={() => setCollectionMenuOpenId(null)}
@@ -1245,6 +1260,14 @@ function ProfileContent() {
         />
         );
       })()}
+
+      {shareSheetCollectionId != null && (
+        <MemberCollectionShareSheet
+          open
+          onClose={() => setShareSheetCollectionId(null)}
+          collectionId={shareSheetCollectionId}
+        />
+      )}
 
       {showCollectionSettings && (
         <CollectionSettingsModal

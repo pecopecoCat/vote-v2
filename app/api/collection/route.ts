@@ -45,7 +45,7 @@ async function removeIndexRow(kv: NonNullable<Awaited<ReturnType<typeof getKV>>>
 export async function POST(request: Request): Promise<NextResponse<{ ok: boolean } | { error: string }>> {
   const kv = await getKV();
   if (!kv) {
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ error: "KV_NOT_CONFIGURED" }, { status: 503 });
   }
   try {
     const body = (await request.json()) as {

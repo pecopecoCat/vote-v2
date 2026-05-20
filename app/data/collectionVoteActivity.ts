@@ -4,6 +4,13 @@
  */
 
 import { DEMO_USER_IDS, getAuth, getCurrentActivityUserId, getDisplayUserForDemo, type DemoUserId } from "./auth";
+import {
+  pickStoredIconUrl,
+  stripIconForParticipantStorage,
+  stripParticipantRowForStorage,
+  stripParticipantsMapForStorage,
+  type ParticipantRowLite,
+} from "./memberParticipantAvatar";
 import type { CardActivity } from "./voteCardActivity";
 import { normalizeCardIdKey } from "../lib/normalize";
 
@@ -19,6 +26,9 @@ const USER_KEY_PREFIX = "vote_collection_scoped_user_";
 const PARTICIPANTS_KEY_PREFIX = "vote_collection_scoped_participants_";
 const JOIN_PROFILES_KEY_PREFIX = "vote_collection_scoped_join_prof_";
 const MEMBER_IDS_KEY_PREFIX = "vote_collection_scoped_member_ids_";
+
+/** localStorage 保存失敗時（巨大 data URL 等）の表示用フォールバック */
+const participantsMemoryCache = new Map<string, Record<string, ParticipantRowLite>>();
 
 /** メンバー限定コレクション内で投票したユーザー（同一ブラウザで記録された分） */
 export interface CollectionScopedParticipant {
@@ -202,7 +212,8 @@ function resolveMemberDisplayName(userId: string, fallback?: string): string {
 }
 
 function resolveMemberIconUrl(userId: string, fallback?: string): string | undefined {
-  if (typeof fallback === "string" && fallback.length > 0) return fallback;
+  const stored = stripIconForParticipantStorage(fallback);
+  if (stored) return stored;
   if ((DEMO_USER_IDS as readonly string[]).includes(userId)) {
     return getDisplayUserForDemo(userId as DemoUserId).iconUrl;
   }
@@ -245,30 +256,38 @@ function loadParticipantsMap(collectionId: string): Record<string, Omit<Collecti
   if (typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(participantsKey(collectionId));
-    if (!raw) return {};
+    if (!raw) {
+      return { ...(participantsMemoryCache.get(collectionId) ?? {}) };
+    }
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    if (typeof parsed !== "object" || parsed === null) return {};
+    if (typeof parsed !== "object" || parsed === null) {
+      return { ...(participantsMemoryCache.get(collectionId) ?? {}) };
+    }
     const out: Record<string, Omit<CollectionScopedParticipant, "userId">> = {};
     for (const [uid, v] of Object.entries(parsed)) {
       if (!v || typeof v !== "object") continue;
       const o = v as Record<string, unknown>;
       const name = typeof o.name === "string" && o.name.trim() ? o.name.trim() : "ゲスト";
-      const iconUrl = typeof o.iconUrl === "string" && o.iconUrl.length > 0 ? o.iconUrl : undefined;
+      const iconUrl = stripIconForParticipantStorage(
+        typeof o.iconUrl === "string" ? o.iconUrl : undefined
+      );
       const lastVotedAt = typeof o.lastVotedAt === "string" ? o.lastVotedAt : new Date(0).toISOString();
       out[uid] = { name, iconUrl, lastVotedAt };
     }
     return out;
   } catch {
-    return {};
+    return { ...(participantsMemoryCache.get(collectionId) ?? {}) };
   }
 }
 
 function saveParticipantsMap(collectionId: string, data: Record<string, Omit<CollectionScopedParticipant, "userId">>): void {
   if (typeof window === "undefined") return;
+  const stripped = stripParticipantsMapForStorage(data);
+  participantsMemoryCache.set(collectionId, stripped);
   try {
-    window.localStorage.setItem(participantsKey(collectionId), JSON.stringify(data));
+    window.localStorage.setItem(participantsKey(collectionId), JSON.stringify(stripped));
   } catch {
-    // ignore
+    // 巨大 data URL 等で QuotaExceeded のときも memoryCache で全員分を表示できる
   }
 }
 
@@ -315,7 +334,9 @@ function normalizeSnapshot(raw: unknown): MemberCollectionVotesSnapshot | null {
       if (!v || typeof v !== "object") continue;
       const p = v as Record<string, unknown>;
       const name = typeof p.name === "string" && p.name.trim() ? p.name.trim() : "ゲスト";
-      const iconUrl = typeof p.iconUrl === "string" && p.iconUrl.length > 0 ? p.iconUrl : undefined;
+      const iconUrl = stripIconForParticipantStorage(
+        typeof p.iconUrl === "string" ? p.iconUrl : undefined
+      );
       const lastVotedAt = typeof p.lastVotedAt === "string" ? p.lastVotedAt : new Date(0).toISOString();
       participants[uid] = { name, iconUrl, lastVotedAt };
     }
@@ -345,9 +366,14 @@ type ParticipantRow = Omit<CollectionScopedParticipant, "userId">;
 function mergeParticipantRows(local: ParticipantRow, server: ParticipantRow): ParticipantRow {
   const lt = local.lastVotedAt ?? "";
   const st = server.lastVotedAt ?? "";
-  if (st > lt) return { name: server.name, iconUrl: server.iconUrl, lastVotedAt: server.lastVotedAt };
-  if (lt > st) return { name: local.name, iconUrl: local.iconUrl, lastVotedAt: local.lastVotedAt };
-  return { name: server.name, iconUrl: server.iconUrl ?? local.iconUrl, lastVotedAt: st || lt };
+  const iconUrl = stripIconForParticipantStorage(server.iconUrl) ?? stripIconForParticipantStorage(local.iconUrl);
+  if (st > lt) {
+    return { name: server.name, iconUrl, lastVotedAt: server.lastVotedAt };
+  }
+  if (lt > st) {
+    return { name: local.name, iconUrl, lastVotedAt: local.lastVotedAt };
+  }
+  return { name: server.name, iconUrl, lastVotedAt: st || lt };
 }
 
 function mergeParticipantsMaps(
@@ -402,7 +428,14 @@ function mergeParticipantMapsPreferServer(
   mode: HydrateCollectionScopedMode
 ): Record<string, ParticipantRow> {
   const out: Record<string, ParticipantRow> = { ...server };
-  if (mode !== "fromPost") return out;
+  if (mode === "fromFetch") {
+    for (const [uid, row] of Object.entries(out)) {
+      if (stripIconForParticipantStorage(row.iconUrl)) continue;
+      const localIcon = stripIconForParticipantStorage(local[uid]?.iconUrl);
+      if (localIcon) out[uid] = { ...row, iconUrl: localIcon };
+    }
+    return out;
+  }
   for (const [uid, row] of Object.entries(local)) {
     if (server[uid]) continue;
     if (uid === currentUserId) out[uid] = row;
@@ -598,10 +631,9 @@ function buildParticipantPayload(): { name: string; iconUrl?: string } {
     auth.isLoggedIn && typeof auth.user?.name === "string" && auth.user.name.trim()
       ? auth.user.name.trim()
       : "ゲスト";
-  const iconUrl =
-    auth.isLoggedIn && typeof auth.user?.iconUrl === "string" && auth.user.iconUrl.length > 0
-      ? auth.user.iconUrl
-      : undefined;
+  const iconUrl = stripIconForParticipantStorage(
+    auth.isLoggedIn && typeof auth.user?.iconUrl === "string" ? auth.user.iconUrl : undefined
+  );
   return iconUrl ? { name, iconUrl } : { name };
 }
 
@@ -629,15 +661,16 @@ function upsertParticipantFromCurrentAuth(collectionId: string): void {
     auth.isLoggedIn && typeof auth.user?.name === "string" && auth.user.name.trim()
       ? auth.user.name.trim()
       : "ゲスト";
-  const iconUrl =
-    auth.isLoggedIn && typeof auth.user?.iconUrl === "string" && auth.user.iconUrl.length > 0
-      ? auth.user.iconUrl
-      : undefined;
-  const lastVotedAt = new Date().toISOString();
   const map = loadParticipantsMap(collectionId);
+  const prev = map[userId];
+  const iconUrl =
+    stripIconForParticipantStorage(auth.isLoggedIn ? auth.user?.iconUrl : undefined) ??
+    stripIconForParticipantStorage(prev?.iconUrl) ??
+    resolveMemberIconUrl(userId);
+  const lastVotedAt = new Date().toISOString();
   saveParticipantsMap(collectionId, {
     ...map,
-    [userId]: { name, iconUrl, lastVotedAt },
+    [userId]: stripParticipantRowForStorage({ name, iconUrl, lastVotedAt }),
   });
 }
 
@@ -692,7 +725,7 @@ export function getCollectionScopedParticipants(collectionId: string): Collectio
     .map(([userId, row]) => ({
       userId,
       name: resolveMemberDisplayName(userId, row.name),
-      iconUrl: row.iconUrl ?? resolveMemberIconUrl(userId, row.iconUrl),
+      iconUrl: resolveMemberIconUrl(userId, row.iconUrl),
       lastVotedAt: row.lastVotedAt,
     }));
   list.sort((a, b) => (b.lastVotedAt || "").localeCompare(a.lastVotedAt || ""));

@@ -7,8 +7,26 @@
  */
 
 let kvLoadPromise: Promise<KVClient | null> | null = null;
-let devMemoryKvSingleton: KVClient | null = null;
-let devMemoryKvWarned = false;
+
+/** Next.js dev では route ごとにモジュールが複製されうるため、process 内で1つに揃える */
+type DevKvGlobal = typeof globalThis & {
+  __voteDevMemoryKv?: KVClient;
+  __voteDevMemoryKvWarned?: boolean;
+};
+
+function getDevMemoryKvSingleton(): KVClient {
+  const g = globalThis as DevKvGlobal;
+  if (!g.__voteDevMemoryKv) {
+    g.__voteDevMemoryKv = createDevMemoryKv();
+    if (!g.__voteDevMemoryKvWarned && typeof console !== "undefined" && console.warn) {
+      g.__voteDevMemoryKvWarned = true;
+      console.warn(
+        "[kv] KV_REST_API_URL / KV_REST_API_TOKEN が未設定のため、開発用インメモリ KV を使用しています（サーバー再起動でリセット）。本番では Vercel KV 等を設定してください。"
+      );
+    }
+  }
+  return g.__voteDevMemoryKv;
+}
 
 function jsonClone<T>(v: T): T {
   if (v === null || typeof v !== "object") return v;
@@ -127,16 +145,7 @@ export async function getKV(): Promise<KVClient | null> {
   }
 
   if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
-    if (!devMemoryKvSingleton) {
-      devMemoryKvSingleton = createDevMemoryKv();
-      if (!devMemoryKvWarned && typeof console !== "undefined" && console.warn) {
-        devMemoryKvWarned = true;
-        console.warn(
-          "[kv] KV_REST_API_URL / KV_REST_API_TOKEN が未設定のため、開発用インメモリ KV を使用しています（サーバー再起動でリセット）。本番では Vercel KV 等を設定してください。"
-        );
-      }
-    }
-    return devMemoryKvSingleton;
+    return getDevMemoryKvSingleton();
   }
 
   return null;

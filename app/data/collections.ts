@@ -517,11 +517,7 @@ export function saveCollections(collections: Collection[]): void {
   save(getCurrentActivityUserId(), collections);
 }
 
-/** 公開・メンバー限定コレクションをAPIに同期（リンクで誰でも見れるように） */
-function syncCollectionToApi(col: Collection): void {
-  if (col.joinedParticipation) return;
-  if (col.visibility === "private") return;
-  const userId = getCurrentActivityUserId();
+function buildCollectionSyncPayload(col: Collection, userId: string) {
   const auth = getAuth();
   const ownerName =
     col.createdByDisplayName?.trim() ||
@@ -529,43 +525,90 @@ function syncCollectionToApi(col: Collection): void {
   const ownerIcon =
     col.createdByIconUrl ||
     (auth.isLoggedIn && auth.user?.iconUrl?.length ? auth.user.iconUrl : undefined);
-  void (async () => {
-    try {
-      const res = await fetch("/api/collection", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          collection: {
-            id: col.id,
-            name: col.name,
-            color: col.color,
-            gradient: col.gradient,
-            visibility: col.visibility,
-            cardIds: col.cardIds,
-            ...(ownerName ? { createdByDisplayName: ownerName } : {}),
-            ...(ownerIcon ? { createdByIconUrl: ownerIcon } : {}),
-          },
-        }),
-      });
-      if (!res.ok) {
+  return {
+    userId,
+    collection: {
+      id: col.id,
+      name: col.name,
+      color: col.color,
+      gradient: col.gradient,
+      visibility: col.visibility,
+      cardIds: col.cardIds,
+      ...(ownerName ? { createdByDisplayName: ownerName } : {}),
+      ...(ownerIcon ? { createdByIconUrl: ownerIcon } : {}),
+    },
+  };
+}
+
+/**
+ * 公開・メンバー限定コレクションを KV に同期し、共有リンク用 GET まで確認する。
+ * メンバー限定のシェア前に await すること。
+ */
+export async function syncCollectionToApiAndWait(
+  col: Collection,
+  opts?: { quiet?: boolean }
+): Promise<boolean> {
+  const quiet = opts?.quiet === true;
+  if (col.joinedParticipation || col.visibility === "private") return true;
+  const userId = getCurrentActivityUserId();
+  try {
+    const res = await fetch("/api/collection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildCollectionSyncPayload(col, userId)),
+    });
+    if (!res.ok) {
+      if (res.status === 507) {
+        if (!quiet) {
+          showAppToast("サーバーの保存容量の上限に達したため、共有リンクを発行できません。", "error");
+        }
+        return false;
+      }
+      if (!quiet) {
         let message = "コレクションの公開設定をサーバーに保存できませんでした。";
         try {
-          const data = (await res.json()) as { error?: string; code?: string };
+          const data = (await res.json()) as { error?: string };
           if (typeof data?.error === "string" && data.error.length > 0) message = data.error;
-          if (data?.code === "STORAGE_LIMIT" || res.status === 507) {
-            // サーバー容量上限は通知しない（ローカル保存は成功していても、共有できないなら黙ってスキップ）
-            return;
-          }
         } catch {
           /* ignore */
         }
         showAppToast(message, "error");
       }
-    } catch {
-      showAppToast("コレクションの公開設定をサーバーに保存できませんでした。", "error");
+      return false;
     }
-  })();
+    let verifyOk = false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const verify = await fetch(
+        `/api/collection/${encodeURIComponent(col.id)}?userId=${encodeURIComponent(userId)}`,
+        { cache: "no-store" }
+      );
+      if (verify.status === 503) {
+        if (!quiet) showAppToast("共有リンクにはサーバー（KV）の設定が必要です。", "error");
+        return false;
+      }
+      if (verify.ok) {
+        verifyOk = true;
+        break;
+      }
+      if (verify.status !== 404 || attempt === 3) break;
+      await new Promise((r) => setTimeout(r, 40 * (attempt + 1)));
+    }
+    if (!verifyOk) {
+      if (!quiet) showAppToast("共有用のコレクション登録を確認できませんでした。", "error");
+      return false;
+    }
+    return true;
+  } catch {
+    if (!quiet) showAppToast("コレクションの公開設定をサーバーに保存できませんでした。", "error");
+    return false;
+  }
+}
+
+/** 公開・メンバー限定コレクションをAPIに同期（リンクで誰でも見れるように） */
+function syncCollectionToApi(col: Collection): void {
+  if (col.joinedParticipation) return;
+  if (col.visibility === "private") return;
+  void syncCollectionToApiAndWait(col);
 }
 
 /** コレクションをAPIから削除（非公開化・削除時） */

@@ -1,4 +1,12 @@
+import {
+  pickStoredIconUrl,
+  resolveParticipantIconUrl,
+  stripIconForParticipantStorage,
+  stripParticipantRowForStorage,
+} from "../data/memberParticipantAvatar";
 import type { KVClient } from "./kv";
+
+const USER_PROFILE_KV_PREFIX = "vote_user_profile_";
 
 export const COLLECTION_KV_PREFIX = "vote_collection:";
 export const MEMBER_GLOBAL_PREFIX = "vote_coll_member_global:";
@@ -152,7 +160,7 @@ function parsePartRowJson(json: string): MemberPartRow | null {
   try {
     const o = JSON.parse(json) as Record<string, unknown>;
     const name = typeof o.name === "string" && o.name.trim() ? o.name.trim() : "ゲスト";
-    const iconUrl = typeof o.iconUrl === "string" && o.iconUrl.length > 0 ? o.iconUrl : undefined;
+    const iconUrl = stripIconForParticipantStorage(typeof o.iconUrl === "string" ? o.iconUrl : undefined);
     const lastVotedAt =
       typeof o.lastVotedAt === "string" && o.lastVotedAt.length > 0 ? o.lastVotedAt : new Date(0).toISOString();
     return { name, iconUrl, lastVotedAt };
@@ -176,8 +184,9 @@ function participantsFromHgetall(raw: Record<string, string> | null): MemberPart
 function mergePartRowsPreferNewer(a: MemberPartRow, b: MemberPartRow): MemberPartRow {
   const at = a.lastVotedAt ?? "";
   const bt = b.lastVotedAt ?? "";
-  if (bt >= at) return { name: b.name, iconUrl: b.iconUrl ?? a.iconUrl, lastVotedAt: b.lastVotedAt };
-  return { name: a.name, iconUrl: a.iconUrl ?? b.iconUrl, lastVotedAt: a.lastVotedAt };
+  const iconUrl = stripIconForParticipantStorage(b.iconUrl) ?? stripIconForParticipantStorage(a.iconUrl);
+  if (bt >= at) return { name: b.name, iconUrl, lastVotedAt: b.lastVotedAt };
+  return { name: a.name, iconUrl, lastVotedAt: a.lastVotedAt };
 }
 
 /** 参加者: Hash（新）と旧 JSON ストアをマージ（移行期・欠損防止） */
@@ -246,20 +255,74 @@ export async function removeParticipantFromKv(
   }
 }
 
+async function readParticipantRowFromKv(
+  kv: KVClient,
+  collectionId: string,
+  userId: string
+): Promise<MemberPartRow | null> {
+  const merged = await readParticipantsMerged(kv, collectionId);
+  return merged[userId] ?? null;
+}
+
+/** 投票 POST 時に iconUrl が省略されても、既存のアイコンを消さない */
+function mergeParticipantRowForUpsert(existing: MemberPartRow | null, incoming: MemberPartRow): MemberPartRow {
+  return stripParticipantRowForStorage({
+    name: incoming.name,
+    lastVotedAt: incoming.lastVotedAt,
+    iconUrl:
+      stripIconForParticipantStorage(incoming.iconUrl) ??
+      stripIconForParticipantStorage(existing?.iconUrl),
+  });
+}
+
+/** 他端末表示用: デモ既定アイコン・ユーザープロフィール KV で iconUrl を補完 */
+async function enrichParticipantIconsFromProfiles(
+  kv: KVClient,
+  participants: MemberPartsMap
+): Promise<MemberPartsMap> {
+  const out: MemberPartsMap = { ...participants };
+  const needsProfile: string[] = [];
+  for (const [uid, row] of Object.entries(out)) {
+    if (stripIconForParticipantStorage(row.iconUrl)) continue;
+    const demo = resolveParticipantIconUrl(uid);
+    if (demo) {
+      out[uid] = { ...row, iconUrl: demo };
+      continue;
+    }
+    needsProfile.push(uid);
+  }
+  await Promise.all(
+    needsProfile.map(async (uid) => {
+      const row = out[uid];
+      if (!row) return;
+      try {
+        const prof = await kv.get<{ iconUrl?: string }>(USER_PROFILE_KV_PREFIX + uid);
+        const iconUrl = stripIconForParticipantStorage(prof?.iconUrl);
+        if (iconUrl) out[uid] = { ...row, iconUrl };
+      } catch {
+        /* ignore */
+      }
+    })
+  );
+  return out;
+}
+
 export async function upsertParticipantInKv(
   kv: KVClient,
   collectionId: string,
   userId: string,
   row: MemberPartRow
 ): Promise<void> {
+  const existing = await readParticipantRowFromKv(kv, collectionId, userId);
+  const merged = mergeParticipantRowForUpsert(existing, row);
   const legacyKey = memberPartsKey(collectionId);
   if (kv.hset) {
     const hashKey = memberPartsHashKey(collectionId);
-    await kv.hset(hashKey, { [userId]: JSON.stringify(row) });
+    await kv.hset(hashKey, { [userId]: JSON.stringify(merged) });
     return;
   }
   const parts = (await kv.get<MemberPartsMap>(legacyKey)) ?? {};
-  await kv.set(legacyKey, { ...parts, [userId]: row });
+  await kv.set(legacyKey, { ...parts, [userId]: merged });
 }
 
 /** 参加登録 API で積まれる「このコレに参加した userId」一覧 */
@@ -324,10 +387,11 @@ export async function readMemberVotesMaps(
   const global = gRaw && typeof gRaw === "object" ? gRaw : {};
   const userSelections: MemberUserMap = uRaw && typeof uRaw === "object" ? uRaw : {};
   const enriched = enrichMemberMapsFromIndex(participants, joinProfiles, memberUserIds);
+  const participantsWithIcons = await enrichParticipantIconsFromProfiles(kv, enriched.participants);
   return {
     global,
     userSelections,
-    participants: enriched.participants,
+    participants: participantsWithIcons,
     joinProfiles: enriched.joinProfiles,
     memberUserIds,
   };

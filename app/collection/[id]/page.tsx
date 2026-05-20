@@ -10,6 +10,7 @@ import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import MemberCollectionShareSheet from "../../components/MemberCollectionShareSheet";
+import MemberParticipantAvatar from "../../components/MemberParticipantAvatar";
 import BottomNav from "../../components/BottomNav";
 import AppHeader from "../../components/AppHeader";
 import Checkbox from "../../components/Checkbox";
@@ -26,6 +27,7 @@ import {
   PINNED_UPDATED_EVENT,
   isOtherUsersCollection,
   syncJoinedMemberCollectionCardIdsFromCanonical,
+  syncCollectionToApiAndWait,
   togglePinnedCollection,
   type Collection,
   type CollectionVisibility,
@@ -59,9 +61,9 @@ import { getCreatedVotesForTimeline } from "../../data/createdVotes";
 import { isVotingAllowedNow, resolveCardForVotePeriod } from "../../data/votePeriod";
 import type { CurrentUser } from "../../components/VoteCard";
 import type { CollectionGradient } from "../../data/search";
-import { getAvatarProxySrc } from "../../lib/avatarProxy";
+import { pickStoredIconUrl } from "../../data/memberParticipantAvatar";
 import { perfMeasure } from "../../lib/perf";
-import { isRemoteHttpUrl, normalizeCardIdKey, resolveAvatarSrc } from "../../lib/normalize";
+import { normalizeCardIdKey } from "../../lib/normalize";
 import { navigateBack } from "../../lib/navigateBack";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
@@ -116,8 +118,7 @@ function buildMemberParticipantsForDisplay(
   if (!oid) {
     const sorted = [...participants].sort((a, b) => (b.lastVotedAt || "").localeCompare(a.lastVotedAt || ""));
     const displayName = collection.createdByDisplayName?.trim() || viewerAsOwner?.name;
-    const displayIconRaw = collection.createdByIconUrl || viewerAsOwner?.iconUrl;
-    const displayIcon = typeof displayIconRaw === "string" && displayIconRaw.length > 0 ? displayIconRaw : undefined;
+    const displayIcon = pickStoredIconUrl(collection.createdByIconUrl || viewerAsOwner?.iconUrl);
     if (displayName || displayIcon) {
       return [
         {
@@ -144,8 +145,9 @@ function buildMemberParticipantsForDisplay(
     viewerAsOwner?.name ||
     fromCard?.name ||
     "作成者";
-  const displayIconRaw = collection.createdByIconUrl || viewerAsOwner?.iconUrl || fromCard?.iconUrl;
-  const displayIcon = typeof displayIconRaw === "string" && displayIconRaw.length > 0 ? displayIconRaw : undefined;
+  const displayIcon = pickStoredIconUrl(
+    collection.createdByIconUrl || viewerAsOwner?.iconUrl || fromCard?.iconUrl
+  );
 
   const others = participants.filter((p) => p.userId !== oid);
   const existing = participants.find((p) => p.userId === oid);
@@ -155,7 +157,7 @@ function buildMemberParticipantsForDisplay(
       existing && existing.name.trim() && existing.name !== "ゲスト"
         ? existing.name
         : displayName,
-    iconUrl: existing?.iconUrl || displayIcon,
+    iconUrl: pickStoredIconUrl(existing?.iconUrl) ?? displayIcon,
     lastVotedAt: existing?.lastVotedAt ?? "",
   };
   const sortedOthers = [...others].sort((a, b) =>
@@ -211,6 +213,7 @@ export default function CollectionPage() {
   const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [sharePreparing, setSharePreparing] = useState(false);
   const [cardSortOrder, setCardSortOrder] = useState<NewestOldestSortOrder>("newest");
   const [scopedVotesVersion, setScopedVotesVersion] = useState(0);
   const [auth, setAuth] = useState(() => getAuth());
@@ -269,7 +272,9 @@ export default function CollectionPage() {
 
   const localCollection = useMemo(() => getCollectionById(id), [id, collections]);
   const [collectionFromApi, setCollectionFromApi] = useState<Collection | null>(null);
-  const [apiFetchFailed, setApiFetchFailed] = useState(false);
+  const [apiFetchStatus, setApiFetchStatus] = useState<"idle" | "loading" | "ok" | "404" | "503" | "error">(
+    "idle"
+  );
   /** メンバー限定を共有URLで開いたが未ログイン（本文は出さずログイン導線） */
   const [memberShareNeedsLogin, setMemberShareNeedsLogin] = useState(false);
   /** API 取得が続くときだけ表示（一瞬で終わるときは出さない） */
@@ -285,23 +290,29 @@ export default function CollectionPage() {
   useLayoutEffect(() => {
     if (!needsCanonicalCollectionFetch) {
       setCollectionFromApi(null);
-      setApiFetchFailed(false);
+      setApiFetchStatus("idle");
       setMemberShareNeedsLogin(false);
       return;
     }
     let cancelled = false;
-    setApiFetchFailed(false);
+    setApiFetchStatus("loading");
     setMemberShareNeedsLogin(false);
     fetch(
       `/api/collection/${encodeURIComponent(id)}?userId=${encodeURIComponent(activityUserId)}`
     )
       .then((res) => {
         if (cancelled) return;
-        if (!res.ok) {
-          setApiFetchFailed(true);
+        if (res.status === 503) {
+          setApiFetchStatus("503");
           setMemberShareNeedsLogin(false);
           return;
         }
+        if (!res.ok) {
+          setApiFetchStatus("404");
+          setMemberShareNeedsLogin(false);
+          return;
+        }
+        setApiFetchStatus("ok");
         return res.json();
       })
       .then(
@@ -392,7 +403,7 @@ export default function CollectionPage() {
       )
       .catch(() => {
         if (!cancelled) {
-          setApiFetchFailed(true);
+          setApiFetchStatus("error");
           setMemberShareNeedsLogin(false);
         }
       });
@@ -412,7 +423,7 @@ export default function CollectionPage() {
     Boolean(id) &&
     !localCollection &&
     !collectionFromApi &&
-    !apiFetchFailed &&
+    apiFetchStatus === "loading" &&
     !memberShareNeedsLogin;
 
   useEffect(() => {
@@ -670,11 +681,27 @@ export default function CollectionPage() {
     setPinnedIds(getPinnedCollectionIds());
   };
 
+  const handleOpenShareSheet = useCallback(async () => {
+    if (!collection || collection.visibility !== "member" || sharePreparing) return;
+    setSharePreparing(true);
+    const ok = await syncCollectionToApiAndWait(collection);
+    setSharePreparing(false);
+    if (ok) setShareSheetOpen(true);
+  }, [collection, sharePreparing]);
+
+  /** オーナー表示中に KV へ先に載せ、共有リンクが空振りしないようにする */
+  useEffect(() => {
+    if (!localCollection || localCollection.visibility !== "member" || localCollection.joinedParticipation) {
+      return;
+    }
+    void syncCollectionToApiAndWait(localCollection, { quiet: true });
+  }, [localCollection?.id, localCollection?.visibility, localCollection?.joinedParticipation]);
+
   if (!collection) {
     if (memberShareNeedsLogin && id) {
       return <MemberCollectionLoginGate collectionId={id} />;
     }
-    if (!apiFetchFailed && !localCollection && id) {
+    if (!localCollection && id && apiFetchStatus === "loading") {
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#F1F1F1] px-6 text-center">
           <p className="text-sm font-medium text-gray-700">読み込み中…</p>
@@ -691,7 +718,11 @@ export default function CollectionPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F1F1F1]">
         <div className="px-6 text-center">
-          <p className="text-gray-600">コレクションが見つかりませんでした。</p>
+          <p className="text-gray-600">
+            {apiFetchStatus === "503"
+              ? "共有リンクを開くにはサーバー（KV）の設定が必要です。"
+              : "このコレクションは見つかりませんでした。リンクが古いか、まだ共有されていない可能性があります。"}
+          </p>
           <Link href="/search" className="mt-4 inline-block text-blue-600 underline">
             検索へ
           </Link>
@@ -763,7 +794,9 @@ export default function CollectionPage() {
                 type="button"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-700 transition-opacity active:opacity-70"
                 aria-label="シェアする"
-                onClick={() => setShareSheetOpen(true)}
+                onClick={() => void handleOpenShareSheet()}
+                disabled={sharePreparing}
+                aria-busy={sharePreparing}
               >
                 <img src="/icons/icon_share.svg" alt="" className="h-5 w-5" width={20} height={21} />
               </button>
@@ -790,40 +823,13 @@ export default function CollectionPage() {
               <p className="text-[11px] leading-tight text-gray-500">まだ参加者はいません</p>
             ) : (
               <ul className="flex flex-wrap gap-x-2.5 gap-y-1.5">
-                {memberParticipantsForDisplay.map((p) => {
-                  const rawAvatar = resolveAvatarSrc(p.iconUrl);
-                  const proxied = getAvatarProxySrc(rawAvatar);
-                  const avatarSrc = proxied ?? rawAvatar;
-                  const useNoReferrer = proxied == null && isRemoteHttpUrl(rawAvatar);
-                  return (
+                {memberParticipantsForDisplay.map((p) => (
                   <li key={p.userId} className="flex max-w-[10rem] min-w-0 items-center gap-1.5">
-                    <span className="relative inline-block h-6 w-6 shrink-0 rounded-full bg-gray-200 align-middle ring-1 ring-[rgba(0,0,0,0.06)] [transform:translateZ(0)]">
-                      <img
-                        key={`${p.userId}-${p.lastVotedAt}-${p.iconUrl ?? ""}`}
-                        src={avatarSrc}
-                        alt=""
-                        className="block h-6 w-6 rounded-full object-cover object-center"
-                        width={24}
-                        height={24}
-                        loading="eager"
-                        fetchPriority="high"
-                        referrerPolicy={useNoReferrer ? "no-referrer" : undefined}
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          if (proxied != null && e.currentTarget.src.includes("/api/avatar")) {
-                            e.currentTarget.src = rawAvatar;
-                            if (isRemoteHttpUrl(rawAvatar)) {
-                              e.currentTarget.referrerPolicy = "no-referrer";
-                            } else {
-                              e.currentTarget.removeAttribute("referrerpolicy");
-                            }
-                            return;
-                          }
-                          e.currentTarget.src = "/default-avatar.png";
-                          e.currentTarget.removeAttribute("referrerpolicy");
-                        }}
-                      />
-                    </span>
+                    <MemberParticipantAvatar
+                      userId={p.userId}
+                      iconUrl={p.iconUrl}
+                      lastVotedAt={p.lastVotedAt}
+                    />
                     <span className="min-w-0 truncate text-[11px] leading-tight text-gray-600">{p.name}</span>
                     {(collection.createdByUserId === p.userId || p.userId === "__owner__") && (
                       <span className="shrink-0 rounded bg-gray-200 px-1 py-px text-[9px] font-medium text-gray-600">
@@ -831,8 +837,7 @@ export default function CollectionPage() {
                       </span>
                     )}
                   </li>
-                  );
-                })}
+                ))}
               </ul>
             )}
           </div>

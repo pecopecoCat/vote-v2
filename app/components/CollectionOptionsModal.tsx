@@ -1,9 +1,10 @@
 "use client";
 
 export interface CollectionOptionsModalProps {
-  /** メンバー限定コレクションのとき true（VOTEカードの「シェアする」と同様に X で URL 共有） */
+  /** メンバー限定コレクションのとき true */
   showShare?: boolean;
-  collectionId?: string;
+  /** シェアするタップ時（半モーダル：リンクコピー / X にシェア） */
+  onShare?: () => void;
   /** 参加中の他人コレクションのとき true（設定変更を出さない） */
   hideEdit?: boolean;
   /** 削除ボタンの文言（参加中はマイリストから外す意味に変更可） */
@@ -15,22 +16,13 @@ export interface CollectionOptionsModalProps {
 
 export default function CollectionOptionsModal({
   showShare = false,
-  collectionId,
+  onShare,
   hideEdit = false,
   deleteLabel = "コレクションを削除",
   onClose,
   onEdit,
   onDelete,
 }: CollectionOptionsModalProps) {
-  const handleShare = () => {
-    if (typeof window !== "undefined" && collectionId) {
-      const url = `${window.location.origin}/collection/${encodeURIComponent(collectionId)}`;
-      const shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=VOTE`;
-      window.open(shareUrl, "_blank", "noopener,noreferrer");
-    }
-    onClose();
-  };
-
   return (
     <>
       <div className="fixed inset-0 z-[60] bg-black/50" aria-hidden onClick={onClose} />
@@ -53,12 +45,15 @@ export default function CollectionOptionsModal({
           </button>
         </div>
         <ul className="border-t border-gray-100 divide-y divide-gray-100">
-          {showShare && collectionId ? (
+          {showShare && onShare ? (
             <li>
               <button
                 type="button"
                 className="flex w-full items-center gap-3 px-4 py-4 text-left text-sm font-bold text-gray-900 transition-colors hover:bg-gray-50 active:bg-gray-50"
-                onClick={handleShare}
+                onClick={() => {
+                  onClose();
+                  onShare();
+                }}
               >
                 <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />
                 シェアする
