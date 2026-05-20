@@ -76,6 +76,8 @@ export interface VoteCardProps {
   onMoreClick?: (cardId: string) => void;
   /** true のときコメント導線を出さず受け付けない旨を表示 */
   commentsDisabled?: boolean;
+  /** true のときフッターのシェアアイコンを出さない（メンバー限定コレクション内など） */
+  hideShare?: boolean;
   /** Aの画像URL（指定時はフッター下にA/B画像を表示） */
   optionAImageUrl?: string;
   /** Bの画像URL */
@@ -120,6 +122,7 @@ function VoteCard({
   hasCommented = false,
   onMoreClick,
   commentsDisabled = false,
+  hideShare = false,
   optionAImageUrl,
   optionBImageUrl,
   periodStart,
@@ -452,7 +455,7 @@ function VoteCard({
           )}
         </button>
         <div className="ml-auto flex items-center gap-1">
-          {cardId != null && (
+          {cardId != null && !hideShare && (
             <button
               type="button"
               className="flex items-center justify-center text-[var(--color-brand-logo)] hover:opacity-80"
@@ -591,7 +594,7 @@ function VoteCard({
       {/* タグなしの場合の下マージン */}
       {tags.length === 0 && <div className="pb-4" aria-hidden />}
 
-      {shareSheetOpen && cardId != null && (
+      {shareSheetOpen && cardId != null && !hideShare && (
         <VoteCardShareSheet open={shareSheetOpen} onClose={() => setShareSheetOpen(false)} cardId={cardId} />
       )}
       <VoteBeforeCommentModal open={voteBeforeCommentOpen} onClose={() => setVoteBeforeCommentOpen(false)} />

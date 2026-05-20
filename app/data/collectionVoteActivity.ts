@@ -392,9 +392,8 @@ function mergeJoinProfileMaps(
 }
 
 /**
- * 参加者・参加プロフィールはサーバーが正（マイリスト解除で KV から消えた人をローカルが復活させない）。
- * 自分の楽観更新だけ、サーバーにまだ無いときだけローカルを残す。
- * サーバーが空でローカルだけあるときは GET 欠損の可能性があるため従来の和集合マージにフォールバック。
+ * 参加者はサーバーが正（マイリスト解除で KV から消えた人をローカルが復活させない）。
+ * POST 直後のみ、自分の楽観行をサーバーにまだ無いときだけ足す。
  */
 function mergeParticipantMapsPreferServer(
   local: Record<string, ParticipantRow>,
@@ -402,11 +401,7 @@ function mergeParticipantMapsPreferServer(
   currentUserId: string,
   mode: HydrateCollectionScopedMode
 ): Record<string, ParticipantRow> {
-  if (Object.keys(server).length === 0 && Object.keys(local).length > 0) {
-    return mergeParticipantsMaps(local, server);
-  }
   const out: Record<string, ParticipantRow> = { ...server };
-  // GET/ポーリング: サーバーに無い人（マイリスト解除済み）をローカルから復活させない
   if (mode !== "fromPost") return out;
   for (const [uid, row] of Object.entries(local)) {
     if (server[uid]) continue;
@@ -421,9 +416,6 @@ function mergeJoinProfileMapsPreferServer(
   currentUserId: string,
   mode: HydrateCollectionScopedMode
 ): Record<string, MemberCollectionJoinProfile> {
-  if (Object.keys(server).length === 0 && Object.keys(local).length > 0) {
-    return mergeJoinProfileMaps(local, server);
-  }
   const out: Record<string, MemberCollectionJoinProfile> = { ...server };
   if (mode !== "fromPost") return out;
   for (const [uid, row] of Object.entries(local)) {
@@ -525,9 +517,39 @@ export function hydrateCollectionScopedFromSnapshot(
     mode
   );
   saveParticipantsMap(collectionId, mergedParticipants);
-  if (Array.isArray(normalized.memberUserIds)) {
-    saveMemberUserIds(collectionId, normalized.memberUserIds);
+  saveMemberUserIds(
+    collectionId,
+    Array.isArray(normalized.memberUserIds) ? normalized.memberUserIds : []
+  );
+  notifyCollectionScopedUpdated(collectionId);
+}
+
+/** マイリスト解除後など、他タブのコレ画面が即時 GET できるよう通知 */
+export const MEMBER_COLLECTION_LEFT_EVENT = "vote_member_collection_left";
+
+export function notifyMemberCollectionLeft(collectionId: string, userId: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(MEMBER_COLLECTION_LEFT_EVENT, { detail: { collectionId, userId } })
+  );
+}
+
+/** 他タブのコレ画面用：指定ユーザーをローカル参加者から即除去（GET 前の表示更新） */
+export function pruneLocalParticipant(collectionId: string, userId: string): void {
+  if (!userId) return;
+  const map = loadParticipantsMap(collectionId);
+  if (!map[userId]) return;
+  const next = { ...map };
+  delete next[userId];
+  saveParticipantsMap(collectionId, next);
+  const joinMap = loadJoinProfilesMap(collectionId);
+  if (joinMap[userId]) {
+    const nextJoin = { ...joinMap };
+    delete nextJoin[userId];
+    saveJoinProfilesMap(collectionId, nextJoin);
   }
+  const memberIds = loadMemberUserIds(collectionId).filter((id) => id !== userId);
+  saveMemberUserIds(collectionId, memberIds);
   notifyCollectionScopedUpdated(collectionId);
 }
 

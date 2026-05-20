@@ -41,6 +41,8 @@ import {
   getAllCollectionScopedActivity,
   getCollectionScopedParticipants,
   hydrateCollectionScopedFromSnapshot,
+  MEMBER_COLLECTION_LEFT_EVENT,
+  pruneLocalParticipant,
   parseMemberCollectionVotesPayload,
   type CollectionScopedParticipant,
 } from "../../data/collectionVoteActivity";
@@ -497,12 +499,21 @@ export default function CollectionPage() {
     const onVis = () => {
       if (document.visibilityState === "visible") void pullImmediate();
     };
+    const onLeft = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ collectionId?: string; userId?: string }>).detail;
+      if (detail?.collectionId !== colId) return;
+      if (detail.userId) pruneLocalParticipant(colId, detail.userId);
+      setScopedVotesVersion((v) => v + 1);
+      void pullImmediate();
+    };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener(MEMBER_COLLECTION_LEFT_EVENT, onLeft as EventListener);
     return () => {
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener(MEMBER_COLLECTION_LEFT_EVENT, onLeft as EventListener);
     };
   }, [collection?.id, collection?.visibility, activityUserId]);
 
@@ -876,13 +887,14 @@ export default function CollectionPage() {
                   optimisticVoteResult={showVoted}
                   onVote={handleCollectionVote}
                   onBookmarkClick={setModalCardId}
-                  onMoreClick={handleCollectionCardMoreClick}
+                  onMoreClick={isMemberCollection ? undefined : handleCollectionCardMoreClick}
                   visibility={card.visibility}
                   optionAImageUrl={card.optionAImageUrl}
                   optionBImageUrl={card.optionBImageUrl}
                   periodStart={card.periodStart}
                   periodEnd={card.periodEnd}
                   commentsDisabled={isMemberCollection || card.commentsDisabled === true}
+                  hideShare={isMemberCollection}
                 />
               );
             })}

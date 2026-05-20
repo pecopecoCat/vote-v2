@@ -5,11 +5,10 @@ import {
   type MemberJoinProfileRow,
   memberCollectionMembersKey,
   memberGlobalKey,
-  memberPartsHashKey,
-  memberPartsKey,
   memberUserKey,
   readParticipantsMerged,
   rebuildMemberCollectionGlobalFromUserVotes,
+  removeParticipantFromKv,
   removeUserJoinProfile,
   upsertJoinProfileInKv,
 } from "../../lib/memberCollectionVotesKv";
@@ -218,27 +217,10 @@ export async function DELETE(
     try {
       await kv.del(memberUserKey(collectionId, userId));
 
-      // 参加者: 新 Hash があればそこから削除、無ければ旧 JSON マップから削除
-      const kvAny = kv as unknown as { hdel?: (key: string, fields: string[]) => Promise<unknown> };
-      if (typeof kvAny.hdel === "function") {
-        await kvAny.hdel(memberPartsHashKey(collectionId), [userId]);
-      } else {
-        const legacyKey = memberPartsKey(collectionId);
-        const legacyRaw = await kv.get<unknown>(legacyKey);
-        if (legacyRaw && typeof legacyRaw === "object" && !Array.isArray(legacyRaw)) {
-          const cur = legacyRaw as Record<string, unknown>;
-          if (userId in cur) {
-            const { [userId]: _removed, ...rest } = cur;
-            if (Object.keys(rest).length === 0) await kv.del(legacyKey);
-            else await kv.set(legacyKey, rest);
-          }
-        }
-      }
+      await removeParticipantFromKv(kv, collectionId, userId);
 
-      // 全体集計を、残っている投票者の userSelections から再構築（マイリスト未登録の投票者も participants に残る）
       const remainingParticipants = await readParticipantsMerged(kv, collectionId);
-      const voterIds = new Set<string>([...nextMembers, ...Object.keys(remainingParticipants)]);
-      voterIds.delete(userId);
+      const voterIds = new Set<string>(Object.keys(remainingParticipants));
       const global = await rebuildMemberCollectionGlobalFromUserVotes(kv, collectionId, voterIds);
       if (Object.keys(global).length === 0) {
         await kv.del(memberGlobalKey(collectionId));

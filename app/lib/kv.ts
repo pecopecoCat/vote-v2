@@ -76,6 +76,20 @@ function createDevMemoryKv(): KVClient {
       hashes.set(key, cur);
       return 0;
     },
+
+    async hdel(key: string, ...fields: string[]): Promise<number> {
+      const h = hashes.get(key);
+      if (!h) return 0;
+      let removed = 0;
+      for (const field of fields) {
+        if (field in h) {
+          delete h[field];
+          removed++;
+        }
+      }
+      if (Object.keys(h).length === 0) hashes.delete(key);
+      return removed;
+    },
   };
 
   /** 通常の `set(k,v)` と active-user の `set(k,v,{nx,ex})` の両対応（戻りは Upstash と揃える） */
@@ -138,4 +152,5 @@ export type KVClient = {
   /** Redis Hash（@vercel/kv / Upstash に存在）— 参加者 userId フィールドを原子的に更新するのに使用 */
   hgetall?: (key: string) => Promise<Record<string, string> | null>;
   hset?: (key: string, fields: Record<string, string>) => Promise<unknown>;
+  hdel?: (key: string, ...fields: string[]) => Promise<number>;
 };

@@ -217,6 +217,35 @@ export async function readParticipantsMerged(kv: KVClient, collectionId: string)
 /**
  * 1ユーザーの参加者行を保存。hset が使えれば Hash のみ更新（並行投票でも他メンバーが消えない）。
  */
+/** マイリスト解除時: Hash / 旧 JSON の両方から参加者行を削除 */
+export async function removeParticipantFromKv(
+  kv: KVClient,
+  collectionId: string,
+  userId: string
+): Promise<void> {
+  const hashKey = memberPartsHashKey(collectionId);
+  const legacyKey = memberPartsKey(collectionId);
+
+  if (kv.hdel) {
+    await kv.hdel(hashKey, userId);
+  } else if (kv.hgetall && kv.hset) {
+    const raw = await kv.hgetall(hashKey);
+    if (raw && userId in raw) {
+      const next = { ...raw };
+      delete next[userId];
+      if (Object.keys(next).length === 0) await kv.del(hashKey);
+      else await kv.hset(hashKey, next);
+    }
+  }
+
+  const legacyRaw = await kv.get<MemberPartsMap>(legacyKey);
+  if (legacyRaw && typeof legacyRaw === "object" && !Array.isArray(legacyRaw) && userId in legacyRaw) {
+    const { [userId]: _removed, ...rest } = legacyRaw;
+    if (Object.keys(rest).length === 0) await kv.del(legacyKey);
+    else await kv.set(legacyKey, rest);
+  }
+}
+
 export async function upsertParticipantInKv(
   kv: KVClient,
   collectionId: string,

@@ -8,7 +8,11 @@
 
 import type { CollectionGradient } from "./search";
 import { getAuth, getCurrentActivityUserId } from "./auth";
-import { clearCollectionScopedLocalData, upsertLocalJoinProfileFromAuth } from "./collectionVoteActivity";
+import {
+  clearCollectionScopedLocalData,
+  notifyMemberCollectionLeft,
+  upsertLocalJoinProfileFromAuth,
+} from "./collectionVoteActivity";
 import { removeLocalCommentsForCollection } from "./voteCardActivity";
 import { addBookmark, removeBookmark } from "./bookmarks";
 import { showAppToast } from "../lib/appToast";
@@ -696,13 +700,21 @@ export function deleteCollection(id: string): void {
     clearCollectionScopedLocalData(id);
     removeLocalCommentsForCollection(id);
     const auth = getAuth();
-    if (auth.isLoggedIn && auth.userId) {
-      void fetch("/api/member-collections", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: auth.userId, collectionId: id }),
-      }).catch(() => {});
-    }
+    const remoteUserId = auth.isLoggedIn && auth.userId ? auth.userId : userId;
+    void (async () => {
+      if (auth.isLoggedIn && auth.userId) {
+        try {
+          await fetch("/api/member-collections", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: auth.userId, collectionId: id }),
+          });
+        } catch {
+          // ignore
+        }
+      }
+      notifyMemberCollectionLeft(id, remoteUserId);
+    })();
     return;
   }
   // 作成者削除: ローカルのコレ内キャッシュも掃除
