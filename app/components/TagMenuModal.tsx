@@ -44,7 +44,6 @@ export default function TagMenuModal({
   const trendingItems: { label: string; subLabel?: string; icon: string; onClick: () => void }[] = [
     {
       label: "興味がない",
-      subLabel: "VOTEに表示しない",
       icon: "/icons/icon_dislike.svg",
       onClick: handleNotInterested,
     },

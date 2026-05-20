@@ -399,12 +399,15 @@ function mergeJoinProfileMaps(
 function mergeParticipantMapsPreferServer(
   local: Record<string, ParticipantRow>,
   server: Record<string, ParticipantRow>,
-  currentUserId: string
+  currentUserId: string,
+  mode: HydrateCollectionScopedMode
 ): Record<string, ParticipantRow> {
   if (Object.keys(server).length === 0 && Object.keys(local).length > 0) {
     return mergeParticipantsMaps(local, server);
   }
   const out: Record<string, ParticipantRow> = { ...server };
+  // GET/ポーリング: サーバーに無い人（マイリスト解除済み）をローカルから復活させない
+  if (mode !== "fromPost") return out;
   for (const [uid, row] of Object.entries(local)) {
     if (server[uid]) continue;
     if (uid === currentUserId) out[uid] = row;
@@ -415,12 +418,14 @@ function mergeParticipantMapsPreferServer(
 function mergeJoinProfileMapsPreferServer(
   local: Record<string, MemberCollectionJoinProfile>,
   server: Record<string, MemberCollectionJoinProfile>,
-  currentUserId: string
+  currentUserId: string,
+  mode: HydrateCollectionScopedMode
 ): Record<string, MemberCollectionJoinProfile> {
   if (Object.keys(server).length === 0 && Object.keys(local).length > 0) {
     return mergeJoinProfileMaps(local, server);
   }
   const out: Record<string, MemberCollectionJoinProfile> = { ...server };
+  if (mode !== "fromPost") return out;
   for (const [uid, row] of Object.entries(local)) {
     if (server[uid]) continue;
     if (uid === currentUserId) out[uid] = row;
@@ -509,17 +514,18 @@ export function hydrateCollectionScopedFromSnapshot(
   const mergedJoin = mergeJoinProfileMapsPreferServer(
     loadJoinProfilesMap(collectionId),
     normalized.joinProfiles ?? {},
-    uid
+    uid,
+    mode
   );
   saveJoinProfilesMap(collectionId, mergedJoin);
   const mergedParticipants = mergeParticipantMapsPreferServer(
     loadParticipantsMap(collectionId),
     normalized.participants,
-    uid
+    uid,
+    mode
   );
-  const mergedForDisplay = mergeParticipantsWithJoinProfiles(mergedParticipants, mergedJoin);
-  saveParticipantsMap(collectionId, mergedForDisplay);
-  if (Array.isArray(normalized.memberUserIds) && normalized.memberUserIds.length > 0) {
+  saveParticipantsMap(collectionId, mergedParticipants);
+  if (Array.isArray(normalized.memberUserIds)) {
     saveMemberUserIds(collectionId, normalized.memberUserIds);
   }
   notifyCollectionScopedUpdated(collectionId);
@@ -655,27 +661,18 @@ export function upsertLocalJoinProfileFromAuth(collectionId: string): void {
   notifyCollectionScopedUpdated(collectionId);
 }
 
-/** メンバー限定コレクションの参加者一覧（投票済み＋参加登録＋参加インデックス・新しい活動順） */
+/** メンバー限定コレクションの参加者一覧（コレ内で1票以上入れたユーザー・新しい活動順） */
 export function getCollectionScopedParticipants(collectionId: string): CollectionScopedParticipant[] {
-  const merged = mergeParticipantsWithJoinProfiles(
-    loadParticipantsMap(collectionId),
-    loadJoinProfilesMap(collectionId)
-  );
+  const voters = loadParticipantsMap(collectionId);
   const epoch = new Date(0).toISOString();
-  for (const userId of loadMemberUserIds(collectionId)) {
-    if (merged[userId]) continue;
-    merged[userId] = {
-      name: resolveMemberDisplayName(userId),
-      iconUrl: resolveMemberIconUrl(userId),
-      lastVotedAt: epoch,
-    };
-  }
-  const list: CollectionScopedParticipant[] = Object.entries(merged).map(([userId, row]) => ({
-    userId,
-    name: resolveMemberDisplayName(userId, row.name),
-    iconUrl: row.iconUrl ?? resolveMemberIconUrl(userId, row.iconUrl),
-    lastVotedAt: row.lastVotedAt,
-  }));
+  const list: CollectionScopedParticipant[] = Object.entries(voters)
+    .filter(([, row]) => Boolean(row.lastVotedAt && row.lastVotedAt > epoch))
+    .map(([userId, row]) => ({
+      userId,
+      name: resolveMemberDisplayName(userId, row.name),
+      iconUrl: row.iconUrl ?? resolveMemberIconUrl(userId, row.iconUrl),
+      lastVotedAt: row.lastVotedAt,
+    }));
   list.sort((a, b) => (b.lastVotedAt || "").localeCompare(a.lastVotedAt || ""));
   return list;
 }
@@ -696,8 +693,11 @@ export function collectionMemberScopedHasAnyVote(collectionId: string): boolean 
 
 /** コレクション内の票数＋現在ユーザーの選択（コメントは含めない。親でグローバルと合成する） */
 export function getCollectionScopedActivity(collectionId: string, cardId: string): CardActivity {
-  const g = loadScopedGlobal(collectionId)[cardId];
-  const u = loadScopedUserSelections(collectionId)[cardId];
+  const nid = normalizeCardIdKey(cardId);
+  const globalMap = loadScopedGlobal(collectionId);
+  const userMap = loadScopedUserSelections(collectionId);
+  const g = globalMap[nid] ?? globalMap[cardId];
+  const u = userMap[nid] ?? userMap[cardId];
   return {
     countA: g?.countA ?? 0,
     countB: g?.countB ?? 0,
@@ -714,7 +714,8 @@ export function getAllCollectionScopedActivity(collectionId: string): Record<str
   const ids = new Set([...Object.keys(global), ...Object.keys(user)]);
   const result: Record<string, CardActivity> = {};
   for (const id of ids) {
-    result[id] = getCollectionScopedActivity(collectionId, id);
+    const nid = normalizeCardIdKey(id);
+    result[nid] = getCollectionScopedActivity(collectionId, nid);
   }
   return result;
 }

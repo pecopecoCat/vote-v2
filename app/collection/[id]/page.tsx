@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMemo, useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
+import { flushSync } from "react-dom";
 import VoteCard from "../../components/VoteCard";
 import { VoteCardList } from "../../components/VoteCardList";
 import CardOptionsModal from "../../components/CardOptionsModal";
@@ -66,6 +67,14 @@ const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   private: "非公開",
   member: "メンバー限定",
 };
+
+function scopedActivityForCard(
+  map: Record<string, CardActivity>,
+  cardId: string
+): CardActivity | undefined {
+  const nid = normalizeCardIdKey(cardId);
+  return map[nid] ?? map[cardId];
+}
 
 function MemberCollectionLoginGate({ collectionId }: { collectionId: string }) {
   const returnTo = `/collection/${collectionId}`;
@@ -572,30 +581,12 @@ export default function CollectionPage() {
     );
   }, [collection, memberParticipants, cardsInCollection, viewerAsOwnerProfile]);
 
-  /** 参加登録 effect 用：cardIds は merge のたびに新配列になるため内容で比較する */
-  const participateCardIdsKey = useMemo(
-    () => (collection?.cardIds ?? []).join("\0"),
-    [collection?.cardIds]
-  );
-
-  /** メンバー限定を開いただけでもマイページのコレクション一覧に載せる（投票前でも可） */
-  useEffect(() => {
-    if (!collection || collection.visibility !== "member") return;
-    if (!auth.isLoggedIn) return;
-    if (collection.createdByUserId && collection.createdByUserId === getCurrentActivityUserId()) return;
-    addParticipatedMemberCollectionIfNeeded(collection);
-  }, [
-    collection?.id,
-    collection?.visibility,
-    collection?.createdByUserId,
-    participateCardIdsKey,
-    auth.isLoggedIn,
-  ]);
-
   const cardsToShow = useMemo(() => {
     if (showVoted) return sortedCardsInCollection;
     if (isMemberCollection) {
-      return sortedCardsInCollection.filter(({ cardId }) => !scopedActivityMap[cardId]?.userSelectedOption);
+      return sortedCardsInCollection.filter(
+        ({ cardId }) => scopedActivityForCard(scopedActivityMap, cardId)?.userSelectedOption == null
+      );
     }
     return sortedCardsInCollection.filter(({ cardId }) => !activity[cardId]?.userSelectedOption);
   }, [sortedCardsInCollection, showVoted, activity, isMemberCollection, scopedActivityMap]);
@@ -604,7 +595,7 @@ export default function CollectionPage() {
     return perfMeasure("collection.voteCardViewModels", () => {
       return cardsToShow.map(({ card, cardId }) => {
         const act = activity[cardId];
-        const scopedAct = scopedActivityMap[cardId];
+        const scopedAct = scopedActivityForCard(scopedActivityMap, cardId);
         const globalComments = Array.isArray(act?.comments) ? act.comments : [];
         const comments = isMemberCollection
           ? []
@@ -647,13 +638,14 @@ export default function CollectionPage() {
       if (collection?.visibility === "member") {
         addCollectionScopedVote(collection.id, cid, option, { useKv: true });
         addParticipatedMemberCollectionIfNeeded(collection);
-        // イベント取りこぼし/描画タイミング差でも参加者・投票数を確実に反映
-        setScopedVotesVersion((v) => v + 1);
+        const bump = () => setScopedVotesVersion((v) => v + 1);
+        if (showVoted) bump();
+        else flushSync(bump);
         return;
       }
       void sharedAddVote(cid, option);
     },
-    [collection, sharedAddVote, cardsInCollection, isRemote, createdVotesForTimeline]
+    [collection, sharedAddVote, cardsInCollection, isRemote, createdVotesForTimeline, showVoted]
   );
 
   const handleCollectionCardMoreClick = useCallback((cardId: string) => {
@@ -881,6 +873,7 @@ export default function CollectionPage() {
                   bookmarked={isCardBookmarked(cardId)}
                   hasCommented={false}
                   initialSelectedOption={initialSelectedOption}
+                  optimisticVoteResult={showVoted}
                   onVote={handleCollectionVote}
                   onBookmarkClick={setModalCardId}
                   onMoreClick={handleCollectionCardMoreClick}

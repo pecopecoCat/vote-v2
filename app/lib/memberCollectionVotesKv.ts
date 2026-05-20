@@ -262,15 +262,11 @@ function enrichMemberMapsFromIndex(
       };
       continue;
     }
+    // 参加登録のみ（未投票）は joinProfiles / memberUserIds に留め、参加者一覧には載せない
     if (jp[uid] && !parts[uid]) {
-      parts[uid] = {
-        name: jp[uid].name,
-        iconUrl: jp[uid].iconUrl,
-        lastVotedAt: jp[uid].joinedAt,
-      };
       continue;
     }
-    if (!jp[uid]) {
+    if (!jp[uid] && !parts[uid]) {
       jp[uid] = { name: uid, joinedAt: epoch };
     }
   }

@@ -40,7 +40,7 @@ import {
 import {
   hydrateParticipatedMemberCollectionsFromRemote,
   hydrateUserOwnedCollectionsFromRemote,
-  ensureSeedPapaWarningCollection,
+  removeSeedPapaWarningCollection,
   isMemberOnlyCollection,
 } from "../data/collections";
 import { hydrateBookmarksFromRemote } from "../data/bookmarks";
@@ -535,7 +535,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     const runHydrate = () => {
       void (async () => {
         await hydrateUserOwnedCollectionsFromRemote();
-        ensureSeedPapaWarningCollection();
+        removeSeedPapaWarningCollection();
         await hydrateParticipatedMemberCollectionsFromRemote();
         await hydrateBookmarksFromRemote();
       })();

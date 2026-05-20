@@ -12,8 +12,8 @@ import { clearCollectionScopedLocalData, upsertLocalJoinProfileFromAuth } from "
 import { removeLocalCommentsForCollection } from "./voteCardActivity";
 import { addBookmark, removeBookmark } from "./bookmarks";
 import { showAppToast } from "../lib/appToast";
-import { getSeedClassicCardIds, getSeedPapaWarningCardIds } from "./voteCards";
-import { DEFAULT_MAMA_AVATAR_URL, DEFAULT_RYO_AVATAR_URL } from "./avatarUrls";
+import { getSeedClassicCardIds } from "./voteCards";
+import { DEFAULT_RYO_AVATAR_URL } from "./avatarUrls";
 
 const STORAGE_KEY_PREFIX = "vote_collections_";
 const PINNED_STORAGE_KEY_PREFIX = "vote_pinned_collection_ids_";
@@ -197,54 +197,6 @@ export async function hydrateUserOwnedCollectionsFromRemote(): Promise<void> {
   }
 }
 
-/**
- * ログイン済みユーザー向けにおすすめシードを1件だけ自動追加（削除済みの場合は再利用しない）。
- * 「⚠️パパ閲覧注意」＝voteCards の末尾シードカードのみ格納。
- */
-export const SEED_PAPA_WARNING_COLLECTION_ID = "col-seed-papa-warning";
-
-export function ensureSeedPapaWarningCollection(): void {
-  if (typeof window === "undefined") return;
-  const auth = getAuth();
-  if (!auth.isLoggedIn) return;
-  const uid = getCurrentActivityUserId();
-  if (uid.startsWith("guest_")) return;
-
-  const cardIds = getSeedPapaWarningCardIds();
-  if (cardIds.length === 0) return;
-
-  const cols = load(uid);
-  const existingIndex = cols.findIndex((c) => c.id === SEED_PAPA_WARNING_COLLECTION_ID);
-  if (existingIndex >= 0) {
-    const existing = cols[existingIndex]!;
-    // 既存があっても、作成者表示はデモ要件に合わせて更新（miki固定）
-    const next: Collection = {
-      ...existing,
-      // 末尾 seed の入れ替えに追従（カード数が変わった場合）
-      cardIds: [...cardIds],
-      createdByDisplayName: "miki",
-      createdByIconUrl: DEFAULT_MAMA_AVATAR_URL,
-    };
-    if (collectionSnapshotEqual(existing, next)) return;
-    cols[existingIndex] = next;
-    save(uid, cols);
-    return;
-  }
-
-  const seedCol: Collection = {
-    id: SEED_PAPA_WARNING_COLLECTION_ID,
-    name: "⚠️パパ閲覧注意",
-    color: "#FFB020",
-    gradient: "orange-yellow",
-    visibility: "public",
-    cardIds: [...cardIds],
-    createdByUserId: uid,
-    createdByDisplayName: "miki",
-    createdByIconUrl: DEFAULT_MAMA_AVATAR_URL,
-  };
-  save(uid, [...cols, seedCol]);
-}
-
 /** 定番の2択（デモ用の固定コレクション。作成者: ryo） */
 export const SEED_CLASSIC_COLLECTION_ID = "col-seed-classic";
 
@@ -294,21 +246,6 @@ export function getCollections(): Collection[] {
 
 function cardIdsEqual(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
-}
-
-function collectionSnapshotEqual(a: Collection, b: Collection): boolean {
-  return (
-    a.id === b.id &&
-    a.name === b.name &&
-    a.color === b.color &&
-    a.gradient === b.gradient &&
-    a.visibility === b.visibility &&
-    cardIdsEqual(a.cardIds, b.cardIds) &&
-    (a.createdByUserId ?? "") === (b.createdByUserId ?? "") &&
-    (a.createdByDisplayName ?? "") === (b.createdByDisplayName ?? "") &&
-    (a.createdByIconUrl ?? "") === (b.createdByIconUrl ?? "") &&
-    Boolean(a.joinedParticipation) === Boolean(b.joinedParticipation)
-  );
 }
 
 function joinedParticipationRowEqual(a: Collection, b: Collection): boolean {
@@ -373,8 +310,8 @@ export function mergeMemberCollectionForDisplay(
 }
 
 /**
- * メンバー限定を開いた／投票したとき、マイページ用リストに追加（未登録時のみローカルに push）。
- * ログイン時は参加インデックス・表示用プロフィールの同期のため、既に参加済みでも KV へ POST する。
+ * メンバー限定で初めて投票したとき、マイページ用リストに追加（未登録時のみローカルに push）。
+ * ログイン時は参加中 KV へ同期。コレを開いただけでは呼ばない。
  * `createdByUserId` が現在ユーザーと一致する場合はオーナーなので何もしない。
  */
 export function addParticipatedMemberCollectionIfNeeded(col: Collection, opts?: { skipRemote?: boolean }): void {
@@ -760,7 +697,7 @@ export function deleteCollection(id: string): void {
     removeLocalCommentsForCollection(id);
     const auth = getAuth();
     if (auth.isLoggedIn && auth.userId) {
-      fetch("/api/member-collections", {
+      void fetch("/api/member-collections", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: auth.userId, collectionId: id }),
@@ -772,6 +709,17 @@ export function deleteCollection(id: string): void {
   clearCollectionScopedLocalData(id);
   removeLocalCommentsForCollection(id);
   deleteCollectionFromApi(id);
+}
+
+const SEED_PAPA_WARNING_COLLECTION_ID = "col-seed-papa-warning";
+
+/** 旧デモ用シード「⚠️パパ閲覧注意」を一覧から除去（既に登録済みの端末向け） */
+export function removeSeedPapaWarningCollection(): void {
+  if (typeof window === "undefined") return;
+  const uid = getCurrentActivityUserId();
+  const cols = load(uid);
+  if (!cols.some((c) => c.id === SEED_PAPA_WARNING_COLLECTION_ID)) return;
+  deleteCollection(SEED_PAPA_WARNING_COLLECTION_ID);
 }
 
 function loadPinnedIds(userId: string): string[] {

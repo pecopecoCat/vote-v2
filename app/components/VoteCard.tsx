@@ -63,6 +63,11 @@ export interface VoteCardProps {
   initialSelectedOption?: "A" | "B" | null;
   /** 投票時に親へ通知（cardId と A/B） */
   onVote?: (cardId: string, option: "A" | "B") => void;
+  /**
+   * false のとき投票タップでカード内の結果表示・票数の先出しをせず onVote のみ呼ぶ。
+   * コレクション画面で「投票済みを表示」OFF のとき、親が一覧から外す用途。
+   */
+  optimisticVoteResult?: boolean;
   /** public: みんな見れる / private: リンクを知ってる人だけ（非公開バッジ表示） */
   visibility?: "public" | "private";
   /** 自分がコメント済みの場合 true（コメントアイコンを #FFE100 で表示） */
@@ -110,6 +115,7 @@ function VoteCard({
   onBookmarkClick,
   initialSelectedOption = null,
   onVote,
+  optimisticVoteResult = true,
   visibility,
   hasCommented = false,
   onMoreClick,
@@ -218,16 +224,20 @@ function VoteCard({
     if (!periodAllowsVote) return;
     if (isSelectingRef.current || selectedOption) return;
     isSelectingRef.current = true;
-    setSelectedOption("A");
-    setLocalCountA((c) => c + 1);
+    if (optimisticVoteResult) {
+      setSelectedOption("A");
+      setLocalCountA((c) => c + 1);
+    }
     if (cardId != null && onVote) onVote(cardId, "A");
   };
   const handleSelectB = () => {
     if (!periodAllowsVote) return;
     if (isSelectingRef.current || selectedOption) return;
     isSelectingRef.current = true;
-    setSelectedOption("B");
-    setLocalCountB((c) => c + 1);
+    if (optimisticVoteResult) {
+      setSelectedOption("B");
+      setLocalCountB((c) => c + 1);
+    }
     if (cardId != null && onVote) onVote(cardId, "B");
   };
 
