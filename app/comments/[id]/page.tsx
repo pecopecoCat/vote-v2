@@ -295,6 +295,13 @@ export default function CommentsPage() {
     : { type: "guest" as const };
 
   const handleVote = (side: "A" | "B") => {
+    if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem(`vote_last_selection_${stableId}`, side);
+      } catch {
+        /* ignore */
+      }
+    }
     void sharedAddVote(stableId, side);
   };
 

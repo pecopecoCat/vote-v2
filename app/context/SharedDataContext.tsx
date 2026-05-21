@@ -335,13 +335,11 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         ? (data.userSelections as Record<string, unknown>)
         : {};
     setActivity((prev) => {
-      const next =
-        lastActivityFetchUserIdRef.current !== userId
-          ? (() => {
-              lastActivityFetchUserIdRef.current = userId;
-              return buildActivityFromApi(global, userSelections);
-            })()
-          : mergeActivityFromApiFetch(prev, global, userSelections);
+      const userChanged = lastActivityFetchUserIdRef.current !== userId;
+      if (userChanged) lastActivityFetchUserIdRef.current = userId;
+      /** ログイン直後は guest→user の local 引き継ぎを消さない（build のみだと未投票に見える） */
+      const base = userChanged ? getAllActivity() : prev;
+      const next = mergeActivityFromApiFetch(base, global, userSelections);
       persistAllActivityToLocalStorage(next);
       return next;
     });
@@ -512,6 +510,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           clearTimeout(authActivityTimerRef.current);
           authActivityTimerRef.current = null;
         }
+        setActivity(getAllActivity());
         void fetchActivity();
         return;
       }

@@ -200,6 +200,35 @@ export async function POST(
       });
     }
 
+    if (type === "claim_guest_selections") {
+      const guestUserId = typeof body.guestUserId === "string" ? body.guestUserId : "";
+      const targetUserId = typeof body.targetUserId === "string" ? body.targetUserId : "";
+      if (!guestUserId.startsWith("guest_") || !targetUserId || targetUserId.startsWith("guest_")) {
+        return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+      }
+      const guestKey = KV_ACTIVITY_USER_PREFIX + guestUserId;
+      const targetKey = KV_ACTIVITY_USER_PREFIX + targetUserId;
+      const guestRaw =
+        (await kv.get<Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>>(guestKey)) ?? {};
+      const targetRaw =
+        (await kv.get<Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>>(targetKey)) ?? {};
+      const merged: Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }> = { ...targetRaw };
+      for (const [cardId, row] of Object.entries(guestRaw)) {
+        const opt = row?.userSelectedOption;
+        if (opt !== "A" && opt !== "B") continue;
+        const nid = normalizeCardIdKey(cardId);
+        const existing = merged[nid];
+        const gt = typeof row.votedAt === "string" ? row.votedAt : "";
+        const et = typeof existing?.votedAt === "string" ? existing.votedAt : "";
+        if (!existing?.userSelectedOption || gt >= et) {
+          merged[nid] = { userSelectedOption: opt, votedAt: gt || new Date().toISOString() };
+        }
+      }
+      await kv.set(targetKey, merged);
+      await kv.del(guestKey);
+      return NextResponse.json({ ok: true });
+    }
+
     if (type === "bookmark") {
       const cardId = normalizeCardIdKey(body.cardId as string);
       if (!cardId || typeof cardId !== "string") {

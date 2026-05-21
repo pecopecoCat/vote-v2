@@ -114,29 +114,99 @@ export function removeLocalCommentsForCollection(collectionId: string, opts?: { 
 
 export type UserVoteSelectionRow = { userSelectedOption?: "A" | "B"; votedAt?: string };
 
-function loadUserSelections(): Record<string, UserVoteSelectionRow> {
-  if (typeof window === "undefined") return {};
+function parseUserSelectionsJson(raw: string | null): Record<string, UserVoteSelectionRow> {
+  if (!raw) return {};
   try {
-    const raw = window.localStorage.getItem(getUserStorageKey());
-    if (!raw) return {};
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (typeof parsed !== "object" || parsed === null) return {};
     const out: Record<string, UserVoteSelectionRow> = {};
     for (const [cardId, v] of Object.entries(parsed)) {
+      const nid = normalizeCardIdKey(cardId);
       if (typeof v === "string" && (v === "A" || v === "B")) {
-        out[cardId] = { userSelectedOption: v };
+        out[nid] = { userSelectedOption: v };
         continue;
       }
       if (v && typeof v === "object") {
         const o = v as Record<string, unknown>;
         const opt = o.userSelectedOption === "A" || o.userSelectedOption === "B" ? o.userSelectedOption : undefined;
         const votedAt = typeof o.votedAt === "string" ? o.votedAt : undefined;
-        if (opt || votedAt) out[cardId] = { userSelectedOption: opt, votedAt };
+        if (opt || votedAt) out[nid] = { userSelectedOption: opt, votedAt };
       }
     }
     return out;
   } catch {
     return {};
+  }
+}
+
+function loadUserSelectionsForActivityUserId(activityUserId: string): Record<string, UserVoteSelectionRow> {
+  if (typeof window === "undefined") return {};
+  try {
+    return parseUserSelectionsJson(window.localStorage.getItem(USER_STORAGE_KEY_PREFIX + activityUserId));
+  } catch {
+    return {};
+  }
+}
+
+function loadUserSelections(): Record<string, UserVoteSelectionRow> {
+  return loadUserSelectionsForActivityUserId(getCurrentActivityUserId());
+}
+
+/**
+ * 未ログイン（guest_*）で入れた投票選択をログイン後のユーザーに引き継ぐ（localStorage）。
+ * グローバル票数は既に加算済みのため、ユーザー別の選択のみコピーする。
+ */
+export function migrateGuestVoteSelectionsToUser(
+  targetActivityUserId: string,
+  guestActivityUserId: string
+): void {
+  if (typeof window === "undefined") return;
+  if (!guestActivityUserId.startsWith("guest_")) return;
+  if (targetActivityUserId.startsWith("guest_")) return;
+
+  const guest = loadUserSelectionsForActivityUserId(guestActivityUserId);
+  if (Object.keys(guest).length === 0) return;
+
+  const target = loadUserSelectionsForActivityUserId(targetActivityUserId);
+  const next = { ...target };
+  for (const [cardId, row] of Object.entries(guest)) {
+    const opt = row.userSelectedOption;
+    if (opt !== "A" && opt !== "B") continue;
+    const nid = normalizeCardIdKey(cardId);
+    const existing = next[nid];
+    const gt = row.votedAt ?? "";
+    const et = existing?.votedAt ?? "";
+    if (!existing?.userSelectedOption || gt >= et) {
+      next[nid] = { userSelectedOption: opt, votedAt: gt || new Date().toISOString() };
+    }
+  }
+  try {
+    window.localStorage.setItem(USER_STORAGE_KEY_PREFIX + targetActivityUserId, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+/** KV 上の guest 用 userSelections をログインユーザーへ移す（票数は増やさない） */
+export async function claimGuestVoteSelectionsOnServer(
+  guestActivityUserId: string,
+  targetActivityUserId: string
+): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (!guestActivityUserId.startsWith("guest_")) return;
+  if (targetActivityUserId.startsWith("guest_")) return;
+  try {
+    await fetch("/api/activity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "claim_guest_selections",
+        guestUserId: guestActivityUserId,
+        targetUserId: targetActivityUserId,
+      }),
+    });
+  } catch {
+    // ignore
   }
 }
 

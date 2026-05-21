@@ -5,6 +5,10 @@
 
 import type { VoteCardData } from "./voteCards";
 import {
+  claimGuestVoteSelectionsOnServer,
+  migrateGuestVoteSelectionsToUser,
+} from "./voteCardActivity";
+import {
   DEFAULT_AI_AVATAR_URL,
   DEFAULT_KOUTA_AVATAR_URL,
   DEFAULT_MAMA_AVATAR_URL,
@@ -135,11 +139,24 @@ export function getAuth(): AuthState {
   return load();
 }
 
+function migrateGuestVotesBeforeAuthSwitch(targetActivityUserId: string): void {
+  if (typeof window === "undefined") return;
+  const guestActivityUserId = getCurrentActivityUserId();
+  migrateGuestVoteSelectionsToUser(targetActivityUserId, guestActivityUserId);
+  void claimGuestVoteSelectionsOnServer(guestActivityUserId, targetActivityUserId);
+}
+
 /** LINEでログイン済みにする（デモ用。本番では LINE Login コールバックで user を渡す） */
 export function setLineLogin(user?: LineAuthUser): void {
+  const targetActivityUserId =
+    user?.name && DEMO_USER_IDS.includes(user.name as DemoUserId) ? user.name : "line";
+  migrateGuestVotesBeforeAuthSwitch(targetActivityUserId);
   save({
     isLoggedIn: true,
     user: user ?? DEMO_USERS.user1,
+    ...(DEMO_USER_IDS.includes(targetActivityUserId as DemoUserId)
+      ? { userId: targetActivityUserId as DemoUserId }
+      : {}),
   });
 }
 
@@ -195,6 +212,7 @@ export function mapDemoCreatorDisplayForTimeline(cards: VoteCardData[]): VoteCar
 
 /** 簡易デモ：user1..user6 のいずれかでログイン（localStorage 優先、なければ API から復元） */
 export async function loginAsDemoUser(userId: DemoUserId): Promise<void> {
+  migrateGuestVotesBeforeAuthSwitch(userId);
   const defaultUser = DEMO_USERS[userId];
   let saved = loadSavedProfile(userId);
   if (!saved) {

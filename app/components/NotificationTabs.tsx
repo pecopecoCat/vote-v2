@@ -1,8 +1,14 @@
 "use client";
 
 import AppHeader from "./AppHeader";
+import UnderlineTabBar, { type UnderlineTabItem } from "./UnderlineTabBar";
 
 export type NotificationTabId = "activity" | "announcements";
+
+const NOTIFICATION_TAB_ITEMS: UnderlineTabItem<NotificationTabId>[] = [
+  { id: "activity", label: "アクティビティ" },
+  { id: "announcements", label: "運営からのお知らせ" },
+];
 
 export interface NotificationTabsProps {
   /** SNSログイン時のみアクティビティタブを表示。未ログインは運営お知らせのみ */
@@ -33,45 +39,15 @@ export default function NotificationTabs({
     <div className="bg-[#F1F1F1]">
       <AppHeader type="logo" />
 
-      {/* タブバー：上マージン120%(12px→14.4px)、下マージン95%(12px→11.4px)。黄ラインは境界に */}
-      {isLoggedIn && (
-        <div className="w-full min-w-0">
-          <nav className="flex w-full bg-white" aria-label="お知らせタブ">
-            <button
-              type="button"
-              onClick={() => onTabChange("activity")}
-              className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-                effectiveTab === "activity" ? "text-gray-900" : "text-gray-500"
-              }`}
-            >
-              <span className="flex-1" aria-hidden />
-              <span className="inline-block">アクティビティ</span>
-              {effectiveTab === "activity" && (
-                <span
-                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
-                  aria-hidden
-                />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => onTabChange("announcements")}
-              className={`relative flex flex-1 min-w-0 flex-col pt-[14.4px] pb-[11.4px] text-sm font-bold ${
-                effectiveTab === "announcements" ? "text-gray-900" : "text-gray-500"
-              }`}
-            >
-              <span className="flex-1" aria-hidden />
-              <span className="inline-block">運営からのお知らせ</span>
-              {effectiveTab === "announcements" && (
-                <span
-                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FFE100]"
-                  aria-hidden
-                />
-              )}
-            </button>
-          </nav>
-        </div>
-      )}
+      {isLoggedIn ? (
+        <UnderlineTabBar
+          items={NOTIFICATION_TAB_ITEMS}
+          activeId={effectiveTab}
+          onSelect={onTabChange}
+          ariaLabel="お知らせタブ"
+          layout="equal"
+        />
+      ) : null}
 
       {/* アクティビティは区切り線フル幅のため横パディングなし。お知らせは 335/375 相当のコンテンツ幅 */}
       <main className="mx-auto max-w-lg pb-6 pt-4">
