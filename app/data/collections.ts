@@ -165,18 +165,18 @@ export async function hydrateUserOwnedCollectionsFromRemote(): Promise<void> {
   const uid = getCurrentActivityUserId();
   if (!uid || uid.startsWith("guest_")) return;
   try {
-    const res = await fetch(`/api/user-collections?userId=${encodeURIComponent(uid)}`);
-    if (res.status === 503) return;
-    if (!res.ok) return;
-    const data = (await res.json()) as { collections?: unknown };
-    const list = Array.isArray(data?.collections) ? data.collections : [];
-    const ownedServer: Collection[] = [];
-    for (const raw of list) {
-      if (!raw || typeof raw !== "object") continue;
-      ownedServer.push(normalizeCollection(raw as Record<string, unknown>));
-    }
-
     await withCollectionsWriteLock(async () => {
+      const res = await fetch(`/api/user-collections?userId=${encodeURIComponent(uid)}`);
+      if (res.status === 503) return;
+      if (!res.ok) return;
+      const data = (await res.json()) as { collections?: unknown };
+      const list = Array.isArray(data?.collections) ? data.collections : [];
+      const ownedServer: Collection[] = [];
+      for (const raw of list) {
+        if (!raw || typeof raw !== "object") continue;
+        ownedServer.push(normalizeCollection(raw as Record<string, unknown>));
+      }
+
       const local = load(uid);
       const joined = local.filter((c) => c.joinedParticipation);
       const ownedLocal = local.filter((c) => !c.joinedParticipation);
@@ -199,6 +199,11 @@ export async function hydrateUserOwnedCollectionsFromRemote(): Promise<void> {
   } catch {
     // ignore
   }
+}
+
+/** 直近の PUT /api/user-collections が終わるまで待つ（作成直後の hydrate 競合防止） */
+export function waitForCollectionsRemoteQueue(): Promise<void> {
+  return collectionsWriteChain;
 }
 
 /** 定番の2択（デモ用の固定コレクション。作成者: ryo） */
@@ -630,16 +635,28 @@ export function getAllBookmarkedCardIds(): string[] {
   return Array.from(set);
 }
 
+type CollectionMutationOpts = { skipApiSync?: boolean; skipRemotePush?: boolean };
+
 /** カードをコレクションに追加（Bookmarkにも登録する） */
-export function addCardToCollection(collectionId: string, cardId: string): void {
+export function addCardToCollection(
+  collectionId: string,
+  cardId: string,
+  opts?: CollectionMutationOpts
+): void {
   const userId = getCurrentActivityUserId();
   const cols = load(userId);
   const col = cols.find((c) => c.id === collectionId);
   if (!col || col.cardIds.includes(cardId)) return;
   col.cardIds.push(cardId);
-  save(userId, cols);
+  save(userId, cols, opts?.skipRemotePush ? { skipRemotePush: true } : undefined);
   addBookmark(cardId);
-  if (!col.joinedParticipation && (col.visibility === "public" || col.visibility === "member")) syncCollectionToApi(col);
+  if (
+    !opts?.skipApiSync &&
+    !col.joinedParticipation &&
+    (col.visibility === "public" || col.visibility === "member")
+  ) {
+    syncCollectionToApi(col);
+  }
 }
 
 /** カードをコレクションから削除 */
@@ -672,7 +689,13 @@ export function toggleCardInCollection(collectionId: string, cardId: string): vo
 /** 新規コレクション作成（現在ユーザーが作る。名前必須） */
 export function createCollection(
   name: string,
-  options?: { color?: string; gradient?: CollectionGradient; visibility?: CollectionVisibility }
+  options?: {
+    color?: string;
+    gradient?: CollectionGradient;
+    visibility?: CollectionVisibility;
+    skipApiSync?: boolean;
+    skipRemotePush?: boolean;
+  }
 ): Collection {
   const userId = getCurrentActivityUserId();
   const auth = getAuth();
@@ -692,9 +715,47 @@ export function createCollection(
       auth.isLoggedIn && auth.user?.iconUrl?.length ? auth.user.iconUrl : undefined,
   };
   cols.push(newCol);
-  save(userId, cols);
-  if (newCol.visibility === "public" || newCol.visibility === "member") syncCollectionToApi(newCol);
+  save(userId, cols, options?.skipRemotePush ? { skipRemotePush: true } : undefined);
+  if (
+    !options?.skipApiSync &&
+    (newCol.visibility === "public" || newCol.visibility === "member")
+  ) {
+    syncCollectionToApi(newCol);
+  }
   return newCol;
+}
+
+/** 公開・メンバー限定コレを KV に1回だけ同期（作成直後＋カード追加のまとめ用） */
+export function syncOwnedCollectionToApiIfPublic(collectionId: string): void {
+  const col = load(getCurrentActivityUserId()).find((c) => c.id === collectionId);
+  if (!col || col.joinedParticipation) return;
+  if (col.visibility === "public" || col.visibility === "member") syncCollectionToApi(col);
+}
+
+/**
+ * 設定モーダルから新規コレ作成（ローカル保存 → PUT 完了待ち → 公開系は KV 同期を1回）。
+ * Bookmark の「新しいコレクション」・マイページ追加で共通利用。
+ */
+export async function createOwnedCollectionFromSettings(
+  name: string,
+  options: {
+    gradient?: CollectionGradient;
+    visibility?: CollectionVisibility;
+    cardId?: string;
+  }
+): Promise<Collection> {
+  const created = createCollection(name, {
+    gradient: options.gradient,
+    visibility: options.visibility,
+    skipApiSync: true,
+    skipRemotePush: true,
+  });
+  if (options.cardId) addCardToCollection(created.id, options.cardId, { skipApiSync: true });
+  await waitForCollectionsRemoteQueue();
+  syncOwnedCollectionToApiIfPublic(created.id);
+  const saved = load(getCurrentActivityUserId()).find((c) => c.id === created.id) ?? created;
+  showAppToast("コレクションを作成しました");
+  return saved;
 }
 
 /** コレクションを更新（名前・色・グラデーション・公開設定） */

@@ -65,6 +65,7 @@ import { pickStoredIconUrl } from "../../data/memberParticipantAvatar";
 import { perfMeasure } from "../../lib/perf";
 import { normalizeCardIdKey } from "../../lib/normalize";
 import { navigateBack } from "../../lib/navigateBack";
+import { buildVoteCardProps } from "../../lib/buildVoteCardProps";
 
 const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
   public: "公開",
@@ -418,6 +419,8 @@ export default function CollectionPage() {
   );
   const isFromApi = !!collectionFromApi && !localCollection;
   const isMemberCollection = collection?.visibility === "member";
+  const isMemberCollectionParticipant =
+    isMemberCollection && Boolean(collection?.joinedParticipation);
 
   const isWaitingCollectionFetch =
     Boolean(id) &&
@@ -471,15 +474,19 @@ export default function CollectionPage() {
     };
   }, [collection?.id, collection?.visibility, activityUserId]);
 
+  /** メンバー限定コレの投票・参加者をサーバーから追う間隔（非表示タブではポーリング停止） */
+  const MEMBER_COLLECTION_POLL_MS = 10_000;
+
   /**
    * メンバー限定: 定期・フォーカス・タブ復帰で再取得。
-   * 他端末の参加・投票は CustomEvent で届かないため GET で追う（Safari は間隔が長いと体感遅れやすい）。
+   * 他端末の参加・投票は CustomEvent で届かないため GET で追う。非表示中は interval を止める。
    */
   useEffect(() => {
     if (!collection?.id || collection.visibility !== "member") return;
     const colId = collection.id;
     let inFlight = false;
     let lastPullAt = 0;
+    let intervalId: ReturnType<typeof window.setInterval> | null = null;
     const applyRemote = (r: Awaited<ReturnType<typeof fetchMemberCollectionVotesRemote>>) => {
       if (r.ok) {
         hydrateCollectionScopedFromSnapshot(colId, r.snapshot);
@@ -505,10 +512,29 @@ export default function CollectionPage() {
       inFlight = false;
       applyRemote(r);
     };
-    const interval = window.setInterval(() => void pullThrottled(), 3_000);
-    const onFocus = () => void pullImmediate();
+    const stopPolling = () => {
+      if (intervalId != null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+    const startPolling = () => {
+      if (document.visibilityState !== "visible") return;
+      stopPolling();
+      intervalId = window.setInterval(() => void pullThrottled(), MEMBER_COLLECTION_POLL_MS);
+    };
+    startPolling();
+    const onFocus = () => {
+      if (document.visibilityState !== "visible") return;
+      void pullImmediate();
+    };
     const onVis = () => {
-      if (document.visibilityState === "visible") void pullImmediate();
+      if (document.visibilityState === "visible") {
+        void pullImmediate();
+        startPolling();
+      } else {
+        stopPolling();
+      }
     };
     const onLeft = (ev: Event) => {
       const detail = (ev as CustomEvent<{ collectionId?: string; userId?: string }>).detail;
@@ -521,7 +547,7 @@ export default function CollectionPage() {
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener(MEMBER_COLLECTION_LEFT_EVENT, onLeft as EventListener);
     return () => {
-      window.clearInterval(interval);
+      stopPolling();
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener(MEMBER_COLLECTION_LEFT_EVENT, onLeft as EventListener);
@@ -631,16 +657,10 @@ export default function CollectionPage() {
               userVotedAt: scopedAct?.userVotedAt,
             }
           : { ...(act ?? { countA: 0, countB: 0, comments: [] }), comments };
-        const merged = getMergedCounts(
-          isMemberCollection ? 0 : (card.countA ?? 0),
-          isMemberCollection ? 0 : (card.countB ?? 0),
-          isMemberCollection ? 0 : (card.commentCount ?? 0),
-          voteActivity
-        );
         return {
           card,
           cardId,
-          merged,
+          voteActivity,
           initialSelectedOption: isMemberCollection
             ? (scopedAct?.userSelectedOption ?? null)
             : (act?.userSelectedOption ?? null),
@@ -869,37 +889,30 @@ export default function CollectionPage() {
           </div>
         ) : (
           <VoteCardList className="mt-4">
-            {voteCardViewModels.map(({ card, cardId, merged, initialSelectedOption, backgroundImageUrl }) => {
+            {voteCardViewModels.map(({ card, cardId, voteActivity, initialSelectedOption, backgroundImageUrl }) => {
               return (
                 <VoteCard
                   key={cardId}
-                  backgroundImageUrl={backgroundImageUrl}
-                  patternType={card.patternType ?? "yellow-loops"}
-                  question={card.question}
-                  optionA={card.optionA}
-                  optionB={card.optionB}
-                  countA={merged.countA}
-                  countB={merged.countB}
-                  commentCount={isMemberCollection ? 0 : merged.commentCount}
-                  tags={card.tags}
-                  readMoreText={card.readMoreText}
-                  creator={card.creator}
-                  currentUser={currentUser}
-                  cardId={cardId}
-                  bookmarked={isCardBookmarked(cardId)}
-                  hasCommented={false}
-                  initialSelectedOption={initialSelectedOption}
-                  optimisticVoteResult={showVoted}
-                  onVote={handleCollectionVote}
-                  onBookmarkClick={setModalCardId}
-                  onMoreClick={isMemberCollection ? undefined : handleCollectionCardMoreClick}
-                  visibility={card.visibility}
-                  optionAImageUrl={card.optionAImageUrl}
-                  optionBImageUrl={card.optionBImageUrl}
-                  periodStart={card.periodStart}
-                  periodEnd={card.periodEnd}
-                  commentsDisabled={isMemberCollection || card.commentsDisabled === true}
-                  hideShare={isMemberCollection}
+                  {...buildVoteCardProps({
+                    card,
+                    cardId,
+                    activity: voteActivity,
+                    currentUser,
+                    surface: "participate",
+                    backgroundImageUrl,
+                    bookmarked: isMemberCollectionParticipant ? false : isCardBookmarked(cardId),
+                    hasCommented: false,
+                    onVote: handleCollectionVote,
+                    onBookmarkClick: isMemberCollectionParticipant ? undefined : setModalCardId,
+                    onMoreClick: isMemberCollection ? undefined : handleCollectionCardMoreClick,
+                    commentsDisabled: isMemberCollection || card.commentsDisabled === true,
+                    hideShare: isMemberCollection,
+                    hideBookmark: isMemberCollectionParticipant,
+                    overrides: {
+                      initialSelectedOption,
+                      optimisticVoteResult: isMemberCollection || showVoted,
+                    },
+                  })}
                 />
               );
             })}

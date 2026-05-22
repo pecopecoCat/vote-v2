@@ -45,6 +45,7 @@ import {
 } from "../data/collections";
 import { hydrateBookmarksFromRemote } from "../data/bookmarks";
 import type { MemberJoinOwnerEvent } from "../lib/memberJoinOwnerNotifications";
+import { showAppToast } from "../lib/appToast";
 import {
   normalizeKeyedGlobalRows,
   normalizeKeyedUserSelections,
@@ -718,20 +719,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           }
           if (!usedSync) void fetchActivity();
         } else {
-          // 失敗時は楽観更新を戻す（投票済みの誤表示を避ける）
-          setActivity((prev) => {
-            const cur = prev[cardId];
-            if (!cur) return prev;
-            const next = { ...prev };
-            next[cardId] = {
-              ...cur,
-              countA: Math.max(0, (cur.countA ?? 0) - (option === "A" ? 1 : 0)),
-              countB: Math.max(0, (cur.countB ?? 0) - (option === "B" ? 1 : 0)),
-              userSelectedOption: undefined,
-              userVotedAt: undefined,
-            };
-            return next;
-          });
+          // 送信失敗時も投票済み表示は維持（未投票に戻ると操作ミスに見える）
+          showAppToast("投票の送信に失敗しました。通信を確認して再度お試しください。");
+          void fetchActivity();
         }
         return;
       }
@@ -867,9 +857,15 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     [isRemote, fetchActivity, tryApplyActivityPostSync]
   );
 
+  const recentBookmarkActivityAtRef = useRef<Map<string, number>>(new Map());
+
   const recordBookmarkEvent = useCallback(
     async (cardId: string) => {
       if (!isRemote) return;
+      const now = Date.now();
+      const last = recentBookmarkActivityAtRef.current.get(cardId) ?? 0;
+      if (now - last < 3000) return;
+      recentBookmarkActivityAtRef.current.set(cardId, now);
       try {
         const res = await fetch(ACTIVITY_API, {
           method: "POST",

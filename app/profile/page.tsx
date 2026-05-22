@@ -23,7 +23,7 @@ import { getFavoriteTags, getFavoriteTagsUpdatedEventName, removeFavoriteTag } f
 import {
   getCollections,
   getCollectionsUpdatedEventName,
-  createCollection,
+  createOwnedCollectionFromSettings,
   updateCollection,
   deleteCollection,
   syncCollectionToApiAndWait,
@@ -34,6 +34,7 @@ import { getBookmarkIds, isCardBookmarked, getBookmarksUpdatedEventName } from "
 import { getCollectionGradientStyle } from "../data/search";
 import { getAuth, getAuthUpdatedEventName } from "../data/auth";
 import { perfMeasure } from "../lib/perf";
+import { buildVoteCardProps } from "../lib/buildVoteCardProps";
 import {
   getHiddenUserIds,
   addHiddenUser,
@@ -467,7 +468,13 @@ function ProfileContent() {
   const createdVotesRaw = useMemo(() => {
     if (typeof window === "undefined") return [];
     if (shared.isRemote) {
-      return createdVotesForTimeline.filter((c) => c.createdByUserId === userId);
+      const localMineIds = new Set(getCreatedVotes().map((c) => resolveStableVoteCardId(c)));
+      return createdVotesForTimeline.filter((c) => {
+        const id = resolveStableVoteCardId(c);
+        if (c.createdByUserId === userId) return true;
+        // 旧データで createdByUserId が無いがローカルに自分の作成としてあるもの
+        return !c.createdByUserId && localMineIds.has(id);
+      });
     }
     return getCreatedVotes();
   }, [shared.isRemote, createdVotesForTimeline, createdVotesRefreshKey, userId]);
@@ -550,29 +557,14 @@ function ProfileContent() {
         selectedBookmarkId === "all"
           ? allBookmarkedIds
           : (collections.find((c) => c.id === selectedBookmarkId)?.cardIds ?? []);
-      const out: Array<{
-        card: VoteCardData;
-        cardId: string;
-        merged: ReturnType<typeof getMergedCounts>;
-        bgUrl: string;
-        initialSelectedOption: "A" | "B" | null;
-      }> = [];
+      const out: Array<{ card: VoteCardData; cardId: string; bgUrl: string }> = [];
       for (const cardId of ids) {
         const card = bookmarkedCardsMap.get(cardId);
         if (!card) continue;
-        const act = activity[cardId];
-        const merged = getMergedCounts(
-          card.countA ?? 0,
-          card.countB ?? 0,
-          card.commentCount ?? 0,
-          act ?? { countA: 0, countB: 0, comments: [] }
-        );
         out.push({
           card,
           cardId,
-          merged,
           bgUrl: backgroundForCard(card, cardId),
-          initialSelectedOption: (act?.userSelectedOption ?? null) as "A" | "B" | null,
         });
       }
       return out;
@@ -605,7 +597,8 @@ function ProfileContent() {
     [allCardsFiltered, userId]
   );
 
-  const handleBookmarkListVote = useCallback(
+  /** HOME / 検索と同じ participate 投票（myVOTE・Bookmark 内一覧） */
+  const handleProfileParticipateVote = useCallback(
     (id: string, option: "A" | "B") => {
       void sharedAddVote(id, option);
     },
@@ -848,12 +841,6 @@ function ProfileContent() {
                 {createdVotes.map((card) => {
                   const cardId = resolveStableVoteCardId(card);
                   const act = activity[cardId];
-                  const merged = getMergedCounts(
-                    card.countA ?? 0,
-                    card.countB ?? 0,
-                    card.commentCount ?? 0,
-                    act ?? { countA: 0, countB: 0, comments: [] }
-                  );
                   return (
                     <div key={cardId} className="relative">
                       {isMyVoteEditMode && (
@@ -871,28 +858,18 @@ function ProfileContent() {
                         </button>
                       )}
                       <VoteCard
-                        backgroundImageUrl={backgroundForCard(card, cardId)}
-                        patternType={card.patternType ?? "yellow-loops"}
-                        question={card.question}
-                        optionA={card.optionA}
-                        optionB={card.optionB}
-                        countA={merged.countA}
-                        countB={merged.countB}
-                        commentCount={merged.commentCount}
-                        tags={card.tags}
-                        readMoreText={card.readMoreText}
-                        creator={card.creator}
-                        currentUser={currentUser}
-                        cardId={cardId}
-                        bookmarked={isCardBookmarked(cardId)}
-                        hasCommented={commentedCardIdSet.has(cardId)}
-                        onBookmarkClick={setModalCardId}
-                        visibility={card.visibility}
-                        optionAImageUrl={card.optionAImageUrl}
-                        optionBImageUrl={card.optionBImageUrl}
-                        periodStart={card.periodStart}
-                        periodEnd={card.periodEnd}
-                        commentsDisabled={card.commentsDisabled === true}
+                        {...buildVoteCardProps({
+                          card,
+                          cardId,
+                          activity: act,
+                          currentUser,
+                          surface: "participate",
+                          backgroundImageUrl: backgroundForCard(card, cardId),
+                          bookmarked: isCardBookmarked(cardId),
+                          hasCommented: commentedCardIdSet.has(cardId),
+                          onVote: handleProfileParticipateVote,
+                          onBookmarkClick: setModalCardId,
+                        })}
                       />
                     </div>
                   );
@@ -920,37 +897,21 @@ function ProfileContent() {
                 {votedCards.map((card) => {
                   const cardId = resolveStableVoteCardId(card);
                   const act = activity[cardId];
-                  const merged = getMergedCounts(
-                    card.countA ?? 0,
-                    card.countB ?? 0,
-                    card.commentCount ?? 0,
-                    act ?? { countA: 0, countB: 0, comments: [] }
-                  );
                   return (
                     <VoteCard
                       key={cardId}
-                      backgroundImageUrl={backgroundForCard(card, cardId)}
-                      patternType={card.patternType}
-                      question={card.question}
-                      optionA={card.optionA}
-                      optionB={card.optionB}
-                      countA={merged.countA}
-                      countB={merged.countB}
-                      commentCount={merged.commentCount}
-                      tags={card.tags}
-                      currentUser={currentUser}
-                      cardId={cardId}
-                      initialSelectedOption={act?.userSelectedOption ?? null}
-                      bookmarked={isCardBookmarked(cardId)}
-                      hasCommented={commentedCardIdSet.has(cardId)}
-                      onBookmarkClick={setModalCardId}
-                      onMoreClick={handleProfileCardMoreClick}
-                      visibility={card.visibility}
-                      optionAImageUrl={card.optionAImageUrl}
-                      optionBImageUrl={card.optionBImageUrl}
-                      periodStart={card.periodStart}
-                      periodEnd={card.periodEnd}
-                      commentsDisabled={card.commentsDisabled === true}
+                      {...buildVoteCardProps({
+                        card,
+                        cardId,
+                        activity: act,
+                        currentUser,
+                        surface: "votedHistory",
+                        backgroundImageUrl: backgroundForCard(card, cardId),
+                        bookmarked: isCardBookmarked(cardId),
+                        hasCommented: commentedCardIdSet.has(cardId),
+                        onBookmarkClick: setModalCardId,
+                        onMoreClick: handleProfileCardMoreClick,
+                      })}
                     />
                   );
                 })}
@@ -1051,35 +1012,24 @@ function ProfileContent() {
                   }
                   return (
                     <VoteCardList>
-                      {bookmarkListViewModels.map(({ card, cardId, merged, bgUrl, initialSelectedOption }) => {
+                      {bookmarkListViewModels.map(({ card, cardId, bgUrl }) => {
+                        const act = activity[cardId];
                         return (
                           <VoteCard
                             key={cardId}
-                            backgroundImageUrl={bgUrl}
-                            patternType={card.patternType ?? "yellow-loops"}
-                            question={card.question}
-                            optionA={card.optionA}
-                            optionB={card.optionB}
-                            countA={merged.countA}
-                            countB={merged.countB}
-                            commentCount={merged.commentCount}
-                            tags={card.tags}
-                            readMoreText={card.readMoreText}
-                            creator={card.creator}
-                            currentUser={currentUser}
-                            cardId={cardId}
-                            bookmarked={isCardBookmarked(cardId)}
-                            hasCommented={commentedCardIdSet.has(cardId)}
-                            initialSelectedOption={initialSelectedOption}
-                            onVote={handleBookmarkListVote}
-                            onBookmarkClick={setModalCardId}
-                            onMoreClick={handleProfileCardMoreClick}
-                            visibility={card.visibility}
-                            optionAImageUrl={card.optionAImageUrl}
-                            optionBImageUrl={card.optionBImageUrl}
-                            periodStart={card.periodStart}
-                            periodEnd={card.periodEnd}
-                            commentsDisabled={card.commentsDisabled === true}
+                            {...buildVoteCardProps({
+                              card,
+                              cardId,
+                              activity: act,
+                              currentUser,
+                              surface: "participate",
+                              backgroundImageUrl: bgUrl,
+                              bookmarked: isCardBookmarked(cardId),
+                              hasCommented: commentedCardIdSet.has(cardId),
+                              onVote: handleProfileParticipateVote,
+                              onBookmarkClick: setModalCardId,
+                              onMoreClick: handleProfileCardMoreClick,
+                            })}
                           />
                         );
                       })}
@@ -1276,11 +1226,11 @@ function ProfileContent() {
             setShowCollectionSettings(false);
             setEditingCollectionForSettings(null);
           }}
-          onSave={(name, gradient, visibility) => {
+          onSave={async (name, gradient, visibility) => {
             if (editingCollectionForSettings) {
               updateCollection(editingCollectionForSettings.id, { name, gradient, visibility });
             } else {
-              createCollection(name, { gradient, visibility });
+              await createOwnedCollectionFromSettings(name, { gradient, visibility });
             }
             setCollections(getCollections());
             setShowCollectionSettings(false);

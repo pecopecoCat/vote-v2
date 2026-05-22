@@ -40,6 +40,7 @@ import {
 } from "./data/voteCardActivity";
 import { useSharedData } from "./context/SharedDataContext";
 import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "./lib/appToast";
+import { buildVoteCardProps } from "./lib/buildVoteCardProps";
 import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, resetUser1AndUser2Collections } from "./data/collections";
 import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
 import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "./data/auth";
@@ -364,40 +365,22 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
           const card = item.card;
           const cardId = resolveStableVoteCardId(card);
           const act = activity[cardId];
-          const merged = getMergedCounts(
-            card.countA ?? 0,
-            card.countB ?? 0,
-            card.commentCount ?? 0,
-            act ?? { countA: 0, countB: 0, comments: [] }
-          );
           return (
               <VoteCard
                 key={`vote-${cardId}`}
-                backgroundImageUrl={backgroundForCard(card)}
-                patternType={card.patternType}
-                question={card.question}
-                optionA={card.optionA}
-                optionB={card.optionB}
-                countA={merged.countA}
-                countB={merged.countB}
-                commentCount={merged.commentCount}
-                tags={card.tags}
-                readMoreText={card.readMoreText}
-                creator={card.creator}
-                currentUser={currentUser}
-                cardId={cardId}
-                bookmarked={bookmarkedIds.has(cardId)}
-                hasCommented={commentedCardIdSet.has(cardId)}
-                initialSelectedOption={act?.userSelectedOption ?? null}
-                onVote={handleVote}
-                onBookmarkClick={onBookmarkClick}
-                onMoreClick={onMoreClick}
-                visibility={card.visibility}
-                optionAImageUrl={card.optionAImageUrl}
-                optionBImageUrl={card.optionBImageUrl}
-                periodStart={card.periodStart}
-                periodEnd={card.periodEnd}
-                commentsDisabled={card.commentsDisabled === true}
+                {...buildVoteCardProps({
+                  card,
+                  cardId,
+                  activity: act,
+                  currentUser,
+                  surface: "participate",
+                  backgroundImageUrl: backgroundForCard(card),
+                  bookmarked: bookmarkedIds.has(cardId),
+                  hasCommented: commentedCardIdSet.has(cardId),
+                  onVote: handleVote,
+                  onBookmarkClick,
+                  onMoreClick,
+                })}
               />
           );
         }

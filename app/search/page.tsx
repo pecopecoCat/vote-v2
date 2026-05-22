@@ -10,7 +10,7 @@ import {
   useDeferredValue,
   startTransition,
 } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "../components/AppHeader";
 import CollectionCard from "../components/CollectionCard";
@@ -68,6 +68,7 @@ import {
   type PopularCollection,
 } from "../data/search";
 import { perfMeasure } from "../lib/perf";
+import { buildVoteCardProps } from "../lib/buildVoteCardProps";
 
 function backgroundForSearchCard(card: VoteCardData, cardId: string): string {
   if (card.backgroundImageUrl) return card.backgroundImageUrl;
@@ -161,11 +162,21 @@ function EllipsisIcon({ className }: { className?: string }) {
   );
 }
 
+type SearchTabId = "trending" | "collections" | "favorite";
+
+function parseSearchTabFromUrl(tab: string | null): SearchTabId {
+  if (tab === "collections" || tab === "favorite") return tab;
+  return "trending";
+}
+
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParamsKey = searchParams.toString();
   const tagFromUrl = searchParams.get("tag") ?? "";
   const qFromUrl = searchParams.get("q") ?? "";
+  const tabFromUrl = searchParams.get("tab");
   /** 2回目の Enter で VOTE 検索結果へ（URL の `vote=1` と同期） */
   const voteResultsFromUrl = searchParams.get("vote") === "1";
   const [searchValue, setSearchValue] = useState(() => tagFromUrl || qFromUrl);
@@ -178,8 +189,7 @@ function SearchContent() {
     if (tagFromUrl.length > 0) return "";
     return voteResultsFromUrl ? qFromUrl : "";
   });
-  type SearchTabId = "trending" | "collections" | "favorite";
-  const [activeTab, setActiveTab] = useState<SearchTabId>("trending");
+  const [activeTab, setActiveTab] = useState<SearchTabId>(() => parseSearchTabFromUrl(tabFromUrl));
   const [showVoted, setShowVotedState] = useState(() => getShowVoted());
   /** ハッシュタグ一覧の並び（マイページ等と同じプルダウン） */
   const [tagListSortOrder, setTagListSortOrder] = useState<"newest" | "oldest">("newest");
@@ -300,6 +310,28 @@ function SearchContent() {
   /** ハッシュタグタップで開いたとき（?tag=xxx）→ 従来のカード一覧。虫眼鏡タップ（/search）→ 新しい検索画面 */
   const isTagFilterView = tagFromUrl.length > 0;
 
+  /** ブラウザの戻る／進む・URL直打ちでタブを URL と一致させる */
+  useEffect(() => {
+    if (isTagFilterView) return;
+    setActiveTab(parseSearchTabFromUrl(tabFromUrl));
+  }, [tabFromUrl, isTagFilterView]);
+
+  const selectSearchTab = useCallback(
+    (id: SearchTabId) => {
+      setActiveTab(id);
+      if (isTagFilterView) return;
+      const params = new URLSearchParams(searchParamsKey);
+      if (id === "trending") {
+        params.delete("tab");
+      } else {
+        params.set("tab", id);
+      }
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [isTagFilterView, pathname, router, searchParamsKey]
+  );
+
   /** URL の tag / q と入力欄を同期（?tag= の画面で別キーワードに変えたら /search?q= に遷移してキーワード検索へ） */
   useEffect(() => {
     if (tagFromUrl.length > 0) {
@@ -368,7 +400,6 @@ function SearchContent() {
     if (isTagFilterView) return;
     try {
       const state = {
-        activeTab,
         trendingTagsVisibleCount,
         popularCollectionsVisibleCount,
         voteSearchVisibleCount,
@@ -378,7 +409,7 @@ function SearchContent() {
     } catch {
       // ignore
     }
-  }, [activeTab, isTagFilterView, trendingTagsVisibleCount, popularCollectionsVisibleCount, voteSearchVisibleCount]);
+  }, [isTagFilterView, trendingTagsVisibleCount, popularCollectionsVisibleCount, voteSearchVisibleCount]);
 
   // 戻るで復元（TOP表示のときだけ）
   useEffect(() => {
@@ -389,14 +420,22 @@ function SearchContent() {
       const raw = window.sessionStorage.getItem(UI_STATE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<{
-        activeTab: "trending" | "collections" | "favorite";
         trendingTagsVisibleCount: number;
         popularCollectionsVisibleCount: number;
         voteSearchVisibleCount: number;
         scrollY: number;
       }>;
-      if (parsed.activeTab === "trending" || parsed.activeTab === "collections" || parsed.activeTab === "favorite") {
-        setActiveTab(parsed.activeTab);
+      // 旧 sessionStorage の activeTab を URL に移行（戻る復元用）
+      const legacyActiveTab = (parsed as { activeTab?: string }).activeTab;
+      if (
+        !tabFromUrl &&
+        (legacyActiveTab === "collections" || legacyActiveTab === "favorite")
+      ) {
+        setActiveTab(legacyActiveTab);
+        const params = new URLSearchParams(searchParamsKey);
+        params.set("tab", legacyActiveTab);
+        const qs = params.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
       }
       if (typeof parsed.trendingTagsVisibleCount === "number" && parsed.trendingTagsVisibleCount > 0) {
         setTrendingTagsVisibleCount(parsed.trendingTagsVisibleCount);
@@ -414,7 +453,16 @@ function SearchContent() {
     } catch {
       // ignore
     }
-  }, [isTagFilterView, tagFromUrl, qFromUrl, committedVoteQuery]);
+  }, [
+    isTagFilterView,
+    tagFromUrl,
+    qFromUrl,
+    committedVoteQuery,
+    tabFromUrl,
+    pathname,
+    router,
+    searchParamsKey,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -706,14 +754,8 @@ function SearchContent() {
       return cardsToShow.map((card) => {
         const cardId = resolveStableVoteCardId(card);
         const act = activity[cardId];
-        const merged = getMergedCounts(
-          card.countA ?? 0,
-          card.countB ?? 0,
-          card.commentCount ?? 0,
-          act ?? { countA: 0, countB: 0, comments: [] }
-        );
         const bgUrl = card.backgroundImageUrl ?? backgroundForSearchCard(card, cardId);
-        return { card, cardId, act, merged, bgUrl };
+        return { card, cardId, act, bgUrl };
       });
     });
   }, [cardsToShow, activity]);
@@ -826,35 +868,23 @@ function SearchContent() {
                   </p>
                 </EmptyStatePanel>
               ) : (
-                voteCardViewModels.map(({ card, cardId, act, merged, bgUrl }) => {
+                voteCardViewModels.map(({ card, cardId, act, bgUrl }) => {
                   return (
                     <VoteCard
                       key={cardId}
-                      backgroundImageUrl={bgUrl}
-                      patternType={card.patternType}
-                      question={card.question}
-                      optionA={card.optionA}
-                      optionB={card.optionB}
-                      countA={merged.countA}
-                      countB={merged.countB}
-                      commentCount={merged.commentCount}
-                      tags={card.tags}
-                      readMoreText={card.readMoreText}
-                      creator={card.creator}
-                      currentUser={currentUser}
-                      cardId={cardId}
-                      bookmarked={isCardBookmarked(cardId)}
-                      hasCommented={commentedCardIdSet.has(cardId)}
-                      initialSelectedOption={act?.userSelectedOption ?? null}
-                      onVote={handleVote}
-                      onBookmarkClick={setModalCardId}
-                      onMoreClick={handleTagFilterCardMoreClick}
-                      visibility={card.visibility}
-                      optionAImageUrl={card.optionAImageUrl}
-                      optionBImageUrl={card.optionBImageUrl}
-                      periodStart={card.periodStart}
-                      periodEnd={card.periodEnd}
-                      commentsDisabled={card.commentsDisabled === true}
+                      {...buildVoteCardProps({
+                        card,
+                        cardId,
+                        activity: act,
+                        currentUser,
+                        surface: "participate",
+                        backgroundImageUrl: bgUrl,
+                        bookmarked: isCardBookmarked(cardId),
+                        hasCommented: commentedCardIdSet.has(cardId),
+                        onVote: handleVote,
+                        onBookmarkClick: setModalCardId,
+                        onMoreClick: handleTagFilterCardMoreClick,
+                      })}
                     />
                   );
                 })
@@ -887,7 +917,7 @@ function SearchContent() {
               <UnderlineTabBar
                 items={searchTabItems}
                 activeId={activeTab}
-                onSelect={setActiveTab}
+                onSelect={selectSearchTab}
                 ariaLabel="検索タブ"
                 layout="scroll"
               />
@@ -1052,40 +1082,22 @@ function SearchContent() {
                       {matchedVoteCards.map((card) => {
                         const cardId = resolveStableVoteCardId(card);
                         const act = activity[cardId];
-                        const merged = getMergedCounts(
-                          card.countA ?? 0,
-                          card.countB ?? 0,
-                          card.commentCount ?? 0,
-                          act ?? { countA: 0, countB: 0, comments: [] }
-                        );
                         return (
                             <VoteCard
                               key={cardId}
-                              backgroundImageUrl={backgroundForSearchCard(card, cardId)}
-                              patternType={card.patternType}
-                              question={card.question}
-                              optionA={card.optionA}
-                              optionB={card.optionB}
-                              countA={merged.countA}
-                              countB={merged.countB}
-                              commentCount={merged.commentCount}
-                              tags={card.tags}
-                              readMoreText={card.readMoreText}
-                              creator={card.creator}
-                              currentUser={currentUser}
-                              cardId={cardId}
-                              bookmarked={isCardBookmarked(cardId)}
-                              hasCommented={commentedCardIdSet.has(cardId)}
-                              initialSelectedOption={act?.userSelectedOption ?? null}
-                              onVote={handleVote}
-                              onBookmarkClick={setModalCardId}
-                              onMoreClick={handleTagFilterCardMoreClick}
-                              visibility={card.visibility}
-                              optionAImageUrl={card.optionAImageUrl}
-                              optionBImageUrl={card.optionBImageUrl}
-                              periodStart={card.periodStart}
-                              periodEnd={card.periodEnd}
-                              commentsDisabled={card.commentsDisabled === true}
+                              {...buildVoteCardProps({
+                                card,
+                                cardId,
+                                activity: act,
+                                currentUser,
+                                surface: "participate",
+                                backgroundImageUrl: backgroundForSearchCard(card, cardId),
+                                bookmarked: isCardBookmarked(cardId),
+                                hasCommented: commentedCardIdSet.has(cardId),
+                                onVote: handleVote,
+                                onBookmarkClick: setModalCardId,
+                                onMoreClick: handleTagFilterCardMoreClick,
+                              })}
                             />
                         );
                       })}

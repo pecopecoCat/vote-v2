@@ -78,6 +78,8 @@ export interface VoteCardProps {
   commentsDisabled?: boolean;
   /** true のときフッターのシェアアイコンを出さない（メンバー限定コレクション内など） */
   hideShare?: boolean;
+  /** true のときフッターのブックマークアイコンを出さない（メンバー限定コレクションの参加者側など） */
+  hideBookmark?: boolean;
   /** Aの画像URL（指定時はフッター下にA/B画像を表示） */
   optionAImageUrl?: string;
   /** Bの画像URL */
@@ -123,6 +125,7 @@ function VoteCard({
   onMoreClick,
   commentsDisabled = false,
   hideShare = false,
+  hideBookmark = false,
   optionAImageUrl,
   optionBImageUrl,
   periodStart,
@@ -133,9 +136,22 @@ function VoteCard({
 
   const [selectedOption, setSelectedOption] = useState<"A" | "B" | null>(initialSelectedOption);
   const isSelectingRef = useRef(false);
+  const lastCardIdRef = useRef(cardId);
   useEffect(() => {
-    setSelectedOption(initialSelectedOption);
-    // タップ直後に true のまま残ると、親の activity 同期で選択がリセットされたあと再投票できなくなる
+    if (cardId !== lastCardIdRef.current) {
+      lastCardIdRef.current = cardId;
+      setSelectedOption(initialSelectedOption);
+      isSelectingRef.current = false;
+      return;
+    }
+    setSelectedOption((prev) => {
+      if (initialSelectedOption === "A" || initialSelectedOption === "B") {
+        return initialSelectedOption;
+      }
+      // GET/ポーリングが一瞬古い状態を返しても、タップ直後の結果表示を消さない
+      if (prev === "A" || prev === "B") return prev;
+      return null;
+    });
     isSelectingRef.current = false;
   }, [initialSelectedOption, cardId]);
   const [isBookmarked, setIsBookmarked] = useState(Boolean(bookmarked));
@@ -171,8 +187,16 @@ function VoteCard({
   const percentB = total > 0 ? Math.round((localCountB / total) * 100) : 0;
   const displayTotal = voteCount ?? total;
 
+  const showResult = selectedOption !== null;
+  /** onVote が無い画面（投票済み一覧など）は投票 UI を出さない */
+  const canInteractVote = Boolean(onVote) && periodAllowsVote && selectedOption === null;
+
   useEffect(() => {
-    if (selectedOption === null) return;
+    if (!showResult) {
+      setDisplayPercentA(0);
+      setDisplayPercentB(0);
+      return;
+    }
     setDisplayPercentA(0);
     setDisplayPercentB(0);
     const t = requestAnimationFrame(() => {
@@ -182,7 +206,7 @@ function VoteCard({
       });
     });
     return () => cancelAnimationFrame(t);
-  }, [selectedOption, percentA, percentB]);
+  }, [showResult, percentA, percentB]);
 
   // 「2行を超えるなら続きを読むを出す」をDOMの高さ差で判定（line-clamp適用時）
   useLayoutEffect(() => {
@@ -224,7 +248,7 @@ function VoteCard({
   }, [readMoreText]);
 
   const handleSelectA = () => {
-    if (!periodAllowsVote) return;
+    if (!canInteractVote) return;
     if (isSelectingRef.current || selectedOption) return;
     isSelectingRef.current = true;
     if (optimisticVoteResult) {
@@ -234,7 +258,7 @@ function VoteCard({
     if (cardId != null && onVote) onVote(cardId, "A");
   };
   const handleSelectB = () => {
-    if (!periodAllowsVote) return;
+    if (!canInteractVote) return;
     if (isSelectingRef.current || selectedOption) return;
     isSelectingRef.current = true;
     if (optimisticVoteResult) {
@@ -244,7 +268,6 @@ function VoteCard({
     if (cardId != null && onVote) onVote(cardId, "B");
   };
 
-  const showResult = selectedOption !== null;
   const handleNavigateToComments = () => {
     if (typeof window === "undefined") return;
     if (cardId == null) return;
@@ -288,10 +311,10 @@ function VoteCard({
               <button
                 type="button"
                 className={`vote-card-answer-shadow flex w-full items-stretch overflow-hidden rounded-xl bg-white text-left ${
-                  periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-default"
+                  canInteractVote ? "transition-opacity active:opacity-90" : "cursor-default"
                 }`}
-                onClick={handleSelectA}
-                aria-disabled={!periodAllowsVote}
+                onClick={canInteractVote ? handleSelectA : undefined}
+                aria-disabled={!canInteractVote}
               >
                 <span className="flex w-[14.25%] min-w-[41px] shrink-0 flex-col justify-center self-stretch rounded-l-xl bg-[#E63E48] py-3.5 text-center text-base font-bold text-white">
                   A
@@ -303,10 +326,10 @@ function VoteCard({
               <button
                 type="button"
                 className={`vote-card-answer-shadow flex w-full items-stretch overflow-hidden rounded-xl bg-white text-left ${
-                  periodAllowsVote ? "transition-opacity active:opacity-90" : "cursor-default"
+                  canInteractVote ? "transition-opacity active:opacity-90" : "cursor-default"
                 }`}
-                onClick={handleSelectB}
-                aria-disabled={!periodAllowsVote}
+                onClick={canInteractVote ? handleSelectB : undefined}
+                aria-disabled={!canInteractVote}
               >
                 <span className="flex w-[14.25%] min-w-[41px] shrink-0 flex-col justify-center self-stretch rounded-l-xl bg-[#3273E3] py-3.5 text-center text-base font-bold text-white">
                   B
@@ -423,37 +446,39 @@ function VoteCard({
             <span className="vote-card-footer-count">{commentCount}</span>
           </span>
         )}
-        <button
-          type="button"
-          className="flex items-center justify-center text-gray-400 hover:text-gray-600"
-          aria-label={isBookmarked ? "ブックマークを外す" : "ブックマーク"}
-          onClick={() => {
-            if (cardId == null) return;
-            if (onBookmarkClick) {
-              onBookmarkClick(cardId);
-              return;
-            }
-            if (isBookmarked) {
-              removeBookmarkFully(cardId);
-              setIsBookmarked(false);
-              showAppToast("bookmarkを解除しました");
-              return;
-            }
-            const next = !isBookmarked;
-            setIsBookmarked(next);
-            if (onBookmarkToggle) onBookmarkToggle(cardId, next);
-          }}
-        >
-          {isBookmarked ? (
-            <span className="bookmark-icon-bookmarked vote-card-footer-icon-bookmark" aria-hidden />
-          ) : (
-            <img
-              src="/icons/bookmark.svg"
-              alt=""
-              className="vote-card-footer-icon-bookmark opacity-40"
-            />
-          )}
-        </button>
+        {!hideBookmark && (
+          <button
+            type="button"
+            className="flex items-center justify-center text-gray-400 hover:text-gray-600"
+            aria-label={isBookmarked ? "ブックマークを外す" : "ブックマーク"}
+            onClick={() => {
+              if (cardId == null) return;
+              if (onBookmarkClick) {
+                onBookmarkClick(cardId);
+                return;
+              }
+              if (isBookmarked) {
+                removeBookmarkFully(cardId);
+                setIsBookmarked(false);
+                showAppToast("bookmarkを解除しました");
+                return;
+              }
+              const next = !isBookmarked;
+              setIsBookmarked(next);
+              if (onBookmarkToggle) onBookmarkToggle(cardId, next);
+            }}
+          >
+            {isBookmarked ? (
+              <span className="bookmark-icon-bookmarked vote-card-footer-icon-bookmark" aria-hidden />
+            ) : (
+              <img
+                src="/icons/bookmark.svg"
+                alt=""
+                className="vote-card-footer-icon-bookmark opacity-40"
+              />
+            )}
+          </button>
+        )}
         <div className="ml-auto flex items-center gap-1">
           {cardId != null && !hideShare && (
             <button
@@ -491,9 +516,9 @@ function VoteCard({
             <button
               type="button"
               className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFE100] disabled:cursor-default disabled:opacity-100"
-              onClick={handleSelectA}
-              disabled={selectedOption !== null}
-              aria-disabled={!periodAllowsVote && selectedOption === null}
+              onClick={canInteractVote ? handleSelectA : undefined}
+              disabled={!canInteractVote}
+              aria-disabled={!canInteractVote}
               aria-label="Aを投票"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -516,9 +541,9 @@ function VoteCard({
             <button
               type="button"
               className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFE100] disabled:cursor-default disabled:opacity-100"
-              onClick={handleSelectB}
-              disabled={selectedOption !== null}
-              aria-disabled={!periodAllowsVote && selectedOption === null}
+              onClick={canInteractVote ? handleSelectB : undefined}
+              disabled={!canInteractVote}
+              aria-disabled={!canInteractVote}
               aria-label="Bを投票"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

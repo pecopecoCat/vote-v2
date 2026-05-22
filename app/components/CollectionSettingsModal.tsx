@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Collection, CollectionVisibility } from "../data/collections";
 import { COLLECTION_GRADIENT_OPTIONS, type CollectionGradient } from "../data/search";
+
 const VISIBILITY_OPTIONS: { value: CollectionVisibility; label: string }[] = [
   { value: "public", label: "公開" },
   { value: "private", label: "非公開" },
@@ -12,15 +14,25 @@ const VISIBILITY_OPTIONS: { value: CollectionVisibility; label: string }[] = [
 export interface CollectionSettingsModalProps {
   onClose: () => void;
   /** 保存時は name, gradient, visibility を渡す（Bookmark/検索/MyPage/設定で共通グラデーション） */
-  onSave: (name: string, gradient: CollectionGradient, visibility: CollectionVisibility) => void;
+  onSave: (name: string, gradient: CollectionGradient, visibility: CollectionVisibility) => void | Promise<void>;
   /** 編集時は既存コレクションを渡す（新規のときは undefined） */
   editingCollection?: Collection | null;
 }
 
-export default function CollectionSettingsModal({ onClose, onSave, editingCollection }: CollectionSettingsModalProps) {
+export default function CollectionSettingsModal({
+  onClose,
+  onSave,
+  editingCollection,
+}: CollectionSettingsModalProps) {
+  const [mounted, setMounted] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [name, setName] = useState(editingCollection?.name ?? "");
   const [gradient, setGradient] = useState<CollectionGradient>(editingCollection?.gradient ?? "blue-cyan");
   const [visibility, setVisibility] = useState<CollectionVisibility>(editingCollection?.visibility ?? "public");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (editingCollection) {
@@ -34,18 +46,32 @@ export default function CollectionSettingsModal({ onClose, onSave, editingCollec
     }
   }, [editingCollection]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     const trimmed = name.trim() || (editingCollection ? editingCollection.name : "新しいコレクション");
-    onSave(trimmed, gradient, visibility);
-    onClose();
+    setSaving(true);
+    try {
+      await onSave(trimmed, gradient, visibility);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
-  return (
+  const node = (
     <>
-      <div className="fixed inset-0 z-[60] bg-black/50" aria-hidden onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 z-[70] w-[calc(100%-40px)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-5 shadow-xl">
+      <div className="fixed inset-0 z-[100] bg-black/50" aria-hidden onClick={onClose} />
+      <div
+        className="fixed left-1/2 top-1/2 z-[110] w-[calc(100%-40px)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-5 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="collection-settings-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-          <h2 className="text-lg font-bold text-gray-900">コレクションの設定</h2>
+          <h2 id="collection-settings-title" className="text-lg font-bold text-gray-900">
+            コレクションの設定
+          </h2>
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center"
@@ -145,19 +171,24 @@ export default function CollectionSettingsModal({ onClose, onSave, editingCollec
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-[9999px] border border-gray-200 bg-gray-100 py-3 text-sm font-medium text-gray-700"
+            disabled={saving}
+            className="flex-1 rounded-[9999px] border border-gray-200 bg-gray-100 py-3 text-sm font-medium text-gray-700 disabled:opacity-50"
           >
             キャンセル
           </button>
           <button
             type="button"
-            onClick={handleSave}
-            className="btn-font flex-1 rounded-[9999px] bg-[#FFE100] py-3 text-sm font-bold text-[#191919] hover:opacity-90 active:opacity-95"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="btn-font flex-1 rounded-[9999px] bg-[#FFE100] py-3 text-sm font-bold text-[#191919] hover:opacity-90 active:opacity-95 disabled:opacity-50"
           >
-            保存
+            {saving ? "保存中…" : "保存"}
           </button>
         </div>
       </div>
     </>
   );
+
+  if (!mounted) return null;
+  return createPortal(node, document.body);
 }

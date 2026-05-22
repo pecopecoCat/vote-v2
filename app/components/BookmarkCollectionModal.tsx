@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   getCollections,
   toggleCardInCollection,
   removeCardFromCollection,
-  createCollection,
-  addCardToCollection,
+  createOwnedCollectionFromSettings,
   getCollectionsUpdatedEventName,
   type Collection,
 } from "../data/collections";
@@ -109,6 +108,7 @@ export default function BookmarkCollectionModal({
   const shared = useSharedData();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const bookmarkSideEffectsDoneRef = useRef(false);
 
   useEffect(() => {
     if (isLoggedIn) setCollections(getCollections());
@@ -116,11 +116,16 @@ export default function BookmarkCollectionModal({
 
   /** モーダルを開いた＝Bookmarkに登録（まとめはコレクションで） */
   useEffect(() => {
-    if (isLoggedIn && cardId) {
-      addBookmark(cardId);
-      if (shared.isRemote) void shared.recordBookmarkEvent(cardId);
-    }
+    if (!isLoggedIn || !cardId) return;
+    addBookmark(cardId);
+    if (!shared.isRemote || bookmarkSideEffectsDoneRef.current) return;
+    bookmarkSideEffectsDoneRef.current = true;
+    void shared.recordBookmarkEvent(cardId);
   }, [isLoggedIn, cardId, shared.isRemote, shared.recordBookmarkEvent]);
+
+  useEffect(() => {
+    bookmarkSideEffectsDoneRef.current = false;
+  }, [cardId]);
 
   useEffect(() => {
     const eventName = getCollectionsUpdatedEventName();
@@ -146,13 +151,16 @@ export default function BookmarkCollectionModal({
     onCollectionsUpdated?.();
   };
 
-  const handleSaveNewCollection = (
+  const handleSaveNewCollection = async (
     name: string,
     gradient: CollectionGradient,
     visibility: "public" | "private" | "member"
   ) => {
-    const created = createCollection(name, { gradient, visibility });
-    if (cardId) addCardToCollection(created.id, cardId);
+    await createOwnedCollectionFromSettings(name, {
+      gradient,
+      visibility,
+      cardId: cardId ?? undefined,
+    });
     setCollections(getCollections());
     onCollectionsUpdated?.();
     setShowSettingsModal(false);
@@ -277,12 +285,12 @@ export default function BookmarkCollectionModal({
         </ul>
       </BookmarkModalShell>
 
-      {showSettingsModal && (
+      {showSettingsModal ? (
         <CollectionSettingsModal
           onClose={() => setShowSettingsModal(false)}
           onSave={handleSaveNewCollection}
         />
-      )}
+      ) : null}
     </>
   );
 }
