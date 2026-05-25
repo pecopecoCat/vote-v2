@@ -141,6 +141,7 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
             <Link
               key={id}
               href={href}
+              prefetch
               className={className}
               aria-label={
                 id === "notifications" && announcementUnread ? `${label}（未読のお知らせがあります）` : label

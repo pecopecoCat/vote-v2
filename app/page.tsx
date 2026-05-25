@@ -17,7 +17,6 @@ import { VoteCardList } from "./components/VoteCardList";
 import AdCard from "./components/AdCard";
 import RecommendedTags from "./components/RecommendedTags";
 import CollectionCard from "./components/CollectionCard";
-import BottomNav from "./components/BottomNav";
 import FeedTabs from "./components/FeedTabs";
 import BookmarkCollectionModal from "./components/BookmarkCollectionModal";
 import CardOptionsModal from "./components/CardOptionsModal";
@@ -889,9 +888,6 @@ function HomeContent() {
         )}
       </main>
 
-      {/* 下部ナビ（スマホメイン） */}
-      <BottomNav activeId="home" />
-
       {modalCardId != null && (
         <BookmarkCollectionModal
           cardId={modalCardId}
@@ -938,7 +934,6 @@ function HomeFallback() {
       <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
         <HomeLoadingMessage />
       </main>
-      <BottomNav activeId="home" />
     </div>
   );
 }

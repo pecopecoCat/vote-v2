@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "../components/AppHeader";
-import BottomNav from "../components/BottomNav";
 import { voteCardsData } from "../data/voteCards";
 import { getCreatedVotes } from "../data/createdVotes";
 import { getAuth } from "../data/auth";
@@ -154,7 +153,6 @@ export default function CreateQuestionPage() {
         </div>
       </main>
 
-      <BottomNav activeId="add" />
     </div>
   );
 }

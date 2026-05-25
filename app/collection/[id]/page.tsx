@@ -11,7 +11,6 @@ import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import MemberCollectionShareSheet from "../../components/MemberCollectionShareSheet";
 import MemberParticipantAvatar from "../../components/MemberParticipantAvatar";
-import BottomNav from "../../components/BottomNav";
 import AppHeader from "../../components/AppHeader";
 import Checkbox from "../../components/Checkbox";
 import NewestOldestSortDropdown, {
@@ -99,7 +98,6 @@ function MemberCollectionLoginGate({ collectionId }: { collectionId: string }) {
           ログインする
         </Link>
       </main>
-      <BottomNav activeId="search" />
     </div>
   );
 }
@@ -921,8 +919,6 @@ export default function CollectionPage() {
           </VoteCardList>
         )}
       </main>
-
-      <BottomNav activeId="profile" />
 
       {shareSheetOpen && id && collection.visibility === "member" && (
         <MemberCollectionShareSheet

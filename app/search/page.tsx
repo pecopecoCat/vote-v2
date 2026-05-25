@@ -24,7 +24,6 @@ import TagMenuModal, { type TagMenuVariant } from "../components/TagMenuModal";
 import Checkbox from "../components/Checkbox";
 import NewestOldestSortDropdown from "../components/NewestOldestSortDropdown";
 import EmptyStatePanel from "../components/EmptyStatePanel";
-import BottomNav from "../components/BottomNav";
 import UnderlineTabBar, { type UnderlineTabItem } from "../components/UnderlineTabBar";
 import type { CurrentUser } from "../components/VoteCard";
 import type { VoteCardData } from "../data/voteCards";
@@ -909,7 +908,6 @@ function SearchContent() {
               )}
             </VoteCardList>
           </main>
-          <BottomNav activeId="search" />
         </>
       )}
 
@@ -1118,7 +1116,6 @@ function SearchContent() {
         )}
           </main>
 
-          <BottomNav activeId="search" />
         </>
       )}
 

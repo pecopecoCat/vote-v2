@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AppHeader from "../../components/AppHeader";
-import BottomNav from "../../components/BottomNav";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 import { getCollections, addCardToCollection } from "../../data/collections";
@@ -689,7 +688,6 @@ function CreateFormContent() {
         </Button>
       </div>
 
-      <BottomNav activeId="add" />
     </div>
   );
 }

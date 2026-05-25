@@ -8,7 +8,6 @@ import VoteCard from "../../components/VoteCard";
 import VoteCardMini from "../../components/VoteCardMini";
 import { VoteCardList } from "../../components/VoteCardList";
 import CollectionCard from "../../components/CollectionCard";
-import BottomNav from "../../components/BottomNav";
 import CardOptionsModal from "../../components/CardOptionsModal";
 import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
@@ -386,7 +385,6 @@ export default function CommentsPage() {
             準備中です。もう少し待ってね🙏
           </p>
         </main>
-        <BottomNav activeId="home" />
       </div>
     );
   }
@@ -585,8 +583,6 @@ export default function CommentsPage() {
           </Button>
         </div>
       </div>
-
-      <BottomNav activeId="home" />
 
       {cardOptionsCardId != null && (
         <CardOptionsModal

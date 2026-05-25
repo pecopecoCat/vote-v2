@@ -3,7 +3,6 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import BottomNav from "../../components/BottomNav";
 import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, getDisplayUserForDemo, fetchUserProfileFromApi, DEMO_USER_IDS, DEMO_USERS, type DemoUserId } from "../../data/auth";
 
 const USER_MEMOS: Record<DemoUserId, string> = {
@@ -264,7 +263,6 @@ function ProfileLoginContent() {
         </div>
       </main>
 
-      <BottomNav activeId="profile" />
     </div>
   );
 }

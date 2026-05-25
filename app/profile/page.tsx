@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback, Suspense, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
-import BottomNav from "../components/BottomNav";
 import VoteCard from "../components/VoteCard";
 import { VoteCardList } from "../components/VoteCardList";
 import { getCreatedVotes, deleteCreatedVote, getCreatedVotesUpdatedEventName } from "../data/createdVotes";
@@ -690,7 +689,6 @@ function ProfileContent() {
             </div>
           </div>
         </main>
-        <BottomNav activeId="profile" />
       </div>
     );
   }
@@ -1148,8 +1146,6 @@ function ProfileContent() {
           </div>
         </div>
       ) : null}
-
-      <BottomNav activeId="profile" />
 
       {modalCardId != null && (
         <BookmarkCollectionModal

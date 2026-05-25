@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import AppHeader from "../components/AppHeader";
-import BottomNav from "../components/BottomNav";
 import { getDrafts, deleteDraft, type DraftItem } from "../data/drafts";
 
 function TrashIcon({ className }: { className?: string }) {
@@ -62,7 +61,6 @@ export default function DraftsPage() {
         )}
       </main>
 
-      <BottomNav activeId="add" />
     </div>
   );
 }

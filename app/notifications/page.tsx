@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import BottomNav from "../components/BottomNav";
 import NotificationTabs, { type NotificationTabId } from "../components/NotificationTabs";
 import {
   ACTIVITY_TYPE_LABELS,
@@ -303,7 +302,6 @@ export default function NotificationsPage() {
         activityContent={<ActivityList items={activityItems} />}
         announcementsContent={<AnnouncementsList items={MOCK_ANNOUNCEMENTS} />}
       />
-      <BottomNav activeId="notifications" />
     </div>
   );
 }
