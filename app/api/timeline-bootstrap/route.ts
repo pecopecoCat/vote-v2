@@ -10,9 +10,15 @@ export async function GET(request: Request): Promise<NextResponse<Record<string,
   if (!kv) {
     return NextResponse.json({ error: "KV_NOT_CONFIGURED" }, { status: 503 });
   }
-  const userId = new URL(request.url).searchParams.get("userId") ?? "";
+  const url = new URL(request.url);
+  const userId = url.searchParams.get("userId") ?? "";
+  /** HOME 初回用：通知向け memberJoinEvents を省き KV 読み取りを1本減らす */
+  const lean = url.searchParams.get("lean") === "1";
   try {
-    const [createdVotes, activity] = await Promise.all([readCreatedVotesList(kv), readActivityGetPayload(kv, userId)]);
+    const [createdVotes, activity] = await Promise.all([
+      readCreatedVotesList(kv),
+      readActivityGetPayload(kv, userId, { includeMemberJoinEvents: !lean }),
+    ]);
     return NextResponse.json({
       createdVotes,
       global: activity.global,

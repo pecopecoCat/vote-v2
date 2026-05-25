@@ -472,14 +472,21 @@ export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<
         // ignore
       }
       const toRemove = new Set<string>();
-      for (const c of candidates) {
-        if (indexIds && indexIds.has(c.id)) continue;
-        try {
-          const r = await fetch(`/api/collection/${encodeURIComponent(c.id)}?userId=${encodeURIComponent(uid)}`);
-          if (r.status === 404) toRemove.add(c.id);
-        } catch {
-          // ignore（ネットワーク失敗時は消さない）
-        }
+      const need404Check = candidates.filter((c) => !indexIds?.has(c.id));
+      const removedIds = await Promise.all(
+        need404Check.map(async (c) => {
+          try {
+            const r = await fetch(
+              `/api/collection/${encodeURIComponent(c.id)}?userId=${encodeURIComponent(uid)}`
+            );
+            return r.status === 404 ? c.id : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+      for (const rid of removedIds) {
+        if (rid) toRemove.add(rid);
       }
       if (toRemove.size > 0) {
         const next = current.filter((c) => !(c.joinedParticipation && toRemove.has(c.id)));

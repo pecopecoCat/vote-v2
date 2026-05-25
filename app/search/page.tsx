@@ -36,6 +36,7 @@ import {
 } from "../data/voteCards";
 import { getMergedCounts, isCommentAuthoredByCurrentUser, type CardActivity } from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
+import { useEnsureCollectionsHydrated } from "../hooks/useEnsureCollectionsHydrated";
 import {
   getFavoriteTags,
   toggleFavoriteTag,
@@ -249,8 +250,9 @@ function SearchContent() {
     };
   }, []);
 
-  // 検索画面の「人気コレクション」候補をKVから取得（初回ペイントを塞ぎにくくする）
+  // コレクションタブ表示時のみ KV の人気コレ候補を取得
   useEffect(() => {
+    if (activeTab !== "collections") return;
     let cancelled = false;
     const run = () => {
       void (async () => {
@@ -297,7 +299,7 @@ function SearchContent() {
         clearTimeout(idleHandle as ReturnType<typeof setTimeout>);
       }
     };
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
     setFavoriteTags(getFavoriteTags());
@@ -472,7 +474,8 @@ function SearchContent() {
   }, [saveUiState]);
 
   useEffect(() => {
-    saveUiState();
+    const t = window.setTimeout(() => saveUiState(), 500);
+    return () => window.clearTimeout(t);
   }, [saveUiState]);
   useEffect(() => {
     // 戻る復元の直後は初期化しない（表示件数が5に戻るのを防ぐ）
@@ -496,6 +499,8 @@ function SearchContent() {
 
   const query = searchValue.trim();
   const isSearching = query.length > 0;
+  useEnsureCollectionsHydrated(activeTab === "collections" || isSearching);
+
   /** 人気コレ（デモ）＋自分・他人の登録コレクション名の部分一致 */
   const matchedCollectionsRaw = useMemo(() => {
     const q = query.trim().toLowerCase();

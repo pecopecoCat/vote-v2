@@ -107,6 +107,10 @@ export default function BookmarkCollectionModal({
 }: BookmarkCollectionModalProps) {
   const shared = useSharedData();
   const [collections, setCollections] = useState<Collection[]>([]);
+
+  useEffect(() => {
+    if (isLoggedIn) void shared.ensureCollectionsHydrated();
+  }, [isLoggedIn, shared.ensureCollectionsHydrated]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const bookmarkSideEffectsDoneRef = useRef(false);
 

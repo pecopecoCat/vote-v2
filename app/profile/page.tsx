@@ -18,6 +18,7 @@ import {
   type VoteComment,
 } from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
+import { useEnsureCollectionsHydrated } from "../hooks/useEnsureCollectionsHydrated";
 import { getCurrentActivityUserId } from "../data/auth";
 import { getFavoriteTags, getFavoriteTagsUpdatedEventName, removeFavoriteTag } from "../data/favoriteTags";
 import {
@@ -213,6 +214,7 @@ function ProfileContent() {
   const [activeTab, setActiveTab] = useState<ProfileTabId>(() => parseProfileTabFromUrl(tabFromUrl));
   const [collections, setCollections] = useState<Collection[]>([]);
   const shared = useSharedData();
+  useEnsureCollectionsHydrated();
   const {
     createdVotesForTimeline,
     activity,

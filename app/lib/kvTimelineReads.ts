@@ -44,13 +44,20 @@ export async function readCreatedVotesList(kv: KVClient): Promise<CreatedVoteEnt
   return Array.isArray(raw) ? raw : [];
 }
 
-export async function readActivityGetPayload(kv: KVClient, userId: string): Promise<ActivityGetPayload> {
+export async function readActivityGetPayload(
+  kv: KVClient,
+  userId: string,
+  opts?: { includeMemberJoinEvents?: boolean }
+): Promise<ActivityGetPayload> {
+  const includeMemberJoin = opts?.includeMemberJoinEvents !== false;
   const [global, userRaw, voteEvents, bookmarkEvents, memberJoinEvents] = await Promise.all([
     kv.get<Record<string, GlobalCardData>>(KV_ACTIVITY_GLOBAL),
     userId ? kv.get<Record<string, { userSelectedOption?: "A" | "B"; votedAt?: string }>>(KV_ACTIVITY_USER_PREFIX + userId) : null,
     kv.get<VoteEvent[]>(KV_VOTE_EVENTS),
     kv.get<BookmarkEvent[]>(KV_BOOKMARK_EVENTS),
-    userId ? readMemberJoinOwnerEvents(kv, userId) : Promise.resolve([] as MemberJoinOwnerEvent[]),
+    includeMemberJoin && userId
+      ? readMemberJoinOwnerEvents(kv, userId)
+      : Promise.resolve([] as MemberJoinOwnerEvent[]),
   ]);
   const globalData =
     global && typeof global === "object" ? normalizeKeyedGlobalRows(global) : {};

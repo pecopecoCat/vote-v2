@@ -39,6 +39,7 @@ import {
   type CardActivity,
 } from "./data/voteCardActivity";
 import { useSharedData } from "./context/SharedDataContext";
+import { useEnsureCollectionsHydrated } from "./hooks/useEnsureCollectionsHydrated";
 import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "./lib/appToast";
 import { buildVoteCardProps } from "./lib/buildVoteCardProps";
 import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, resetUser1AndUser2Collections } from "./data/collections";
@@ -446,6 +447,7 @@ function HomeContent() {
   const [collections, setCollections] = useState(() => getCollections());
   const shared = useSharedData();
   const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
+  useEnsureCollectionsHydrated();
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
@@ -632,20 +634,6 @@ function HomeContent() {
     [sharedAddVote]
   );
 
-  useEffect(() => {
-    setFeedKeepVotedCardVisibleIds(new Set());
-  }, [activeTab]);
-
-  useEffect(() => {
-    const handler = () => {
-      if (document.visibilityState === "visible") {
-        setFeedKeepVotedCardVisibleIds(new Set());
-      }
-    };
-    document.addEventListener("visibilitychange", handler);
-    return () => document.removeEventListener("visibilitychange", handler);
-  }, []);
-
   /** 急上昇・新着：投票済みは除外。myTimeline は cardsForTab 側で全件 */
   const cardsForFeed = useMemo(
     () =>
@@ -707,18 +695,15 @@ function HomeContent() {
         wasHidden = true;
         return;
       }
-      if (wasHidden && activeTabRef.current === "trending") {
-        wasHidden = false;
-        bumpTrendingOrder();
-      }
-      if (wasHidden && activeTabRef.current === "myTimeline") {
-        wasHidden = false;
-        bumpMyTimelineOrder();
-      }
+      if (!wasHidden) return;
+      wasHidden = false;
+      if (activeTabRef.current === "trending") bumpTrendingOrder();
+      if (activeTabRef.current === "myTimeline") bumpMyTimelineOrder();
+      void shared.refreshActivityIfStale();
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [bumpTrendingOrder]);
+  }, [bumpTrendingOrder, bumpMyTimelineOrder, shared.refreshActivityIfStale]);
 
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
@@ -859,9 +844,16 @@ function HomeContent() {
 
       {/* メインコンテンツ（下ナビ分の余白を確保） */}
       <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
-        {!activityBootstrapDone ? (
-          <HomeLoadingMessage />
-        ) : (
+        {!activityBootstrapDone && (
+          <p
+            className="mb-3 text-center text-xs leading-relaxed text-[#787878]"
+            role="status"
+            aria-live="polite"
+          >
+            最新を取得中…
+          </p>
+        )}
+        {allCardsFiltered.length > 0 ? (
           <VoteCardList>
             {activeTab === "myTimeline" && cardsForTab.length === 0 ? (
               <div className="vote-card-outer px-6 py-12 text-center">
@@ -878,20 +870,22 @@ function HomeContent() {
             ) : null}
 
             {(activeTab !== "myTimeline" || cardsForTab.length > 0) && (
-            <HomeTimelineFeed
-              key={activeTab}
-              timelineItems={timelineItems}
-              timelineTagList={homeTagList}
-              activity={activity}
-              commentedCardIdSet={commentedCardIdSet}
-              bookmarkedIds={bookmarkedIds}
-              currentUser={currentUser}
-              handleVote={handleVote}
-              onBookmarkClick={setModalCardId}
-              onMoreClick={handleCardMoreClick}
-            />
+              <HomeTimelineFeed
+                key={activeTab}
+                timelineItems={timelineItems}
+                timelineTagList={homeTagList}
+                activity={activity}
+                commentedCardIdSet={commentedCardIdSet}
+                bookmarkedIds={bookmarkedIds}
+                currentUser={currentUser}
+                handleVote={handleVote}
+                onBookmarkClick={setModalCardId}
+                onMoreClick={handleCardMoreClick}
+              />
             )}
           </VoteCardList>
+        ) : (
+          <HomeLoadingMessage />
         )}
       </main>
 

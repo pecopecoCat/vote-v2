@@ -38,6 +38,7 @@ import {
   applyDemoCreatorDisplayToCard,
 } from "../data/auth";
 import {
+  getCollectionsUpdatedEventName,
   hydrateParticipatedMemberCollectionsFromRemote,
   hydrateUserOwnedCollectionsFromRemote,
   removeSeedPapaWarningCollection,
@@ -63,6 +64,16 @@ const CREATED_VOTES_API = "/api/created-votes";
 const ACTIVITY_API = "/api/activity";
 /** KV 利用時の初回：created-votes + activity を1リクエストで取得 */
 const TIMELINE_BOOTSTRAP_API = "/api/timeline-bootstrap";
+
+/** 同一ユーザーの activity GET を間引く（タブ復帰の auth 連鎖対策） */
+const ACTIVITY_REFETCH_MIN_MS = 120_000;
+
+/** 再訪時は KV 完了を待たずタイムラインを出せる（localStorage の activity / 作った VOTE） */
+function hasTimelineLocalCache(): boolean {
+  if (typeof window === "undefined") return false;
+  if (mapDemoCreatorDisplayForTimeline(getCreatedVotesForTimeline()).length > 0) return true;
+  return Object.keys(getAllActivity()).length > 0;
+}
 
 type ActivityApiPayload = {
   global?: Record<string, { countA?: number; countB?: number; comments?: CardActivity["comments"] }>;
@@ -242,10 +253,14 @@ export interface SharedDataContextValue {
   removeCreatedVote: (cardId: string) => void;
   /** 初回の作成VOTE/活動取得が完了したか（HOMEの投票済みスナップショット用） */
   activityBootstrapDone: boolean;
-  /** KV 活動・作成者向けイベントを再取得（通知画面の最新化用） */
+  /** KV 活動・作成者向けイベントを再取得（通知画面の最新化用・強制） */
   refetchActivity: () => Promise<boolean>;
+  /** 一定時間内ならスキップ（HOME タブ復帰など） */
+  refreshActivityIfStale: () => Promise<boolean>;
   /** 作成VOTE一覧を KV から再取得（マイページ削除後の同期用） */
   refetchCreatedVotes: () => Promise<boolean>;
+  /** コレクション／ブックマークを KV と同期（初回のみ・必要画面から呼ぶ） */
+  ensureCollectionsHydrated: () => Promise<void>;
 }
 
 const SharedDataContext = createContext<SharedDataContextValue | null>(null);
@@ -280,7 +295,9 @@ export function useSharedData(): SharedDataContextValue {
       removeCreatedVote: () => {},
       activityBootstrapDone: true,
       refetchActivity: async () => false,
+      refreshActivityIfStale: async () => false,
       refetchCreatedVotes: async () => false,
+      ensureCollectionsHydrated: async () => {},
     };
   }
   return ctx;
@@ -289,6 +306,8 @@ export function useSharedData(): SharedDataContextValue {
 export function SharedDataProvider({ children }: { children: ReactNode }) {
   /** fetchActivity のマージは同一 userId のときのみ（アカウント切替で前ユーザーの投票済みが残らないように） */
   const lastActivityFetchUserIdRef = useRef<string>("");
+  const lastActivityFetchAtRef = useRef(0);
+  const collectionsHydratePromiseRef = useRef<Promise<void> | null>(null);
   const [createdVotesForTimeline, setCreatedVotesForTimeline] = useState<VoteCardData[]>(() =>
     typeof window !== "undefined" ? mapDemoCreatorDisplayForTimeline(getCreatedVotesForTimeline()) : []
   );
@@ -299,7 +318,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [bookmarkEvents, setBookmarkEvents] = useState<BookmarkEvent[]>([]);
   const [memberJoinEvents, setMemberJoinEvents] = useState<MemberJoinOwnerEvent[]>([]);
   const [isRemote, setIsRemote] = useState(false);
-  const [activityBootstrapDone, setActivityBootstrapDone] = useState(false);
+  const [activityBootstrapDone, setActivityBootstrapDone] = useState(() =>
+    typeof window !== "undefined" ? hasTimelineLocalCache() : false
+  );
   const isRemoteRef = useRef(false);
   isRemoteRef.current = isRemote;
 
@@ -346,26 +367,54 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     });
     setVoteEvents(Array.isArray(data?.voteEvents) ? data.voteEvents : []);
     setBookmarkEvents(Array.isArray(data?.bookmarkEvents) ? data.bookmarkEvents : []);
-    setMemberJoinEvents(Array.isArray(data?.memberJoinEvents) ? data.memberJoinEvents : []);
+    const joins = Array.isArray(data?.memberJoinEvents) ? data.memberJoinEvents : [];
+    if (joins.length > 0) setMemberJoinEvents(joins);
   }, []);
 
-  const fetchActivity = useCallback(async (): Promise<boolean> => {
-    const userId = getCurrentActivityUserId();
-    try {
-      const res = await fetch(`${ACTIVITY_API}?userId=${encodeURIComponent(userId)}`);
-      if (res.status !== 200) return false;
-      const data = (await res.json()) as ActivityApiPayload;
-      applyActivityResponseData(data, userId);
-      return true;
-    } catch {
-      return false;
+  const fetchActivity = useCallback(
+    async (options?: { force?: boolean }): Promise<boolean> => {
+      const now = Date.now();
+      if (!options?.force && now - lastActivityFetchAtRef.current < ACTIVITY_REFETCH_MIN_MS) {
+        return true;
+      }
+      const userId = getCurrentActivityUserId();
+      try {
+        const res = await fetch(`${ACTIVITY_API}?userId=${encodeURIComponent(userId)}`);
+        if (res.status !== 200) return false;
+        const data = (await res.json()) as ActivityApiPayload;
+        applyActivityResponseData(data, userId);
+        lastActivityFetchAtRef.current = Date.now();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [applyActivityResponseData]
+  );
+
+  const ensureCollectionsHydrated = useCallback(async (): Promise<void> => {
+    if (collectionsHydratePromiseRef.current) {
+      return collectionsHydratePromiseRef.current;
     }
-  }, [applyActivityResponseData]);
+    const p = (async () => {
+      await hydrateUserOwnedCollectionsFromRemote();
+      removeSeedPapaWarningCollection();
+      await hydrateParticipatedMemberCollectionsFromRemote();
+      await hydrateBookmarksFromRemote();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(getCollectionsUpdatedEventName()));
+      }
+    })();
+    collectionsHydratePromiseRef.current = p;
+    await p;
+  }, []);
 
   const runInitialRemoteBootstrap = useCallback(async (): Promise<boolean> => {
     const userId = getCurrentActivityUserId();
     try {
-      const res = await fetch(`${TIMELINE_BOOTSTRAP_API}?userId=${encodeURIComponent(userId)}`);
+      const res = await fetch(
+        `${TIMELINE_BOOTSTRAP_API}?userId=${encodeURIComponent(userId)}&lean=1`
+      );
       if (res.status !== 200) return false;
       const raw = (await res.json()) as ActivityApiPayload & {
         createdVotes?: Array<{ userId?: string; card?: unknown }>;
@@ -379,6 +428,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       }
       setCreatedVotesForTimeline(mapDemoCreatorDisplayForTimeline(cards));
       applyActivityResponseData(raw, userId);
+      lastActivityFetchAtRef.current = Date.now();
       return true;
     } catch {
       return false;
@@ -469,7 +519,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     setActivity(getAllActivity());
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let mounted = true;
     (async () => {
       try {
@@ -477,7 +527,10 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         if (mounted && bootOk) {
           setIsRemote(true);
         } else if (mounted) {
-          const [createdOk, activityOk] = await Promise.all([fetchCreatedVotes(), fetchActivity()]);
+          const [createdOk, activityOk] = await Promise.all([
+            fetchCreatedVotes(),
+            fetchActivity({ force: true }),
+          ]);
           if (createdOk && activityOk) setIsRemote(true);
         }
       } finally {
@@ -512,7 +565,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           authActivityTimerRef.current = null;
         }
         setActivity(getAllActivity());
-        void fetchActivity();
+        collectionsHydratePromiseRef.current = null;
+        void fetchActivity({ force: true });
+        if (getAuth().isLoggedIn) void ensureCollectionsHydrated();
         return;
       }
       scheduleDebouncedFetch();
@@ -526,42 +581,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         authActivityTimerRef.current = null;
       }
     };
-  }, [fetchActivity]);
-
-  // ログイン後: コレクション作成分と参加分はどちらも localStorage を読み書きするため直列にする。
-  // 並列だと Safari 等で完了順がずれ、古い load() 結果で save が上書きし一覧が空になる競合が起き得る。
-  useEffect(() => {
-    let hydrateTimer: ReturnType<typeof setTimeout> | null = null;
-    const runHydrate = () => {
-      void (async () => {
-        await hydrateUserOwnedCollectionsFromRemote();
-        removeSeedPapaWarningCollection();
-        await hydrateParticipatedMemberCollectionsFromRemote();
-        await hydrateBookmarksFromRemote();
-      })();
-    };
-    const hydrateAllFromRemote = (immediate = false) => {
-      if (hydrateTimer != null) {
-        clearTimeout(hydrateTimer);
-        hydrateTimer = null;
-      }
-      if (immediate) {
-        runHydrate();
-        return;
-      }
-      hydrateTimer = setTimeout(() => {
-        hydrateTimer = null;
-        runHydrate();
-      }, 400);
-    };
-    hydrateAllFromRemote(true);
-    const onAuthForHydrate = () => hydrateAllFromRemote(false);
-    window.addEventListener(getAuthUpdatedEventName(), onAuthForHydrate);
-    return () => {
-      if (hydrateTimer != null) clearTimeout(hydrateTimer);
-      window.removeEventListener(getAuthUpdatedEventName(), onAuthForHydrate);
-    };
-  }, []);
+  }, [fetchActivity, ensureCollectionsHydrated]);
 
   // いいねなどで global だけ更新されたとき、既存の activity を上書きせずマージする（API取得分が消えないように）
   useEffect(() => {
@@ -591,23 +611,15 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(ACTIVITY_GLOBAL_UPDATED_EVENT, handler);
   }, []);
 
-  /** キャッシュクリア後などで bfcache から復元されたとき、localStorage が空なのに古いログイン状態が残るのを防ぐ */
+  /** bfcache 復元時のみ auth 再同期（タブ復帰の visibility では activity を再取得しない） */
   useEffect(() => {
-    const syncAuth = () => {
-      window.dispatchEvent(new CustomEvent(getAuthUpdatedEventName()));
-    };
     const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) syncAuth();
-    };
-    const onVisibilityChange = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") syncAuth();
+      if (e.persisted) {
+        window.dispatchEvent(new CustomEvent(getAuthUpdatedEventName()));
+      }
     };
     window.addEventListener("pageshow", onPageShow);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      window.removeEventListener("pageshow", onPageShow);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
+    return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
 
   useEffect(() => {
@@ -910,8 +922,10 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       recordBookmarkEvent,
       removeCreatedVote,
       activityBootstrapDone,
-      refetchActivity: fetchActivity,
+      refetchActivity: () => fetchActivity({ force: true }),
+      refreshActivityIfStale: () => fetchActivity({ force: false }),
       refetchCreatedVotes: fetchCreatedVotes,
+      ensureCollectionsHydrated,
     }),
     [
       createdVotesForTimeline,
@@ -929,6 +943,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       activityBootstrapDone,
       fetchActivity,
       fetchCreatedVotes,
+      ensureCollectionsHydrated,
     ]
   );
 

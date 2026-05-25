@@ -56,6 +56,7 @@ import {
   type CardActivity,
 } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
+import { useEnsureCollectionsHydrated } from "../../hooks/useEnsureCollectionsHydrated";
 import type { VoteCardData } from "../../data/voteCards";
 import { getCreatedVotesForTimeline } from "../../data/createdVotes";
 import { isVotingAllowedNow, resolveCardForVotePeriod } from "../../data/votePeriod";
@@ -202,6 +203,7 @@ export default function CollectionPage() {
   const id = typeof params.id === "string" ? params.id : "";
   const shared = useSharedData();
   const { createdVotesForTimeline, activity, addVote: sharedAddVote, isRemote } = shared;
+  useEnsureCollectionsHydrated();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [showVoted, setShowVotedState] = useState(() => getShowVoted());
@@ -475,7 +477,7 @@ export default function CollectionPage() {
   }, [collection?.id, collection?.visibility, activityUserId]);
 
   /** メンバー限定コレの投票・参加者をサーバーから追う間隔（非表示タブではポーリング停止） */
-  const MEMBER_COLLECTION_POLL_MS = 10_000;
+  const MEMBER_COLLECTION_POLL_MS = 30_000;
 
   /**
    * メンバー限定: 定期・フォーカス・タブ復帰で再取得。
