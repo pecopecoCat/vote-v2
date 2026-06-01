@@ -614,12 +614,22 @@ function HomeContent() {
   }, [activity]);
 
   /**
-   * 急上昇・新着：activity の userSelectedOption で投票済みを除外（キーずれを防ぐ）。
-   * 投票したカード ID をここに入れてタブ切替・visibility まで一覧に残す（結果表示のまま）。
+   * 急上昇・新着：投票済みは通常除外。投票直後だけ ID を入れて結果表示のまま残す。
+   * リロード相当は「HOME 内タブ切替」「HOME 以外へページ遷移」のときのみ。
    */
   const [feedKeepVotedCardVisibleIds, setFeedKeepVotedCardVisibleIds] = useState<Set<string>>(
     () => new Set()
   );
+
+  useEffect(() => {
+    setFeedKeepVotedCardVisibleIds(new Set());
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (pathname !== "/") {
+      setFeedKeepVotedCardVisibleIds(new Set());
+    }
+  }, [pathname]);
 
   const handleVote = useCallback(
     (id: string, option: "A" | "B") => {
