@@ -35,7 +35,6 @@ import {
 } from "../data/voteCards";
 import { getMergedCounts, isCommentAuthoredByCurrentUser, type CardActivity } from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
-import { useEnsureCollectionsHydrated } from "../hooks/useEnsureCollectionsHydrated";
 import {
   getFavoriteTags,
   toggleFavoriteTag,
@@ -48,8 +47,10 @@ import {
   getOtherUsersCollections,
   getPinnedCollectionIds,
   getCollectionsUpdatedEventName,
+  hydrateUserOwnedCollectionsFromRemote,
   PINNED_UPDATED_EVENT,
 } from "../data/collections";
+import { fetchCollectionsIndex, type CollectionsIndexRow } from "../lib/fetchCollectionsIndex";
 import { isCardBookmarked } from "../data/bookmarks";
 import { getShowVoted, setShowVoted } from "../data/showVotedPreference";
 import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../data/auth";
@@ -218,10 +219,8 @@ function SearchContent() {
   const collectionsLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const voteSearchLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
-  const [collections, setCollections] = useState<ReturnType<typeof getCollections>>([]);
-  const [remotePopularCollections, setRemotePopularCollections] = useState<
-    Array<{ id: string; name: string; color: string; gradient?: string; visibility: string; cardIds: string[] }>
-  >([]);
+  const [collections, setCollections] = useState<ReturnType<typeof getCollections>>(() => getCollections());
+  const [remotePopularCollections, setRemotePopularCollections] = useState<CollectionsIndexRow[]>([]);
   const [auth, setAuth] = useState(() => getAuth());
   const isLoggedIn = auth.isLoggedIn;
   const currentUser = useMemo<CurrentUser>(
@@ -248,57 +247,6 @@ function SearchContent() {
       window.removeEventListener(getCollectionsUpdatedEventName(), syncLists);
     };
   }, []);
-
-  // コレクションタブ表示時のみ KV の人気コレ候補を取得
-  useEffect(() => {
-    if (activeTab !== "collections") return;
-    let cancelled = false;
-    const run = () => {
-      void (async () => {
-        try {
-          const res = await fetch("/api/collections");
-          if (!res.ok) return;
-          const data = (await res.json()) as { collections?: unknown };
-          const list = Array.isArray(data?.collections) ? (data.collections as unknown[]) : [];
-          const normalized = list
-            .map((v) => (v && typeof v === "object" ? (v as Record<string, unknown>) : null))
-            .filter((v): v is Record<string, unknown> => v != null)
-            .map((o) => ({
-              id: typeof o.id === "string" ? o.id : "",
-              name: typeof o.name === "string" ? o.name : "",
-              color: typeof o.color === "string" ? o.color : "#E5E7EB",
-              gradient: typeof o.gradient === "string" ? (o.gradient as string) : undefined,
-              visibility: typeof o.visibility === "string" ? o.visibility : "public",
-              cardIds: Array.isArray(o.cardIds) ? o.cardIds.filter((x): x is string => typeof x === "string") : [],
-            }))
-            .filter((c) => c.id.length > 0);
-          if (!cancelled) {
-            startTransition(() => {
-              setRemotePopularCollections(normalized);
-            });
-          }
-        } catch {
-          // ignore
-        }
-      })();
-    };
-    let idleHandle: number | ReturnType<typeof setTimeout> = 0;
-    let usedIdleCallback = false;
-    if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
-      usedIdleCallback = true;
-      idleHandle = window.requestIdleCallback(run, { timeout: 2500 });
-    } else {
-      idleHandle = setTimeout(run, 1);
-    }
-    return () => {
-      cancelled = true;
-      if (usedIdleCallback && typeof window !== "undefined" && typeof window.cancelIdleCallback === "function") {
-        window.cancelIdleCallback(idleHandle as number);
-      } else {
-        clearTimeout(idleHandle as ReturnType<typeof setTimeout>);
-      }
-    };
-  }, [activeTab]);
 
   useEffect(() => {
     setFavoriteTags(getFavoriteTags());
@@ -498,7 +446,41 @@ function SearchContent() {
 
   const query = searchValue.trim();
   const isSearching = query.length > 0;
-  useEnsureCollectionsHydrated(activeTab === "collections" || isSearching);
+
+  /**
+   * コレクションタブ／検索時：人気 index と自分の作成コレのみ並列取得。
+   * 全文 hydrate（member-collections・bookmarks）は呼ばない（検索表示に不要で遅い）。
+   */
+  useEffect(() => {
+    const needIndex = activeTab === "collections";
+    const needOwned = isLoggedIn && (needIndex || isSearching);
+    if (!needIndex && !needOwned) return;
+
+    let cancelled = false;
+    void (async () => {
+      const tasks: Promise<void>[] = [];
+      if (needIndex) {
+        tasks.push(
+          fetchCollectionsIndex().then((rows) => {
+            if (!cancelled) {
+              startTransition(() => setRemotePopularCollections(rows));
+            }
+          })
+        );
+      }
+      if (needOwned) {
+        tasks.push(
+          hydrateUserOwnedCollectionsFromRemote().then(() => {
+            if (!cancelled) setCollections(getCollections());
+          })
+        );
+      }
+      await Promise.all(tasks);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, isSearching, isLoggedIn]);
 
   /** 人気コレ（デモ）＋自分・他人の登録コレクション名の部分一致 */
   const matchedCollectionsRaw = useMemo(() => {

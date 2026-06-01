@@ -454,23 +454,9 @@ export async function hydrateParticipatedMemberCollectionsFromRemote(): Promise<
     const candidates = current.filter((c) => c.joinedParticipation && !remoteIds.has(c.id));
     if (candidates.length > 0) {
       // まず一覧API（index）で存在確認し、無いものだけ個別に 404 確認（不要なリクエスト削減）
-      let indexIds: Set<string> | null = null;
-      try {
-        const idxRes = await fetch("/api/collections");
-        if (idxRes.ok) {
-          const idx = (await idxRes.json()) as { collections?: unknown };
-          const rows = Array.isArray(idx?.collections) ? idx.collections : [];
-          const ids = new Set<string>();
-          for (const r of rows) {
-            if (!r || typeof r !== "object") continue;
-            const id = (r as { id?: unknown }).id;
-            if (typeof id === "string" && id.length > 0) ids.add(id);
-          }
-          indexIds = ids;
-        }
-      } catch {
-        // ignore
-      }
+      const { fetchCollectionsIndex } = await import("../lib/fetchCollectionsIndex");
+      const indexRows = await fetchCollectionsIndex();
+      const indexIds = indexRows.length > 0 ? new Set(indexRows.map((r) => r.id)) : null;
       const toRemove = new Set<string>();
       const need404Check = candidates.filter((c) => !indexIds?.has(c.id));
       const removedIds = await Promise.all(
