@@ -486,7 +486,7 @@ export default function CollectionPage() {
     const colId = collection.id;
     let inFlight = false;
     let lastPullAt = 0;
-    let intervalId: ReturnType<typeof window.setInterval> | null = null;
+    let intervalId: number | null = null;
     const applyRemote = (r: Awaited<ReturnType<typeof fetchMemberCollectionVotesRemote>>) => {
       if (r.ok) {
         hydrateCollectionScopedFromSnapshot(colId, r.snapshot);
