@@ -14,6 +14,8 @@ export interface CollectionCardProps {
   showPin?: boolean;
   /** リンク先（指定時は Link でラップ） */
   href?: string;
+  /** 一覧で並ぶときは false 推奨（true だと表示件数分 /collection/* が一斉 prefetch される） */
+  prefetch?: boolean;
   /** タイトルを白文字・黒ブロックで表示（マリオカード用）。title に \n で改行可能 */
   titleVariant?: "default" | "blackBlock";
   /** 人気コレクション枠：タイムラインのコレバナーに寄せた黒地＋白字（21px 基準の 81% = 0.9×0.9） */
@@ -31,6 +33,7 @@ function CollectionCard({
   gradient = "orange-yellow",
   showPin = false,
   href,
+  prefetch = false,
   titleVariant = "default",
   popularBanner = false,
   label,
@@ -122,7 +125,7 @@ function CollectionCard({
 
   if (href) {
     return (
-      <Link href={href} className="block">
+      <Link href={href} prefetch={prefetch} className="block">
         {content}
       </Link>
     );

@@ -22,6 +22,7 @@ export default function RecommendedTags({ tags, className }: RecommendedTagsProp
             <Link
               key={tag}
               href={`/search?tag=${encodeURIComponent(tag)}`}
+              prefetch={false}
               className="text-sm font-medium text-blue-600 hover:underline"
             >
               #{tag}

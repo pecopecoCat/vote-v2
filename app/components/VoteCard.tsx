@@ -574,6 +574,7 @@ function VoteCard({
             <Link
               key={tag}
               href={`/search?tag=${encodeURIComponent(tag)}`}
+              prefetch={false}
               className="rounded-full text-[14px] text-blue-600 hover:underline"
             >
               #{tag}

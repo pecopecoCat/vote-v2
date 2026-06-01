@@ -797,6 +797,7 @@ function ProfileContent() {
                 <Link
                   key={tag}
                   href={`/search?tag=${encodeURIComponent(tag)}`}
+                  prefetch={false}
                   className="profile-favorite-tag shrink-0 rounded-full bg-white/60 px-4 py-2 text-[13px] text-[#191919]"
                 >
                   {tag}

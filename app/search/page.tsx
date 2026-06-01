@@ -133,6 +133,7 @@ function TagRow({
   return (
     <Link
       href={`/search?tag=${encodeURIComponent(tag)}`}
+      prefetch={false}
       className="flex items-center gap-2 border-b border-gray-100 py-3 last:border-b-0"
     >
       <div className="min-w-0 flex-1">
