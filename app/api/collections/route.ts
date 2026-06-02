@@ -51,7 +51,10 @@ export async function GET(): Promise<NextResponse<Record<string, unknown> | { er
     const raw = await kv.get<unknown>(INDEX_KEY);
     const list = Array.isArray(raw) ? raw : [];
     const collections = list.map(normalizeRow).filter((v): v is IndexRow => v != null);
-    return NextResponse.json({ collections });
+    return NextResponse.json(
+      { collections },
+      { headers: { "Cache-Control": "s-maxage=30, stale-while-revalidate=60" } }
+    );
   } catch (e) {
     console.error("[api/collections] GET error:", e);
     return NextResponse.json({ error: "KV_ERROR" }, { status: 500 });

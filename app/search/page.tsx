@@ -222,6 +222,7 @@ function SearchContent() {
   const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
   const [collections, setCollections] = useState<ReturnType<typeof getCollections>>(() => getCollections());
   const [remotePopularCollections, setRemotePopularCollections] = useState<CollectionsIndexRow[]>([]);
+  const [collectionsIndexLoading, setCollectionsIndexLoading] = useState(false);
   const [auth, setAuth] = useState(() => getAuth());
   const isLoggedIn = auth.isLoggedIn;
   const currentUser = useMemo<CurrentUser>(
@@ -448,40 +449,38 @@ function SearchContent() {
   const query = searchValue.trim();
   const isSearching = query.length > 0;
 
-  /**
-   * コレクションタブ／検索時：人気 index と自分の作成コレのみ並列取得。
-   * 全文 hydrate（member-collections・bookmarks）は呼ばない（検索表示に不要で遅い）。
-   */
+  /** 検索画面を開いた時点でコレ一覧を温める（タブ切替を待たない） */
   useEffect(() => {
-    const needIndex = activeTab === "collections";
-    const needOwned = isLoggedIn && (needIndex || isSearching);
-    if (!needIndex && !needOwned) return;
-
     let cancelled = false;
-    void (async () => {
-      const tasks: Promise<void>[] = [];
-      if (needIndex) {
-        tasks.push(
-          fetchCollectionsIndex().then((rows) => {
-            if (!cancelled) {
-              startTransition(() => setRemotePopularCollections(rows));
-            }
-          })
-        );
-      }
-      if (needOwned) {
-        tasks.push(
-          hydrateUserOwnedCollectionsFromRemote().then(() => {
-            if (!cancelled) setCollections(getCollections());
-          })
-        );
-      }
-      await Promise.all(tasks);
-    })();
+    setCollectionsIndexLoading(true);
+    void fetchCollectionsIndex()
+      .then((rows) => {
+        if (!cancelled) startTransition(() => setRemotePopularCollections(rows));
+      })
+      .finally(() => {
+        if (!cancelled) setCollectionsIndexLoading(false);
+      });
+    if (isLoggedIn) {
+      void hydrateUserOwnedCollectionsFromRemote().then(() => {
+        if (!cancelled) setCollections(getCollections());
+      });
+    }
     return () => {
       cancelled = true;
     };
-  }, [activeTab, isSearching, isLoggedIn]);
+  }, [isLoggedIn]);
+
+  /** コレクションタブに戻ったときだけ index を再確認（キャッシュ 60s 内なら即返る） */
+  useEffect(() => {
+    if (activeTab !== "collections") return;
+    let cancelled = false;
+    void fetchCollectionsIndex().then((rows) => {
+      if (!cancelled) startTransition(() => setRemotePopularCollections(rows));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
 
   /** 人気コレ（デモ）＋自分・他人の登録コレクション名の部分一致 */
   const matchedCollectionsRaw = useMemo(() => {
@@ -942,7 +941,11 @@ function SearchContent() {
             {activeTab === "collections" && (
               <section className="border-b border-gray-200 pt-2.5">
                 <div className="flex flex-col gap-3 px-[5.333vw] pb-5 pt-1">
-                  {collectionsForSection.length === 0 ? (
+                  {collectionsIndexLoading && remotePopularCollections.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-gray-500" role="status" aria-live="polite">
+                      コレクションを読み込み中…
+                    </p>
+                  ) : collectionsForSection.length === 0 ? (
                     <p className="py-6 text-center text-sm text-gray-500">
                       {isLoggedIn ? "コレクションがありません。マイページで作成しよう。" : "コレクションはありません。"}
                     </p>

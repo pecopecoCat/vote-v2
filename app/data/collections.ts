@@ -182,7 +182,8 @@ export async function hydrateUserOwnedCollectionsFromRemote(): Promise<void> {
       const ownedLocal = local.filter((c) => !c.joinedParticipation);
 
       if (ownedServer.length === 0 && ownedLocal.length > 0) {
-        await pushUserOwnedCollectionsToRemoteIfLoggedIn(uid, local);
+        saveUnlocked(uid, local);
+        void pushUserOwnedCollectionsToRemoteIfLoggedIn(uid, local);
         return;
       }
 
