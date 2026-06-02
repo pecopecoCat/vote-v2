@@ -7,7 +7,7 @@ import VoteCard from "../components/VoteCard";
 import TagSearchLink from "../components/TagSearchLink";
 import { VoteCardList } from "../components/VoteCardList";
 import { getCreatedVotes, deleteCreatedVote, getCreatedVotesUpdatedEventName } from "../data/createdVotes";
-import { voteCardsData, CARD_BACKGROUND_IMAGES, resolveStableVoteCardId } from "../data/voteCards";
+import { voteCardsData, resolveStableVoteCardId } from "../data/voteCards";
 import {
   addCommentLike,
   COMMENT_LIKES_BY_ME_UPDATED_EVENT,
@@ -20,10 +20,9 @@ import {
 import { useSharedData } from "../context/SharedDataContext";
 import { useEnsureCollectionsHydrated } from "../hooks/useEnsureCollectionsHydrated";
 import { getCurrentActivityUserId } from "../data/auth";
-import { getFavoriteTags, getFavoriteTagsUpdatedEventName, removeFavoriteTag } from "../data/favoriteTags";
+import { removeFavoriteTag } from "../data/favoriteTags";
 import {
   getCollections,
-  getCollectionsUpdatedEventName,
   createOwnedCollectionFromSettings,
   updateCollection,
   deleteCollection,
@@ -33,9 +32,14 @@ import {
 } from "../data/collections";
 import { getBookmarkIds, isCardBookmarked, getBookmarksUpdatedEventName } from "../data/bookmarks";
 import { getCollectionGradientStyle } from "../data/search";
-import { getAuth, getAuthUpdatedEventName } from "../data/auth";
 import { perfMeasure } from "../lib/perf";
 import { buildVoteCardProps } from "../lib/buildVoteCardProps";
+import { resolveCardBackgroundUrl } from "../lib/resolveCardBackgroundUrl";
+import { useAuthState } from "../hooks/useAuthState";
+import { useFavoriteTags } from "../hooks/useFavoriteTags";
+import { useLocalCollections } from "../hooks/useLocalCollections";
+import { useCardModerationFlow } from "../hooks/useCardModerationFlow";
+import CardModerationModals from "../components/CardModerationModals";
 import {
   getHiddenUserIds,
   addHiddenUser,
@@ -54,8 +58,6 @@ import Button from "../components/Button";
 import CollectionSettingsModal from "../components/CollectionSettingsModal";
 import CollectionOptionsModal from "../components/CollectionOptionsModal";
 import MemberCollectionShareSheet from "../components/MemberCollectionShareSheet";
-import CardOptionsModal from "../components/CardOptionsModal";
-import ReportViolationModal from "../components/ReportViolationModal";
 import NewestOldestSortDropdown from "../components/NewestOldestSortDropdown";
 import CommentThreadGroup from "../components/CommentThreadGroup";
 import UnderlineTabBar, { type UnderlineTabItem } from "../components/UnderlineTabBar";
@@ -196,13 +198,6 @@ function ChevronDownIcon({ className }: { className?: string }) {
   );
 }
 
-function backgroundForCard(card: VoteCardData, cardId: string): string {
-  if (card.backgroundImageUrl) return card.backgroundImageUrl;
-  let h = 0;
-  for (let i = 0; i < cardId.length; i++) h = ((h << 5) - h + cardId.charCodeAt(i)) | 0;
-  return CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
-}
-
 function ProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -212,7 +207,10 @@ function ProfileContent() {
   const bookmarkFromUrl = searchParams.get("bookmark");
   const returnTo = searchParams.get("returnTo"); // 未ログインでVOTE作成から来た場合の戻り先
   const [activeTab, setActiveTab] = useState<ProfileTabId>(() => parseProfileTabFromUrl(tabFromUrl));
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const auth = useAuthState();
+  const { collections, setCollections, refreshCollections } = useLocalCollections();
+  const { favoriteTags, refreshFavoriteTags } = useFavoriteTags();
+  const moderation = useCardModerationFlow();
   const shared = useSharedData();
   useEnsureCollectionsHydrated();
   const {
@@ -222,7 +220,6 @@ function ProfileContent() {
     removeCreatedVote: sharedRemoveCreatedVote,
     refetchCreatedVotes,
   } = shared;
-  const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
   /** Bookmark タブでコレクション or ALL を選択中。null = TOP（リスト表示） */
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<null | "all" | string>(() => {
     if (bookmarkFromUrl === "all") return "all";
@@ -303,9 +300,6 @@ function ProfileContent() {
   );
   /** ブックマーク先選択モーダルを開くカードID */
   const [modalCardId, setModalCardId] = useState<string | null>(null);
-  const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
-  const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
-  const [reportCardId, setReportCardId] = useState<string | null>(null);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
   /** コレクション設定モーダル（新規追加 or 編集） */
@@ -331,43 +325,13 @@ function ProfileContent() {
   const [myVoteSortOrder, setMyVoteSortOrder] = useState<"newest" | "oldest">("newest");
   /** 投票タブ 並び順 */
   const [voteTabSortOrder, setVoteTabSortOrder] = useState<"newest" | "oldest">("newest");
-  /** ログイン状態（LINEのみ。未ログイン時はログイン画面を表示） */
-  const [auth, setAuth] = useState(() => getAuth());
+  useEffect(() => {
+    if (auth.isLoggedIn && auth.userId) refreshCollections();
+  }, [auth.isLoggedIn, auth.userId, refreshCollections]);
 
   useEffect(() => {
-    setCollections(getCollections());
-  }, []);
-
-  useEffect(() => {
-    if (auth.isLoggedIn && auth.userId) {
-      setCollections(getCollections());
-    }
-  }, [auth.isLoggedIn, auth.userId]);
-
-  useEffect(() => {
-    const handler = () => {
-      setAuth(getAuth());
-      setFavoriteTags(getFavoriteTags());
-      setCollections(getCollections());
-    };
-    window.addEventListener(getAuthUpdatedEventName(), handler);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
-  }, []);
-
-  useEffect(() => {
-    setFavoriteTags(getFavoriteTags());
-    const eventName = getFavoriteTagsUpdatedEventName();
-    const handler = () => setFavoriteTags(getFavoriteTags());
-    window.addEventListener(eventName, handler);
-    return () => window.removeEventListener(eventName, handler);
-  }, []);
-
-  useEffect(() => {
-    const eventName = getCollectionsUpdatedEventName();
-    const handler = () => setCollections(getCollections());
-    window.addEventListener(eventName, handler);
-    return () => window.removeEventListener(eventName, handler);
-  }, []);
+    if (auth.isLoggedIn) refreshFavoriteTags();
+  }, [auth.isLoggedIn, auth.userId, refreshFavoriteTags]);
 
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   useEffect(() => {
@@ -566,7 +530,7 @@ function ProfileContent() {
         out.push({
           card,
           cardId,
-          bgUrl: backgroundForCard(card, cardId),
+          bgUrl: resolveCardBackgroundUrl(card, cardId),
         });
       }
       return out;
@@ -592,11 +556,10 @@ function ProfileContent() {
 
   const handleProfileCardMoreClick = useCallback(
     (cardId: string) => {
-      setCardOptionsCardId(cardId);
-      const card = allCardsFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
-      setCardOptionsIsOwnCard(card?.createdByUserId === userId);
+      const target = allCardsFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
+      moderation.openCardOptions(cardId, target?.createdByUserId === userId);
     },
-    [allCardsFiltered, userId]
+    [allCardsFiltered, userId, moderation]
   );
 
   /** HOME / 検索と同じ participate 投票（myVOTE・Bookmark 内一覧） */
@@ -783,7 +746,7 @@ function ProfileContent() {
                       aria-label={`${tag} を削除`}
                       onClick={() => {
                         removeFavoriteTag(tag);
-                        setFavoriteTags(getFavoriteTags());
+                        refreshFavoriteTags();
                       }}
                     >
                       ×
@@ -859,7 +822,7 @@ function ProfileContent() {
                           activity: act,
                           currentUser,
                           surface: "participate",
-                          backgroundImageUrl: backgroundForCard(card, cardId),
+                          backgroundImageUrl: resolveCardBackgroundUrl(card, cardId),
                           bookmarked: isCardBookmarked(cardId),
                           hasCommented: commentedCardIdSet.has(cardId),
                           onVote: handleProfileParticipateVote,
@@ -901,7 +864,7 @@ function ProfileContent() {
                         activity: act,
                         currentUser,
                         surface: "votedHistory",
-                        backgroundImageUrl: backgroundForCard(card, cardId),
+                        backgroundImageUrl: resolveCardBackgroundUrl(card, cardId),
                         bookmarked: isCardBookmarked(cardId),
                         hasCommented: commentedCardIdSet.has(cardId),
                         onBookmarkClick: setModalCardId,
@@ -1083,7 +1046,7 @@ function ProfileContent() {
                         className="block transition-opacity active:opacity-90"
                       >
                           <VoteCardMini
-                            backgroundImageUrl={backgroundForCard(card, cardId)}
+                            backgroundImageUrl={resolveCardBackgroundUrl(card, cardId)}
                             patternType={card.patternType ?? "yellow-loops"}
                             question={card.question}
                             optionA={card.optionA}
@@ -1147,36 +1110,26 @@ function ProfileContent() {
           cardId={modalCardId}
           onClose={() => setModalCardId(null)}
           isLoggedIn={auth.isLoggedIn}
-          onCollectionsUpdated={() => setCollections(getCollections())}
+          onCollectionsUpdated={refreshCollections}
         />
       )}
 
-      {cardOptionsCardId != null && (
-        <CardOptionsModal
-          cardId={cardOptionsCardId}
-          isOwnCard={cardOptionsIsOwnCard}
-          onClose={() => setCardOptionsCardId(null)}
-          onHide={(cardId) => {
-            const card = allCards.find((c) => resolveStableVoteCardId(c) === cardId);
-            if (card?.createdByUserId) addHiddenUser(card.createdByUserId);
-            addHiddenCard(cardId);
-            setHiddenUserIds(getHiddenUserIds());
-            setHiddenCardIds(getHiddenCardIds());
-            setCardOptionsCardId(null);
-          }}
-          onReport={(cardId) => {
-            setReportCardId(cardId);
-            setCardOptionsCardId(null);
-          }}
-        />
-      )}
-
-      {reportCardId != null && (
-        <ReportViolationModal
-          cardId={reportCardId}
-          onClose={() => setReportCardId(null)}
-        />
-      )}
+      <CardModerationModals
+        cardOptionsCardId={moderation.cardOptionsCardId}
+        cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
+        reportCardId={moderation.reportCardId}
+        onCloseOptions={moderation.closeCardOptions}
+        onHideCard={(cardId) => {
+          const target = allCards.find((c) => resolveStableVoteCardId(c) === cardId);
+          if (target?.createdByUserId) addHiddenUser(target.createdByUserId);
+          addHiddenCard(cardId);
+          setHiddenUserIds(getHiddenUserIds());
+          setHiddenCardIds(getHiddenCardIds());
+          moderation.closeCardOptions();
+        }}
+        onReportCard={moderation.openReport}
+        onCloseReport={moderation.closeReport}
+      />
 
       {collectionMenuOpenId != null && (() => {
         const menuCol = collections.find((c) => c.id === collectionMenuOpenId);

@@ -8,7 +8,7 @@ import VoteCard from "../../components/VoteCard";
 import VoteCardMini from "../../components/VoteCardMini";
 import { VoteCardList } from "../../components/VoteCardList";
 import CollectionCard from "../../components/CollectionCard";
-import CardOptionsModal from "../../components/CardOptionsModal";
+import CardModerationModals from "../../components/CardModerationModals";
 import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import { getCollectionById } from "../../data/collections";
@@ -19,7 +19,6 @@ import Button from "../../components/Button";
 import CommentInputModal from "../../components/CommentInputModal";
 import CommentOptionsModal from "../../components/CommentOptionsModal";
 import {
-  getVoteCardById,
   voteCardsData,
   CARD_BACKGROUND_IMAGES,
   getRelatedVoteCardsByTagPriority,
@@ -43,34 +42,18 @@ import {
 } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
 import { isCardBookmarked } from "../../data/bookmarks";
-import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../../data/auth";
+import { getCurrentActivityUserId } from "../../data/auth";
 import { addHiddenUser } from "../../data/hiddenUsers";
 import { addHiddenCard } from "../../data/hiddenCards";
 import type { VoteCardData } from "../../data/voteCards";
 import { normalizeCardIdKey } from "../../lib/normalize";
 import { resolveActivityForCard } from "../../data/voteCardActivity";
-
-/** stableId (seed-N / created-xxx / 0,1,...) からカードを取得 */
-function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
-  if (id.startsWith("seed-")) {
-    const index = parseInt(id.slice(5), 10);
-    if (Number.isNaN(index) || index < 0 || index >= voteCardsData.length) return null;
-    return { ...voteCardsData[index], id: `seed-${index}` };
-  }
-  if (id.startsWith("created-")) {
-    return createdVotesForTimeline.find((c) => c.id === id) ?? null;
-  }
-  const card = getVoteCardById(id);
-  if (card) return { ...card, id: `seed-${id}` };
-  return null;
-}
-
-function backgroundForCard(card: VoteCardData, cardId: string): string {
-  if (card.backgroundImageUrl) return card.backgroundImageUrl;
-  let h = 0;
-  for (let i = 0; i < cardId.length; i++) h = ((h << 5) - h + cardId.charCodeAt(i)) | 0;
-  return CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
-}
+import { resolveVoteCardByStableId } from "../../lib/resolveVoteCardByStableId";
+import { resolveCardBackgroundUrl } from "../../lib/resolveCardBackgroundUrl";
+import { buildVoteCardProps } from "../../lib/buildVoteCardProps";
+import { useAuthState } from "../../hooks/useAuthState";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { useCardModerationFlow } from "../../hooks/useCardModerationFlow";
 
 const emptyActivity = { countA: 0, countB: 0, comments: [] as VoteComment[], userSelectedOption: undefined as "A" | "B" | undefined };
 
@@ -111,14 +94,14 @@ export default function CommentsPage() {
   const [sessionSelectedOption, setSessionSelectedOption] = useState<"A" | "B" | null>(null);
 
   const card = useMemo(
-    () => getCardByStableId(id, createdVotesForTimeline),
+    () => resolveVoteCardByStableId(id, createdVotesForTimeline),
     [id, createdVotesForTimeline]
   );
-  const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
-  const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
-  const [reportCardId, setReportCardId] = useState<string | null>(null);
+  const auth = useAuthState();
+  const currentUser = useCurrentUser(auth);
+  const moderation = useCardModerationFlow();
   const [modalCardId, setModalCardId] = useState<string | null>(null);
-  const [auth, setAuth] = useState(() => getAuth());
+  const [commentReportCardId, setCommentReportCardId] = useState<string | null>(null);
   const [commentSortOrder, setCommentSortOrder] = useState<"newest" | "oldest">("newest");
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(stableId));
@@ -166,12 +149,6 @@ export default function CommentsPage() {
     window.addEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
     return () => window.removeEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
   }, [stableId]);
-
-  useEffect(() => {
-    const handler = () => setAuth(getAuth());
-    window.addEventListener(getAuthUpdatedEventName(), handler);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
-  }, []);
 
   useEffect(() => {
     setRelatedKeepVotedVisibleIds(new Set());
@@ -287,11 +264,9 @@ export default function CommentsPage() {
     [sharedActivity, isLoggedIn, auth.user?.name]
   );
 
-  const backgroundUrl = card ? backgroundForCard(card, id) : CARD_BACKGROUND_IMAGES[0];
+  const backgroundUrl = card ? resolveCardBackgroundUrl(card, id) : CARD_BACKGROUND_IMAGES[0];
   const merged = card ? getMergedCounts(card.countA ?? 0, card.countB ?? 0, card.commentCount ?? 0, activity) : { countA: 0, countB: 0, commentCount: 0 };
-  const currentUser = isLoggedIn && auth.user
-    ? { type: "sns" as const, name: auth.user.name, iconUrl: auth.user.iconUrl }
-    : { type: "guest" as const };
+  const activityUserId = typeof window !== "undefined" ? getCurrentActivityUserId() : "";
 
   const handleVote = (side: "A" | "B") => {
     if (typeof window !== "undefined") {
@@ -325,50 +300,30 @@ export default function CommentsPage() {
     cards.map((related) => {
       const relatedId = related.id ?? related.question;
       const relActivity = sharedActivity[relatedId] ?? emptyActivity;
-      const relMerged = getMergedCounts(
-        related.countA ?? 0,
-        related.countB ?? 0,
-        related.commentCount ?? 0,
-        relActivity
-      );
       return (
         <VoteCard
           key={relatedId}
-          backgroundImageUrl={backgroundForCard(related, relatedId)}
-          patternType={related.patternType}
-          question={related.question}
-          optionA={related.optionA}
-          optionB={related.optionB}
-          countA={relMerged.countA}
-          countB={relMerged.countB}
-          commentCount={relMerged.commentCount}
-          tags={related.tags}
-          readMoreText={related.readMoreText}
-          creator={related.creator}
-          currentUser={currentUser}
-          cardId={relatedId}
-          bookmarked={isCardBookmarked(relatedId)}
-          hasCommented={commentedCardIds.includes(relatedId)}
-          initialSelectedOption={relActivity.userSelectedOption ?? null}
-          onVote={(cid, option) => {
-            setRelatedKeepVotedVisibleIds((prev) => {
-              const next = new Set(prev);
-              next.add(cid);
-              return next;
-            });
-            void sharedAddVote(cid, option);
-          }}
-          onBookmarkClick={setModalCardId}
-          onMoreClick={() => {
-            setCardOptionsCardId(relatedId);
-            setCardOptionsIsOwnCard(related.createdByUserId === getCurrentActivityUserId());
-          }}
-          visibility={related.visibility}
-          optionAImageUrl={related.optionAImageUrl}
-          optionBImageUrl={related.optionBImageUrl}
-          periodStart={related.periodStart}
-          periodEnd={related.periodEnd}
-          commentsDisabled={related.commentsDisabled === true}
+          {...buildVoteCardProps({
+            card: related,
+            cardId: relatedId,
+            activity: relActivity,
+            currentUser,
+            surface: "participate",
+            backgroundImageUrl: resolveCardBackgroundUrl(related, relatedId),
+            bookmarked: isCardBookmarked(relatedId),
+            hasCommented: commentedCardIds.includes(relatedId),
+            onVote: (cid, option) => {
+              setRelatedKeepVotedVisibleIds((prev) => {
+                const next = new Set(prev);
+                next.add(cid);
+                return next;
+              });
+              void sharedAddVote(cid, option);
+            },
+            onBookmarkClick: setModalCardId,
+            onMoreClick: () =>
+              moderation.openCardOptions(relatedId, related.createdByUserId === activityUserId),
+          })}
         />
       );
     });
@@ -426,10 +381,9 @@ export default function CommentsPage() {
             cardId={id}
             bookmarked={isCardBookmarked(id)}
             onBookmarkClick={setModalCardId}
-            onMoreClick={() => {
-              setCardOptionsCardId(id);
-              setCardOptionsIsOwnCard((card?.createdByUserId ?? "") === getCurrentActivityUserId());
-            }}
+            onMoreClick={() =>
+              moderation.openCardOptions(id, (card?.createdByUserId ?? "") === activityUserId)
+            }
             periodStart={card?.periodStart}
             periodEnd={card?.periodEnd}
             expandMiniForCommentsPage
@@ -584,23 +538,20 @@ export default function CommentsPage() {
         </div>
       </div>
 
-      {cardOptionsCardId != null && (
-        <CardOptionsModal
-          cardId={cardOptionsCardId}
-          isOwnCard={cardOptionsIsOwnCard}
-          onClose={() => setCardOptionsCardId(null)}
-          onHide={(cid) => {
-            const target = cid === id ? card : allCards.find((c) => (c.id ?? c.question) === cid);
-            if (target?.createdByUserId) addHiddenUser(target.createdByUserId);
-            addHiddenCard(cid);
-            setCardOptionsCardId(null);
-          }}
-          onReport={(cid) => {
-            setReportCardId(cid);
-            setCardOptionsCardId(null);
-          }}
-        />
-      )}
+      <CardModerationModals
+        cardOptionsCardId={moderation.cardOptionsCardId}
+        cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
+        reportCardId={moderation.reportCardId}
+        onCloseOptions={moderation.closeCardOptions}
+        onHideCard={(cid) => {
+          const target = cid === id ? card : allCards.find((c) => (c.id ?? c.question) === cid);
+          if (target?.createdByUserId) addHiddenUser(target.createdByUserId);
+          addHiddenCard(cid);
+          moderation.closeCardOptions();
+        }}
+        onReportCard={moderation.openReport}
+        onCloseReport={moderation.closeReport}
+      />
 
       {commentMenuTarget != null && (
         <CommentOptionsModal
@@ -618,14 +569,14 @@ export default function CommentsPage() {
               comments: activity.comments ?? [],
             });
           }}
-          onReport={() => setReportCardId(id)}
+          onReport={() => setCommentReportCardId(id)}
         />
       )}
 
-      {reportCardId != null && (
+      {commentReportCardId != null && (
         <ReportViolationModal
-          cardId={reportCardId}
-          onClose={() => setReportCardId(null)}
+          cardId={commentReportCardId}
+          onClose={() => setCommentReportCardId(null)}
         />
       )}
 

@@ -9,8 +9,10 @@ import Button from "../../../../components/Button";
 import CommentInputModal from "../../../../components/CommentInputModal";
 import CommentOptionsModal from "../../../../components/CommentOptionsModal";
 import ReportViolationModal from "../../../../components/ReportViolationModal";
+import { useAuthState } from "../../../../hooks/useAuthState";
+import { useCurrentUser } from "../../../../hooks/useCurrentUser";
+import { resolveVoteCardByStableId } from "../../../../lib/resolveVoteCardByStableId";
 import { CommentAvatar, CommentBody } from "../../../../components/CommentThreadGroup";
-import { getVoteCardById, voteCardsData } from "../../../../data/voteCards";
 import {
   addCommentLike,
   getCommentIdsLikedByCurrentUser,
@@ -21,24 +23,6 @@ import {
 } from "../../../../data/voteCardActivity";
 import { useSharedData } from "../../../../context/SharedDataContext";
 import { normalizeCardIdKey } from "../../../../lib/normalize";
-import { getAuth, getAuthUpdatedEventName } from "../../../../data/auth";
-import type { VoteCardData } from "../../../../data/voteCards";
-
-function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]): VoteCardData | null {
-  if (id.startsWith("seed-")) {
-    const index = parseInt(id.slice(5), 10);
-    if (Number.isNaN(index) || index < 0 || index >= voteCardsData.length) return null;
-    return { ...voteCardsData[index], id: `seed-${index}` };
-  }
-  if (id.startsWith("created-")) {
-    return createdVotesForTimeline.find((c) => c.id === id) ?? null;
-  }
-  const card = getVoteCardById(id);
-  if (card) return { ...card, id: `seed-${id}` };
-  return null;
-}
-
-const emptyActivity = { countA: 0, countB: 0, comments: [] as VoteComment[], userSelectedOption: undefined as "A" | "B" | undefined };
 
 export default function CommentReplyThreadPage() {
   const params = useParams();
@@ -57,10 +41,11 @@ export default function CommentReplyThreadPage() {
   const activity = resolveActivityForCard(sharedActivity, stableId);
 
   const card = useMemo(
-    () => getCardByStableId(id, createdVotesForTimeline),
+    () => resolveVoteCardByStableId(id, createdVotesForTimeline),
     [id, createdVotesForTimeline]
   );
-  const [auth, setAuth] = useState(() => getAuth());
+  const auth = useAuthState();
+  const currentUser = useCurrentUser(auth);
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(stableId));
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
@@ -76,12 +61,6 @@ export default function CommentReplyThreadPage() {
     window.addEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
     return () => window.removeEventListener(COMMENT_LIKES_BY_ME_UPDATED_EVENT, handler);
   }, [stableId]);
-
-  useEffect(() => {
-    const handler = () => setAuth(getAuth());
-    window.addEventListener(getAuthUpdatedEventName(), handler);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
-  }, []);
 
   const parent = useMemo(
     () => activity.comments.find((c) => c.id === commentId) ?? null,
@@ -100,10 +79,6 @@ export default function CommentReplyThreadPage() {
     countB: activity.countB ?? 0,
     comments: activity.comments ?? [],
   };
-
-  const currentUser = isLoggedIn && auth.user
-    ? { type: "sns" as const, name: auth.user.name, iconUrl: auth.user.iconUrl }
-    : { type: "guest" as const };
 
   const handleCommentSubmit = (
     cardId: string,

@@ -306,7 +306,7 @@ export default function CollectionPage() {
           const gradient =
             grad && validGradients.includes(grad as CollectionGradient) ? (grad as CollectionGradient) : undefined;
           const visibility = (data.visibility as CollectionVisibility) ?? "public";
-          if (visibility === "member" && !getAuth().isLoggedIn) {
+          if (visibility === "member" && !auth.isLoggedIn) {
             if (!cancelled) {
               setMemberShareNeedsLogin(true);
               setCollectionFromApi(null);
@@ -376,7 +376,7 @@ export default function CollectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, needsCanonicalCollectionFetch, activityUserId]);
+  }, [id, needsCanonicalCollectionFetch, activityUserId, auth.isLoggedIn]);
 
   const collection = useMemo(
     () => mergeMemberCollectionForDisplay(localCollection, collectionFromApi),

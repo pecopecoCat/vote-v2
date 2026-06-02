@@ -12,7 +12,7 @@ import {
 } from "react";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import AppHeader from "./components/AppHeader";
-import VoteCard from "./components/VoteCard";
+import VoteCard, { type CurrentUser } from "./components/VoteCard";
 import { VoteCardList } from "./components/VoteCardList";
 import AdCard from "./components/AdCard";
 import RecommendedTags from "./components/RecommendedTags";
