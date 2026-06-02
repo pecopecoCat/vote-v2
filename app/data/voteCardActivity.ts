@@ -240,10 +240,17 @@ export function getActivity(cardId: string): CardActivity {
 export function getAllActivity(): Record<string, CardActivity> {
   const global = loadGlobal();
   const user = loadUserSelections();
-  const cardIds = new Set([...Object.keys(global), ...Object.keys(user)]);
+  const rawKeys = new Set([...Object.keys(global), ...Object.keys(user)]);
+  const raw: Record<string, CardActivity> = {};
+  for (const id of rawKeys) {
+    raw[id] = normalizeCardActivity(global[id], user[id]);
+  }
+  const normalizedIds = new Set(
+    [...Object.keys(raw)].map((id) => normalizeCardIdKey(id))
+  );
   const result: Record<string, CardActivity> = {};
-  for (const id of cardIds) {
-    result[id] = normalizeCardActivity(global[id], user[id]);
+  for (const nk of normalizedIds) {
+    result[nk] = resolveActivityForCard(raw, nk);
   }
   return result;
 }
@@ -426,34 +433,61 @@ function saveCommentLikesByMe(data: Record<string, string[]>): void {
 
 /** 現在のユーザーがいいねしたコメントID一覧（カードごと）。コメント一覧で赤表示用 */
 export function getCommentIdsLikedByCurrentUser(cardId: string): string[] {
-  return loadCommentLikesByMe()[cardId] ?? [];
+  return loadCommentLikesByMe()[normalizeCardIdKey(cardId)] ?? [];
+}
+
+export function isCommentLikedByCurrentUser(cardId: string, commentId: string): boolean {
+  return getCommentIdsLikedByCurrentUser(cardId).includes(commentId);
 }
 
 /**
- * コメントにいいねを追加。自分がいいねした一覧にも追加。
+ * コメントいいねのトグル（1ユーザー1コメント1いいねまで。2回目のタップで解除）。
  * currentCard を渡すとその内容を元に更新する（API取得のみで localStorage にないカードのコメントが消えないようにする）
+ * @returns トグル後にいいね済みなら true
  */
+export function toggleCommentLike(
+  cardId: string,
+  commentId: string,
+  currentCard?: { countA: number; countB: number; comments: VoteComment[] }
+): boolean {
+  const nk = normalizeCardIdKey(cardId);
+  const byMe = loadCommentLikesByMe();
+  const cardLikes = byMe[nk] ?? [];
+  const alreadyLiked = cardLikes.includes(commentId);
+
+  const global = loadGlobal();
+  const fromStorage = global[nk] ?? { countA: 0, countB: 0, comments: [] };
+  const current = currentCard ?? fromStorage;
+  const comments = Array.isArray(current.comments) ? current.comments : [];
+
+  const nextComments = comments.map((c) => {
+    if (c.id !== commentId) return c;
+    const count = c.likeCount ?? 0;
+    return {
+      ...c,
+      likeCount: alreadyLiked ? Math.max(0, count - 1) : count + 1,
+    };
+  });
+
+  const nextCardLikes = alreadyLiked
+    ? cardLikes.filter((id) => id !== commentId)
+    : [...cardLikes, commentId];
+
+  saveGlobal({
+    ...global,
+    [nk]: { countA: current.countA, countB: current.countB, comments: nextComments },
+  });
+  saveCommentLikesByMe({ ...byMe, [nk]: nextCardLikes });
+  return !alreadyLiked;
+}
+
+/** @deprecated 名前互換。toggleCommentLike と同じ */
 export function addCommentLike(
   cardId: string,
   commentId: string,
   currentCard?: { countA: number; countB: number; comments: VoteComment[] }
-): void {
-  const global = loadGlobal();
-  const fromStorage = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
-  const current = currentCard ?? fromStorage;
-  const comments = Array.isArray(current.comments) ? current.comments : [];
-  const nextComments = comments.map((c) =>
-    c.id === commentId ? { ...c, likeCount: (c.likeCount ?? 0) + 1 } : c
-  );
-  saveGlobal({
-    ...global,
-    [cardId]: { countA: current.countA, countB: current.countB, comments: nextComments },
-  });
-  const byMe = loadCommentLikesByMe();
-  const cardLikes = byMe[cardId] ?? [];
-  if (!cardLikes.includes(commentId)) {
-    saveCommentLikesByMe({ ...byMe, [cardId]: [...cardLikes, commentId] });
-  }
+): boolean {
+  return toggleCommentLike(cardId, commentId, currentCard);
 }
 
 /** 未ログイン時のコメント表示名（CommentInput 既定） */
@@ -509,12 +543,44 @@ export function isOptimisticCommentId(id: string | undefined): boolean {
   return typeof id === "string" && id.startsWith("local-");
 }
 
+export function activityHasOptimisticComments(activity: Record<string, CardActivity>): boolean {
+  return Object.values(activity).some((row) =>
+    (row.comments ?? []).some((c) => isOptimisticCommentId(c.id))
+  );
+}
+
+export type PersistActivityOptions = {
+  /** 未指定時は activity に local-* があれば自動で true（リロード直後の欠落防止） */
+  includeOptimisticComments?: boolean;
+};
+
+/**
+ * API 取得結果とローカル state のコメントをマージ。
+ * サーバー側に確定コメントがあるときは local-* を捨てて二重表示を防ぐ。
+ */
+export function mergeCommentsForActivitySync(
+  prevComments: VoteComment[] | undefined,
+  nextComments: VoteComment[] | undefined
+): VoteComment[] {
+  const next = nextComments ?? [];
+  const hasServerComments = next.some((c) => c?.id && !isOptimisticCommentId(c.id));
+  const prevFiltered = hasServerComments
+    ? (prevComments ?? []).filter((c) => !isOptimisticCommentId(c.id))
+    : (prevComments ?? []);
+  return mergeVoteComments(prevFiltered, next);
+}
+
 /**
  * KV 同期後の activity を localStorage に書き戻す（リロード直後の getAllActivity / 投票済み表示用）。
- * 楽観コメント（local-*）は保存しない。
+ * local-* は state に残っている間は保存する（POST 完了前のリロード対策）。
  */
-export function persistAllActivityToLocalStorage(activity: Record<string, CardActivity>): void {
+export function persistAllActivityToLocalStorage(
+  activity: Record<string, CardActivity>,
+  options?: PersistActivityOptions
+): void {
   if (typeof window === "undefined") return;
+  const includeOptimistic =
+    options?.includeOptimisticComments ?? activityHasOptimisticComments(activity);
   const global = loadGlobal();
   const user = loadUserSelections();
   const nextGlobal: Record<string, GlobalCardData> = { ...global };
@@ -547,7 +613,9 @@ export function persistAllActivityToLocalStorage(activity: Record<string, CardAc
   }
 
   for (const [nk, row] of normalizedRows) {
-    const comments = (row.comments ?? []).filter((c) => !isOptimisticCommentId(c.id));
+    const comments = (row.comments ?? []).filter(
+      (c) => includeOptimistic || !isOptimisticCommentId(c.id)
+    );
     nextGlobal[nk] = {
       countA: row.countA ?? 0,
       countB: row.countB ?? 0,

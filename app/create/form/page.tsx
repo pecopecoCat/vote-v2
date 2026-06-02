@@ -20,6 +20,79 @@ const YEARS = Array.from({ length: 10 }, (_, i) => CURRENT_YEAR + i);
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
+function OptionAnswerImageControl({
+  side,
+  imageUrl,
+  fileInputRef,
+  onSelect,
+  onRemove,
+}: {
+  side: "A" | "B";
+  imageUrl?: string;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemove: () => void;
+}) {
+  const label = side === "A" ? "A" : "B";
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        aria-label={`${label}の画像を選択`}
+        onChange={onSelect}
+      />
+      {imageUrl ? (
+        <div className="absolute right-5 top-1/2 z-10 -translate-y-1/2">
+          <div className="relative h-10 w-10">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-10 w-10 cursor-pointer overflow-hidden rounded-[10px] hover:opacity-90"
+              aria-label={`${label}の画像を変更`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={onRemove}
+              className="absolute -right-1 -top-1 z-20 flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-white bg-[#333333] text-[10px] font-bold leading-none text-white shadow-sm hover:bg-[#191919]"
+              aria-label={`${label}の画像を削除`}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] bg-[#D9D9D9] hover:opacity-90"
+          aria-label={`${label}の画像を設定`}
+        >
+          <span
+            className="block h-[17.5px] w-5 shrink-0 pointer-events-none"
+            style={{
+              backgroundColor: "#787878",
+              mask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+              WebkitMask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+            }}
+          />
+        </button>
+      )}
+    </>
+  );
+}
+
 function CreateFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -248,6 +321,11 @@ function CreateFormContent() {
     []
   );
 
+  const handleImageRemove = useCallback((side: "A" | "B") => {
+    if (side === "A") setOptionAImageUrl(undefined);
+    else setOptionBImageUrl(undefined);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
       <AppHeader
@@ -303,42 +381,13 @@ function CreateFormContent() {
               placeholder="例) パン"
               className="w-full border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
             />
-            <input
-              ref={fileInputARef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              aria-label="Aの画像を選択"
-              onChange={(e) => handleImageSelect("A", e)}
+            <OptionAnswerImageControl
+              side="A"
+              imageUrl={optionAImageUrl}
+              fileInputRef={fileInputARef}
+              onSelect={(e) => handleImageSelect("A", e)}
+              onRemove={() => handleImageRemove("A")}
             />
-            <button
-              type="button"
-              onClick={() => fileInputARef.current?.click()}
-              className={`absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] hover:opacity-90 ${optionAImageUrl ? "bg-transparent" : "bg-[#D9D9D9]"}`}
-              aria-label={optionAImageUrl ? "Aの画像を変更" : "Aの画像を設定"}
-            >
-              {optionAImageUrl ? (
-                <span className="relative flex h-10 w-10 overflow-hidden rounded-[10px] pointer-events-none">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={optionAImageUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </span>
-              ) : (
-                <span
-                  className="block h-[17.5px] w-5 shrink-0 pointer-events-none"
-                  style={{
-                    backgroundColor: "#787878",
-                    mask: "url(/icons/icon_photo.svg) no-repeat center/contain",
-                    WebkitMask: "url(/icons/icon_photo.svg) no-repeat center/contain",
-                  }}
-                />
-              )}
-            </button>
           </div>
         </section>
 
@@ -355,42 +404,13 @@ function CreateFormContent() {
               placeholder="例) パン"
               className="w-full border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
             />
-            <input
-              ref={fileInputBRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              aria-label="Bの画像を選択"
-              onChange={(e) => handleImageSelect("B", e)}
+            <OptionAnswerImageControl
+              side="B"
+              imageUrl={optionBImageUrl}
+              fileInputRef={fileInputBRef}
+              onSelect={(e) => handleImageSelect("B", e)}
+              onRemove={() => handleImageRemove("B")}
             />
-            <button
-              type="button"
-              onClick={() => fileInputBRef.current?.click()}
-              className={`absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] hover:opacity-90 ${optionBImageUrl ? "bg-transparent" : "bg-[#D9D9D9]"}`}
-              aria-label={optionBImageUrl ? "Bの画像を変更" : "Bの画像を設定"}
-            >
-              {optionBImageUrl ? (
-                <span className="relative flex h-10 w-10 overflow-hidden rounded-[10px] pointer-events-none">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={optionBImageUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </span>
-              ) : (
-                <span
-                  className="block h-[17.5px] w-5 shrink-0 pointer-events-none"
-                  style={{
-                    backgroundColor: "#787878",
-                    mask: "url(/icons/icon_photo.svg) no-repeat center/contain",
-                    WebkitMask: "url(/icons/icon_photo.svg) no-repeat center/contain",
-                  }}
-                />
-              )}
-            </button>
           </div>
         </section>
 

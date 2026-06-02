@@ -738,18 +738,27 @@ export async function createOwnedCollectionFromSettings(
     cardId?: string;
   }
 ): Promise<Collection> {
-  const created = createCollection(name, {
-    gradient: options.gradient,
-    visibility: options.visibility,
-    skipApiSync: true,
-    skipRemotePush: true,
+  return withCollectionsWriteLock(async () => {
+    const userId = getCurrentActivityUserId();
+    const created = createCollection(name, {
+      gradient: options.gradient,
+      visibility: options.visibility,
+      skipApiSync: true,
+      skipRemotePush: true,
+    });
+    if (options.cardId) {
+      addCardToCollection(created.id, options.cardId, {
+        skipApiSync: true,
+        skipRemotePush: true,
+      });
+    }
+    const cols = load(userId);
+    await pushUserOwnedCollectionsToRemoteIfLoggedIn(userId, cols);
+    syncOwnedCollectionToApiIfPublic(created.id);
+    const saved = cols.find((c) => c.id === created.id) ?? load(userId).find((c) => c.id === created.id) ?? created;
+    showAppToast("コレクションを作成しました");
+    return saved;
   });
-  if (options.cardId) addCardToCollection(created.id, options.cardId, { skipApiSync: true });
-  await waitForCollectionsRemoteQueue();
-  syncOwnedCollectionToApiIfPublic(created.id);
-  const saved = load(getCurrentActivityUserId()).find((c) => c.id === created.id) ?? created;
-  showAppToast("コレクションを作成しました");
-  return saved;
 }
 
 /** コレクションを更新（名前・色・グラデーション・公開設定） */

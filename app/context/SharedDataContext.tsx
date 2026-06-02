@@ -25,6 +25,7 @@ import {
   addComment as addCommentLocal,
   removeComment as removeCommentLocal,
   mergeVoteComments,
+  mergeCommentsForActivitySync,
   resolveActivityForCard,
   isOptimisticCommentId,
   persistAllActivityToLocalStorage,
@@ -198,8 +199,10 @@ function mergeActivityFromApiFetch(
     if (b && hasP) {
       merged[cardId] = {
         ...b,
+        countA: Math.max(b.countA ?? 0, p.countA ?? 0),
+        countB: Math.max(b.countB ?? 0, p.countB ?? 0),
         // GETが古いcommentsを返しても、送信直後のローカル分が消えないようにマージする
-        comments: mergeVoteComments(p.comments, b.comments),
+        comments: mergeCommentsForActivitySync(p.comments, b.comments),
         userSelectedOption: b.userSelectedOption ?? p.userSelectedOption,
         userVotedAt: b.userVotedAt ?? p.userVotedAt,
       };
@@ -493,8 +496,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           ...prev,
           [cardId]: {
             ...p,
-            countA: s.card!.countA!,
-            countB: s.card!.countB!,
+            countA: Math.max(p.countA ?? 0, s.card!.countA!),
+            countB: Math.max(p.countB ?? 0, s.card!.countB!),
             // サーバー確定一覧を正とする（楽観 local-* と二重表示しない）
             comments,
             userSelectedOption: p.userSelectedOption,
@@ -589,22 +592,18 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       const next = getAllActivity();
       setActivity((prev) => {
         const merged: Record<string, CardActivity> = { ...prev };
-        for (const [cardId, a] of Object.entries(next)) {
-          const p = prev[cardId];
+        for (const [rawId, a] of Object.entries(next)) {
+          const cardId = normalizeCardIdKey(rawId);
+          const p = resolveActivityForCard(prev, cardId);
           merged[cardId] = {
-            ...(p ?? a),
-            countA: a.countA,
-            countB: a.countB,
-            comments: mergeVoteComments(
-              (p?.comments ?? []).filter((c) => !isOptimisticCommentId(c.id)),
-              a.comments
-            ),
-            // remote(KV) の userSelectedOption を localStorage(=undefined) で上書きしない
-            userSelectedOption: p?.userSelectedOption ?? a.userSelectedOption,
-            userVotedAt: a.userVotedAt ?? p?.userVotedAt,
+            countA: Math.max(p.countA ?? 0, a.countA ?? 0),
+            countB: Math.max(p.countB ?? 0, a.countB ?? 0),
+            comments: mergeCommentsForActivitySync(p.comments, a.comments),
+            userSelectedOption: p.userSelectedOption ?? a.userSelectedOption,
+            userVotedAt: a.userVotedAt ?? p.userVotedAt,
           };
         }
-        return merged;
+        return collapseActivityByCardId(merged);
       });
     };
     window.addEventListener(ACTIVITY_GLOBAL_UPDATED_EVENT, handler);
@@ -705,7 +704,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         const votedAt = new Date().toISOString();
         setActivity((prev) => {
           const p = resolveActivityForCard(prev, cardId);
-          return collapseActivityByCardId({
+          const next = collapseActivityByCardId({
             ...prev,
             [cardId]: {
               ...p,
@@ -715,6 +714,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
               userVotedAt: votedAt,
             },
           });
+          persistAllActivityToLocalStorage(next);
+          return next;
         });
         const res = await fetch(ACTIVITY_API, {
           method: "POST",
@@ -769,7 +770,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         setActivity((prev) => {
           const cur = resolveActivityForCard(prev, cardId);
           const nextComments = Array.isArray(cur.comments) ? cur.comments : [];
-          return collapseActivityByCardId({
+          const next = collapseActivityByCardId({
             ...prev,
             [cardId]: {
               ...cur,
@@ -788,6 +789,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
               ],
             },
           });
+          persistAllActivityToLocalStorage(next);
+          return next;
         });
         const res = await fetch(ACTIVITY_API, {
           method: "POST",
@@ -814,13 +817,15 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         } else {
           // 失敗時は追加した分だけ取り消し（楽観コメントの残存を避ける）
           setActivity((prev) => {
-            const cur = prev[cardId];
-            if (!cur) return prev;
-            const next = { ...prev };
-            next[cardId] = {
-              ...cur,
-              comments: (cur.comments ?? []).filter((c) => c.id !== optimisticId),
-            };
+            const cur = resolveActivityForCard(prev, cardId);
+            const next = collapseActivityByCardId({
+              ...prev,
+              [cardId]: {
+                ...cur,
+                comments: (cur.comments ?? []).filter((c) => c.id !== optimisticId),
+              },
+            });
+            persistAllActivityToLocalStorage(next);
             return next;
           });
         }

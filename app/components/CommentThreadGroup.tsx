@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import type { VoteComment } from "../data/voteCardActivity";
+import { formatCommentDate } from "../lib/formatCommentDate";
 
 /** 下端基準の拡大（矢印・丸みを相対的に大きく。ラッパーでクリップ） */
 const THREAD_CONNECTOR_SCALE = 2.68;
@@ -94,7 +95,10 @@ export function CommentBody({
 }) {
   const router = useRouter();
   const replyCount = replyCountOverride ?? comment.replyCount ?? 0;
-  const likeCount = comment.likeCount ?? 0;
+  const likeCountRaw = comment.likeCount ?? 0;
+  /** 自分のいいね済みと集計のズレ時（リロード直後など）でも 0 表示＋赤アイコンにならないよう補正 */
+  const displayLikeCount = isLikedByMe ? Math.max(likeCountRaw, 1) : likeCountRaw;
+  const dateLabel = formatCommentDate(comment.date);
   const navigable = Boolean(navigateHref);
   const handleNavigate = useCallback(() => {
     if (!navigateHref) return;
@@ -118,7 +122,17 @@ export function CommentBody({
       }
       aria-label={navigable ? "リプライ画面へ" : undefined}
     >
-      <p className="text-[14px] font-bold text-[#191919]">{comment.user.name}</p>
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
+        <p className="text-[14px] font-bold text-[#191919]">{comment.user.name}</p>
+        {dateLabel ? (
+          <time
+            dateTime={comment.date}
+            className="text-[11px] font-normal leading-none text-[#787878]"
+          >
+            {dateLabel}
+          </time>
+        ) : null}
+      </div>
       <p className="mt-[0.2625rem] text-[15px] font-medium leading-relaxed text-[#191919]">{comment.text}</p>
       <div className="mt-[0.525rem] flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-5 text-xs font-medium text-[#191919]">
@@ -163,7 +177,8 @@ export function CommentBody({
               e.stopPropagation();
               onLike?.();
             }}
-            aria-label="いいね"
+            aria-label={isLikedByMe ? "いいねを解除" : "いいね"}
+            aria-pressed={isLikedByMe}
           >
             <img
               src="/icons/good.svg"
@@ -171,7 +186,7 @@ export function CommentBody({
               className="h-[18px] w-[18px]"
               style={isLikedByMe ? { filter: "brightness(0) saturate(100%) invert(18%) sepia(98%) saturate(7000%) hue-rotate(348deg)" } : undefined}
             />
-            <span className={isLikedByMe ? "text-[var(--color-select-a)]" : undefined}>{likeCount}</span>
+            <span className={isLikedByMe ? "text-[var(--color-select-a)]" : undefined}>{displayLikeCount}</span>
           </button>
         </div>
         {onCommentMore ? (
