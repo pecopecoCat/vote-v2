@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import TagSearchLink from "./TagSearchLink";
 
 export interface RecommendedTagsProps {
   tags: string[];
@@ -19,14 +19,7 @@ export default function RecommendedTags({ tags, className }: RecommendedTagsProp
         <h2 className="mb-3 text-base font-semibold text-gray-900">おすすめタグ</h2>
         <div className="flex flex-wrap gap-2">
           {tags.map((tag) => (
-            <Link
-              key={tag}
-              href={`/search?tag=${encodeURIComponent(tag)}`}
-              prefetch={false}
-              className="text-sm font-medium text-blue-600 hover:underline"
-            >
-              #{tag}
-            </Link>
+            <TagSearchLink key={tag} tag={tag} variant="chip" />
           ))}
         </div>
       </div>

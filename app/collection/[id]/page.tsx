@@ -6,16 +6,13 @@ import { useMemo, useState, useEffect, useLayoutEffect, useCallback, useRef } fr
 import { flushSync } from "react-dom";
 import VoteCard from "../../components/VoteCard";
 import { VoteCardList } from "../../components/VoteCardList";
-import CardOptionsModal from "../../components/CardOptionsModal";
-import ReportViolationModal from "../../components/ReportViolationModal";
+import CardModerationModals from "../../components/CardModerationModals";
+import ShowVotedFilterBar from "../../components/ShowVotedFilterBar";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import MemberCollectionShareSheet from "../../components/MemberCollectionShareSheet";
 import MemberParticipantAvatar from "../../components/MemberParticipantAvatar";
 import AppHeader from "../../components/AppHeader";
-import Checkbox from "../../components/Checkbox";
-import NewestOldestSortDropdown, {
-  type NewestOldestSortOrder,
-} from "../../components/NewestOldestSortDropdown";
+import type { NewestOldestSortOrder } from "../../components/NewestOldestSortDropdown";
 import {
   addParticipatedMemberCollectionIfNeeded,
   getCollectionById,
@@ -33,8 +30,8 @@ import {
 } from "../../data/collections";
 import { isCardBookmarked } from "../../data/bookmarks";
 import { getCollectionGradientClass } from "../../data/search";
-import { voteCardsData, CARD_BACKGROUND_IMAGES } from "../../data/voteCards";
-import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../../data/auth";
+import { voteCardsData } from "../../data/voteCards";
+import { getCurrentActivityUserId } from "../../data/auth";
 import {
   addCollectionScopedVote,
   COLLECTION_SCOPED_VOTES_UPDATED_EVENT,
@@ -48,7 +45,11 @@ import {
   type CollectionScopedParticipant,
 } from "../../data/collectionVoteActivity";
 import { addHiddenUser } from "../../data/hiddenUsers";
-import { getShowVoted, setShowVoted } from "../../data/showVotedPreference";
+import { useShowVotedPreference } from "../../hooks/useShowVotedPreference";
+import { useAuthState } from "../../hooks/useAuthState";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { useCardModerationFlow } from "../../hooks/useCardModerationFlow";
+import { resolveCardBackgroundUrl } from "../../lib/resolveCardBackgroundUrl";
 import {
   getMergedCounts,
   isCommentAuthoredByCurrentUser,
@@ -59,7 +60,6 @@ import { useEnsureCollectionsHydrated } from "../../hooks/useEnsureCollectionsHy
 import type { VoteCardData } from "../../data/voteCards";
 import { getCreatedVotesForTimeline } from "../../data/createdVotes";
 import { isVotingAllowedNow, resolveCardForVotePeriod } from "../../data/votePeriod";
-import type { CurrentUser } from "../../components/VoteCard";
 import type { CollectionGradient } from "../../data/search";
 import { pickStoredIconUrl } from "../../data/memberParticipantAvatar";
 import { perfMeasure } from "../../lib/perf";
@@ -182,19 +182,6 @@ function getCardByStableId(id: string, createdVotesForTimeline: VoteCardData[]):
   return null;
 }
 
-function backgroundForCard(card: VoteCardData, cardId: string): string {
-  if (card.backgroundImageUrl) return card.backgroundImageUrl;
-  const cached = backgroundCache.get(cardId);
-  if (cached) return cached;
-  let h = 0;
-  for (let i = 0; i < cardId.length; i++) h = ((h << 5) - h + cardId.charCodeAt(i)) | 0;
-  const url = CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
-  backgroundCache.set(cardId, url);
-  return url;
-}
-
-const backgroundCache = new Map<string, string>();
-
 export default function CollectionPage() {
   const params = useParams();
   const router = useRouter();
@@ -204,37 +191,21 @@ export default function CollectionPage() {
   useEnsureCollectionsHydrated();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
-  const [showVoted, setShowVotedState] = useState(() => getShowVoted());
-  const handleShowVotedChange = useCallback((value: boolean) => {
-    setShowVoted(value);
-    setShowVotedState(value);
-  }, []);
-  const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
-  const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
-  const [reportCardId, setReportCardId] = useState<string | null>(null);
+  const { showVoted, handleShowVotedChange } = useShowVotedPreference();
+  const moderation = useCardModerationFlow();
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [sharePreparing, setSharePreparing] = useState(false);
   const [cardSortOrder, setCardSortOrder] = useState<NewestOldestSortOrder>("newest");
   const [scopedVotesVersion, setScopedVotesVersion] = useState(0);
-  const [auth, setAuth] = useState(() => getAuth());
+  const auth = useAuthState();
   /** コレクションAPIの userId クエリ用（ログイン切替で再取得） */
   const activityUserId = useMemo(
     () => getCurrentActivityUserId(),
     [auth.isLoggedIn, auth.user?.name, auth.userId]
   );
   const skipNextMemberPullRef = useRef(false);
-  const currentUser = useMemo<CurrentUser>(
-    () =>
-      auth.isLoggedIn && auth.user
-        ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
-        : { type: "guest" },
-    [auth.isLoggedIn, auth.user]
-  );
-
-  useEffect(() => {
-    setAuth(getAuth());
-  }, []);
+  const currentUser = useCurrentUser(auth);
   useEffect(() => {
     setCollections(getCollections());
     setPinnedIds(getPinnedCollectionIds());
@@ -253,12 +224,6 @@ export default function CollectionPage() {
       window.removeEventListener(eventName, handler);
       window.removeEventListener(PINNED_UPDATED_EVENT, handler);
     };
-  }, []);
-
-  useEffect(() => {
-    const handler = () => setAuth(getAuth());
-    window.addEventListener(getAuthUpdatedEventName(), handler);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
   useEffect(() => {
@@ -664,7 +629,7 @@ export default function CollectionPage() {
           initialSelectedOption: isMemberCollection
             ? (scopedAct?.userSelectedOption ?? null)
             : (act?.userSelectedOption ?? null),
-          backgroundImageUrl: backgroundForCard(card, cardId),
+          backgroundImageUrl: resolveCardBackgroundUrl(card, cardId),
         };
       });
     });
@@ -690,11 +655,13 @@ export default function CollectionPage() {
     [collection, sharedAddVote, cardsInCollection, isRemote, createdVotesForTimeline, showVoted]
   );
 
-  const handleCollectionCardMoreClick = useCallback((cardId: string) => {
-    setCardOptionsCardId(cardId);
-    const found = cardsInCollection.find((x) => x.cardId === cardId);
-    setCardOptionsIsOwnCard(found?.card.createdByUserId === getCurrentActivityUserId());
-  }, [cardsInCollection]);
+  const handleCollectionCardMoreClick = useCallback(
+    (cardId: string) => {
+      const found = cardsInCollection.find((x) => x.cardId === cardId);
+      moderation.openCardOptions(cardId, found?.card.createdByUserId === getCurrentActivityUserId());
+    },
+    [cardsInCollection, moderation]
+  );
 
   const handleTogglePin = () => {
     togglePinnedCollection(id);
@@ -866,17 +833,13 @@ export default function CollectionPage() {
           <div className="-mx-[5.333vw] mt-2 h-px bg-gray-300" aria-hidden />
         )}
 
-        {/* 新着順・投票済み（検索のタグ一覧と同じコンポーネントで並び替え可能） */}
-        <div className="relative z-10 mt-3 flex items-center justify-between gap-2 border-b border-gray-200 pb-3">
-          <div className="relative z-30 min-w-0 shrink-0">
-            <NewestOldestSortDropdown value={cardSortOrder} onChange={setCardSortOrder} />
-          </div>
-          <Checkbox
-            checked={showVoted}
-            onChange={handleShowVotedChange}
-            label="投票済みを表示"
-          />
-        </div>
+        <ShowVotedFilterBar
+          className="relative z-10 mt-3 pb-3"
+          sortOrder={cardSortOrder}
+          onSortOrderChange={setCardSortOrder}
+          showVoted={showVoted}
+          onShowVotedChange={handleShowVotedChange}
+        />
 
         {/* カード一覧 */}
         {cardsToShow.length === 0 ? (
@@ -928,31 +891,21 @@ export default function CollectionPage() {
         />
       )}
 
-      {cardOptionsCardId != null && (
-        <CardOptionsModal
-          cardId={cardOptionsCardId}
-          isOwnCard={cardOptionsIsOwnCard}
-          onClose={() => setCardOptionsCardId(null)}
-          onHide={(cardId) => {
-            const entry = cardsInCollection.find(({ cardId: cid }) => cid === cardId);
-            if (entry?.card.createdByUserId) {
-              addHiddenUser(entry.card.createdByUserId);
-            }
-            setCardOptionsCardId(null);
-          }}
-          onReport={(cardId) => {
-            setReportCardId(cardId);
-            setCardOptionsCardId(null);
-          }}
-        />
-      )}
-
-      {reportCardId != null && (
-        <ReportViolationModal
-          cardId={reportCardId}
-          onClose={() => setReportCardId(null)}
-        />
-      )}
+      <CardModerationModals
+        cardOptionsCardId={moderation.cardOptionsCardId}
+        cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
+        reportCardId={moderation.reportCardId}
+        onCloseOptions={moderation.closeCardOptions}
+        onHideCard={(cardId) => {
+          const entry = cardsInCollection.find(({ cardId: cid }) => cid === cardId);
+          if (entry?.card.createdByUserId) {
+            addHiddenUser(entry.card.createdByUserId);
+          }
+          moderation.closeCardOptions();
+        }}
+        onReportCard={moderation.openReport}
+        onCloseReport={moderation.closeReport}
+      />
 
       {modalCardId != null && (
         <BookmarkCollectionModal

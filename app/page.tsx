@@ -19,14 +19,10 @@ import RecommendedTags from "./components/RecommendedTags";
 import CollectionCard from "./components/CollectionCard";
 import FeedTabs from "./components/FeedTabs";
 import BookmarkCollectionModal from "./components/BookmarkCollectionModal";
-import CardOptionsModal from "./components/CardOptionsModal";
-import ReportViolationModal from "./components/ReportViolationModal";
-import type { CurrentUser } from "./components/VoteCard";
 import type { FeedTabId } from "./components/FeedTabs";
 import type { VoteCardData } from "./data/voteCards";
 import {
   voteCardsData,
-  CARD_BACKGROUND_IMAGES,
   resolveStableVoteCardId,
   recommendedTagList,
 } from "./data/voteCards";
@@ -41,9 +37,14 @@ import { useSharedData } from "./context/SharedDataContext";
 import { useEnsureCollectionsHydrated } from "./hooks/useEnsureCollectionsHydrated";
 import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "./lib/appToast";
 import { buildVoteCardProps } from "./lib/buildVoteCardProps";
+import { resolveCardBackgroundUrl } from "./lib/resolveCardBackgroundUrl";
+import { useAuthState } from "./hooks/useAuthState";
+import { useCurrentUser } from "./hooks/useCurrentUser";
+import { useCardModerationFlow } from "./hooks/useCardModerationFlow";
+import CardModerationModals from "./components/CardModerationModals";
 import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, resetUser1AndUser2Collections } from "./data/collections";
 import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
-import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "./data/auth";
+import { getCurrentActivityUserId } from "./data/auth";
 import {
   getHiddenUserIds,
   addHiddenUser,
@@ -143,15 +144,6 @@ function sortMyTimelineCards(
     });
 }
 
-/** IDから安定した背景画像を選ぶ（同じカードは常に同じ背景） */
-function backgroundForCard(card: VoteCardData): string {
-  if (card.backgroundImageUrl) return card.backgroundImageUrl;
-  let h = 0;
-  const id = resolveStableVoteCardId(card);
-  for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
-  const idx = Math.abs(h) % CARD_BACKGROUND_IMAGES.length;
-  return CARD_BACKGROUND_IMAGES[idx];
-}
 
 /** タイムライン差し込みルール：5個に1つコレクション、10個につき1setおすすめタグ、15個につき1つPR */
 const COLLECTION_EVERY = 5;
@@ -374,7 +366,7 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
                   activity: act,
                   currentUser,
                   surface: "participate",
-                  backgroundImageUrl: backgroundForCard(card),
+                  backgroundImageUrl: resolveCardBackgroundUrl(card),
                   bookmarked: bookmarkedIds.has(cardId),
                   hasCommented: commentedCardIdSet.has(cardId),
                   onVote: handleVote,
@@ -448,14 +440,12 @@ function HomeContent() {
   const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
   useEnsureCollectionsHydrated();
   const [modalCardId, setModalCardId] = useState<string | null>(null);
-  const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
-  const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
-  const [reportCardId, setReportCardId] = useState<string | null>(null);
+  const moderation = useCardModerationFlow();
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
   const hiddenCardIdSet = useMemo(() => new Set(hiddenCardIds), [hiddenCardIds]);
   const hiddenUserIdSet = useMemo(() => new Set(hiddenUserIds), [hiddenUserIds]);
-  const [auth, setAuth] = useState(() => getAuth());
+  const auth = useAuthState();
 
   useEffect(() => {
     const handler = () => setHiddenUserIds(getHiddenUserIds());
@@ -473,19 +463,7 @@ function HomeContent() {
     ensureUser1User2CollectionsResetOnce();
   }, []);
 
-  useEffect(() => {
-    const handler = () => setAuth(getAuth());
-    window.addEventListener(getAuthUpdatedEventName(), handler);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
-  }, []);
-
-  const currentUser = useMemo<CurrentUser>(
-    () =>
-      auth.isLoggedIn && auth.user
-        ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
-        : { type: "guest" },
-    [auth.isLoggedIn, auth.user]
-  );
+  const currentUser = useCurrentUser(auth);
 
   const searchParamsKey = searchParams.toString();
 
@@ -565,11 +543,13 @@ function HomeContent() {
     return set;
   }, [activity, auth.isLoggedIn, auth.user?.name]);
 
-  const handleCardMoreClick = useCallback((cardId: string) => {
-    setCardOptionsCardId(cardId);
-    const card = allCardsFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
-    setCardOptionsIsOwnCard(card?.createdByUserId === getCurrentActivityUserId());
-  }, [allCardsFiltered]);
+  const handleCardMoreClick = useCallback(
+    (cardId: string) => {
+      const card = allCardsFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
+      moderation.openCardOptions(cardId, card?.createdByUserId === getCurrentActivityUserId());
+    },
+    [allCardsFiltered, moderation]
+  );
 
   /** 公開カードのみ（private はリンクを知ってる人だけ＝一覧には出さない） */
   const publicCards = useMemo(
@@ -907,32 +887,22 @@ function HomeContent() {
         />
       )}
 
-      {cardOptionsCardId != null && (
-        <CardOptionsModal
-          cardId={cardOptionsCardId}
-          isOwnCard={cardOptionsIsOwnCard}
-          onClose={() => setCardOptionsCardId(null)}
-          onHide={(cardId) => {
-            const card = allCards.find((c) => resolveStableVoteCardId(c) === cardId);
-            if (card?.createdByUserId) addHiddenUser(card.createdByUserId);
-            addHiddenCard(cardId);
-            setHiddenUserIds(getHiddenUserIds());
-            setHiddenCardIds(getHiddenCardIds());
-            setCardOptionsCardId(null);
-          }}
-          onReport={(cardId) => {
-            setReportCardId(cardId);
-            setCardOptionsCardId(null);
-          }}
-        />
-      )}
-
-      {reportCardId != null && (
-        <ReportViolationModal
-          cardId={reportCardId}
-          onClose={() => setReportCardId(null)}
-        />
-      )}
+      <CardModerationModals
+        cardOptionsCardId={moderation.cardOptionsCardId}
+        cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
+        reportCardId={moderation.reportCardId}
+        onCloseOptions={moderation.closeCardOptions}
+        onHideCard={(cardId) => {
+          const card = allCards.find((c) => resolveStableVoteCardId(c) === cardId);
+          if (card?.createdByUserId) addHiddenUser(card.createdByUserId);
+          addHiddenCard(cardId);
+          setHiddenUserIds(getHiddenUserIds());
+          setHiddenCardIds(getHiddenCardIds());
+          moderation.closeCardOptions();
+        }}
+        onReportCard={moderation.openReport}
+        onCloseReport={moderation.closeReport}
+      />
     </div>
   );
 }

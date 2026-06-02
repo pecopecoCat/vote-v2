@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, Suspense, useRef } from "rea
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import VoteCard from "../components/VoteCard";
+import TagSearchLink from "../components/TagSearchLink";
 import { VoteCardList } from "../components/VoteCardList";
 import { getCreatedVotes, deleteCreatedVote, getCreatedVotesUpdatedEventName } from "../data/createdVotes";
 import { voteCardsData, CARD_BACKGROUND_IMAGES, resolveStableVoteCardId } from "../data/voteCards";
@@ -794,14 +795,7 @@ function ProfileContent() {
           ) : (
             <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
               {favoriteTags.map((tag) => (
-                <Link
-                  key={tag}
-                  href={`/search?tag=${encodeURIComponent(tag)}`}
-                  prefetch={false}
-                  className="profile-favorite-tag shrink-0 rounded-full bg-white/60 px-4 py-2 text-[13px] text-[#191919]"
-                >
-                  {tag}
-                </Link>
+                <TagSearchLink key={tag} tag={tag} variant="profilePill" />
               ))}
             </div>
           )}

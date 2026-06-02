@@ -5,6 +5,7 @@ import { memo } from "react";
 import Link from "next/link";
 import { removeBookmarkFully } from "../data/bookmarkRemove";
 import { showAppToast } from "../lib/appToast";
+import TagSearchLink from "./TagSearchLink";
 import VoteCardShareSheet from "./VoteCardShareSheet";
 import VoteBeforeCommentModal from "./VoteBeforeCommentModal";
 import { getVotePeriodStatusText, isVotingAllowedNow } from "../data/votePeriod";
@@ -571,14 +572,7 @@ function VoteCard({
           className={`vote-card-tags-margin-top flex flex-wrap gap-2 px-5 ${!readMoreText && !periodStatusText ? "pb-[0.78em]" : ""}`}
         >
           {tags.map((tag) => (
-            <Link
-              key={tag}
-              href={`/search?tag=${encodeURIComponent(tag)}`}
-              prefetch={false}
-              className="rounded-full text-[14px] text-blue-600 hover:underline"
-            >
-              #{tag}
-            </Link>
+            <TagSearchLink key={tag} tag={tag} variant="pill" />
           ))}
         </div>
       )}

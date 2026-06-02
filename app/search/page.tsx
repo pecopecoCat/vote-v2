@@ -17,43 +17,29 @@ import CollectionCard from "../components/CollectionCard";
 import RecommendedTags from "../components/RecommendedTags";
 import VoteCard from "../components/VoteCard";
 import { VoteCardList } from "../components/VoteCardList";
-import CardOptionsModal from "../components/CardOptionsModal";
-import ReportViolationModal from "../components/ReportViolationModal";
 import BookmarkCollectionModal from "../components/BookmarkCollectionModal";
+import CardModerationModals from "../components/CardModerationModals";
+import TagListRow from "../components/TagListRow";
 import TagMenuModal, { type TagMenuVariant } from "../components/TagMenuModal";
-import Checkbox from "../components/Checkbox";
-import NewestOldestSortDropdown from "../components/NewestOldestSortDropdown";
+import ShowVotedFilterBar from "../components/ShowVotedFilterBar";
 import EmptyStatePanel from "../components/EmptyStatePanel";
 import UnderlineTabBar, { type UnderlineTabItem } from "../components/UnderlineTabBar";
-import type { CurrentUser } from "../components/VoteCard";
 import type { VoteCardData } from "../data/voteCards";
-import {
-  voteCardsData,
-  CARD_BACKGROUND_IMAGES,
-  resolveStableVoteCardId,
-  recommendedTagList,
-} from "../data/voteCards";
+import { voteCardsData, resolveStableVoteCardId, recommendedTagList } from "../data/voteCards";
 import { getMergedCounts, isCommentAuthoredByCurrentUser, type CardActivity } from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
-import {
-  getFavoriteTags,
-  toggleFavoriteTag,
-  isFavoriteTag,
-  getFavoriteTagsUpdatedEventName,
-} from "../data/favoriteTags";
+import { toggleFavoriteTag, isFavoriteTag } from "../data/favoriteTags";
 import { isHiddenTag } from "../data/hiddenTags";
-import {
-  getCollections,
-  getOtherUsersCollections,
-  getPinnedCollectionIds,
-  getCollectionsUpdatedEventName,
-  hydrateUserOwnedCollectionsFromRemote,
-  PINNED_UPDATED_EVENT,
-} from "../data/collections";
-import { fetchCollectionsIndex, type CollectionsIndexRow } from "../lib/fetchCollectionsIndex";
+import { getOtherUsersCollections } from "../data/collections";
 import { isCardBookmarked } from "../data/bookmarks";
-import { getShowVoted, setShowVoted } from "../data/showVotedPreference";
-import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../data/auth";
+import { getCurrentActivityUserId } from "../data/auth";
+import { useAuthState } from "../hooks/useAuthState";
+import { useCurrentUser } from "../hooks/useCurrentUser";
+import { useFavoriteTags } from "../hooks/useFavoriteTags";
+import { useLocalCollections } from "../hooks/useLocalCollections";
+import { useShowVotedPreference } from "../hooks/useShowVotedPreference";
+import { useSearchCollectionsWarm } from "../hooks/useSearchCollectionsWarm";
+import { useCardModerationFlow } from "../hooks/useCardModerationFlow";
 import {
   getHiddenUserIds,
   addHiddenUser,
@@ -70,19 +56,8 @@ import {
 } from "../data/search";
 import { perfMeasure } from "../lib/perf";
 import { buildVoteCardProps } from "../lib/buildVoteCardProps";
-
-function backgroundForSearchCard(card: VoteCardData, cardId: string): string {
-  if (card.backgroundImageUrl) return card.backgroundImageUrl;
-  const cached = backgroundCache.get(cardId);
-  if (cached) return cached;
-  let h = 0;
-  for (let i = 0; i < cardId.length; i++) h = ((h << 5) - h + cardId.charCodeAt(i)) | 0;
-  const url = CARD_BACKGROUND_IMAGES[Math.abs(h) % CARD_BACKGROUND_IMAGES.length];
-  backgroundCache.set(cardId, url);
-  return url;
-}
-
-const backgroundCache = new Map<string, string>();
+import { resolveCardBackgroundUrl } from "../lib/resolveCardBackgroundUrl";
+import { sortCollectionsByPinned } from "../lib/sortCollectionsByPinned";
 
 /** ピン留めコレクション用グラデーションのローテーション（検索画面はグラデーション表示に統一） */
 const PINNED_GRADIENTS: CollectionGradient[] = [
@@ -118,52 +93,6 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** タグ1行（タグ名・登録数・縦三点メニュー） */
-function TagRow({
-  tag,
-  count,
-  variant,
-  onMenuClick,
-}: {
-  tag: string;
-  count: number;
-  variant: TagMenuVariant;
-  onMenuClick?: (tag: string, variant: TagMenuVariant) => void;
-}) {
-  return (
-    <Link
-      href={`/search?tag=${encodeURIComponent(tag)}`}
-      prefetch={false}
-      className="flex items-center gap-2 border-b border-gray-100 py-3 last:border-b-0"
-    >
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold text-gray-900">{tag}</p>
-        <p className="text-xs text-gray-500">登録数 {count}件</p>
-      </div>
-      <button
-        type="button"
-        className="shrink-0 p-1 text-[#191919] hover:opacity-75"
-        aria-label="メニュー"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onMenuClick?.(tag, variant);
-        }}
-      >
-        <EllipsisIcon className="h-5 w-5" />
-      </button>
-    </Link>
-  );
-}
-
-function EllipsisIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-    </svg>
-  );
-}
-
 type SearchTabId = "trending" | "collections" | "favorite";
 
 function parseSearchTabFromUrl(tab: string | null): SearchTabId {
@@ -192,19 +121,17 @@ function SearchContent() {
     return voteResultsFromUrl ? qFromUrl : "";
   });
   const [activeTab, setActiveTab] = useState<SearchTabId>(() => parseSearchTabFromUrl(tabFromUrl));
-  const [showVoted, setShowVotedState] = useState(() => getShowVoted());
+  const { showVoted, handleShowVotedChange } = useShowVotedPreference();
   /** ハッシュタグ一覧の並び（マイページ等と同じプルダウン） */
   const [tagListSortOrder, setTagListSortOrder] = useState<"newest" | "oldest">("newest");
-  const handleShowVotedChange = useCallback((value: boolean) => {
-    setShowVoted(value);
-    setShowVotedState(value);
-  }, []);
   const shared = useSharedData();
   const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
-  const [favoriteTags, setFavoriteTags] = useState<string[]>([]);
-  const [cardOptionsCardId, setCardOptionsCardId] = useState<string | null>(null);
-  const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
-  const [reportCardId, setReportCardId] = useState<string | null>(null);
+  const auth = useAuthState();
+  const isLoggedIn = auth.isLoggedIn;
+  const currentUser = useCurrentUser(auth);
+  const { favoriteTags, setFavoriteTags, refreshFavoriteTags } = useFavoriteTags();
+  const { collections, pinnedCollectionIds, refreshCollections } = useLocalCollections();
+  const moderation = useCardModerationFlow();
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [tagMenu, setTagMenu] = useState<{ tag: string; variant: TagMenuVariant } | null>(null);
@@ -219,44 +146,11 @@ function SearchContent() {
   const trendingLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const collectionsLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const voteSearchLoadSentinelRef = useRef<HTMLDivElement | null>(null);
-  const [pinnedCollectionIds, setPinnedCollectionIds] = useState<string[]>([]);
-  const [collections, setCollections] = useState<ReturnType<typeof getCollections>>(() => getCollections());
-  const [remotePopularCollections, setRemotePopularCollections] = useState<CollectionsIndexRow[]>([]);
-  const [collectionsIndexLoading, setCollectionsIndexLoading] = useState(false);
-  const [auth, setAuth] = useState(() => getAuth());
-  const isLoggedIn = auth.isLoggedIn;
-  const currentUser = useMemo<CurrentUser>(
-    () =>
-      auth.isLoggedIn && auth.user
-        ? { type: "sns", name: auth.user.name, iconUrl: auth.user.iconUrl }
-        : { type: "guest" },
-    [auth.isLoggedIn, auth.user]
+  const { remotePopularCollections, collectionsIndexLoading } = useSearchCollectionsWarm(
+    isLoggedIn,
+    activeTab,
+    refreshCollections
   );
-  useEffect(() => {
-    const syncLists = () => {
-      setAuth(getAuth());
-      setFavoriteTags(getFavoriteTags());
-      setCollections(getCollections());
-      setPinnedCollectionIds(getPinnedCollectionIds());
-    };
-    syncLists();
-    window.addEventListener(getAuthUpdatedEventName(), syncLists);
-    window.addEventListener(PINNED_UPDATED_EVENT, syncLists);
-    window.addEventListener(getCollectionsUpdatedEventName(), syncLists);
-    return () => {
-      window.removeEventListener(getAuthUpdatedEventName(), syncLists);
-      window.removeEventListener(PINNED_UPDATED_EVENT, syncLists);
-      window.removeEventListener(getCollectionsUpdatedEventName(), syncLists);
-    };
-  }, []);
-
-  useEffect(() => {
-    setFavoriteTags(getFavoriteTags());
-    const eventName = getFavoriteTagsUpdatedEventName();
-    const handler = () => setFavoriteTags(getFavoriteTags());
-    window.addEventListener(eventName, handler);
-    return () => window.removeEventListener(eventName, handler);
-  }, []);
 
   /** ハッシュタグタップで開いたとき（?tag=xxx）→ 従来のカード一覧。虫眼鏡タップ（/search）→ 新しい検索画面 */
   const isTagFilterView = tagFromUrl.length > 0;
@@ -449,39 +343,6 @@ function SearchContent() {
   const query = searchValue.trim();
   const isSearching = query.length > 0;
 
-  /** 検索画面を開いた時点でコレ一覧を温める（タブ切替を待たない） */
-  useEffect(() => {
-    let cancelled = false;
-    setCollectionsIndexLoading(true);
-    void fetchCollectionsIndex()
-      .then((rows) => {
-        if (!cancelled) startTransition(() => setRemotePopularCollections(rows));
-      })
-      .finally(() => {
-        if (!cancelled) setCollectionsIndexLoading(false);
-      });
-    if (isLoggedIn) {
-      void hydrateUserOwnedCollectionsFromRemote().then(() => {
-        if (!cancelled) setCollections(getCollections());
-      });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoggedIn]);
-
-  /** コレクションタブに戻ったときだけ index を再確認（キャッシュ 60s 内なら即返る） */
-  useEffect(() => {
-    if (activeTab !== "collections") return;
-    let cancelled = false;
-    void fetchCollectionsIndex().then((rows) => {
-      if (!cancelled) startTransition(() => setRemotePopularCollections(rows));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab]);
-
   /** 人気コレ（デモ）＋自分・他人の登録コレクション名の部分一致 */
   const matchedCollectionsRaw = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -511,16 +372,7 @@ function SearchContent() {
   }, [query, collections, pinnedCollectionIds]);
   /** 検索時コレクション：ピン留めを上に表示 */
   const matchedCollections = useMemo(
-    () =>
-      [...matchedCollectionsRaw].sort((a, b) => {
-        const aPin = pinnedCollectionIds.includes(a.id);
-        const bPin = pinnedCollectionIds.includes(b.id);
-        if (aPin && !bPin) return -1;
-        if (!aPin && bPin) return 1;
-        if (aPin && bPin)
-          return pinnedCollectionIds.indexOf(a.id) - pinnedCollectionIds.indexOf(b.id);
-        return 0;
-      }),
+    () => sortCollectionsByPinned(matchedCollectionsRaw, pinnedCollectionIds),
     [matchedCollectionsRaw, pinnedCollectionIds]
   );
 
@@ -547,15 +399,7 @@ function SearchContent() {
       seen.add(c.id);
       return true;
     });
-    return combined.sort((a, b) => {
-      const aPin = pinnedCollectionIds.includes(a.id);
-      const bPin = pinnedCollectionIds.includes(b.id);
-      if (aPin && !bPin) return -1;
-      if (!aPin && bPin) return 1;
-      if (aPin && bPin)
-        return pinnedCollectionIds.indexOf(a.id) - pinnedCollectionIds.indexOf(b.id);
-      return 0;
-    });
+    return sortCollectionsByPinned(combined, pinnedCollectionIds);
   }, [collections, pinnedCollectionIds, remotePopularCollections]);
   const displayedCollectionsForSection = useMemo(
     () => collectionsForSection.slice(0, popularCollectionsVisibleCount),
@@ -740,7 +584,7 @@ function SearchContent() {
       return cardsToShow.map((card) => {
         const cardId = resolveStableVoteCardId(card);
         const act = activity[cardId];
-        const bgUrl = card.backgroundImageUrl ?? backgroundForSearchCard(card, cardId);
+        const bgUrl = resolveCardBackgroundUrl(card, cardId);
         return { card, cardId, act, bgUrl };
       });
     });
@@ -757,11 +601,10 @@ function SearchContent() {
 
   const handleTagFilterCardMoreClick = useCallback(
     (cardId: string) => {
-      setCardOptionsCardId(cardId);
       const card = allCardsForTagFilterFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
-      setCardOptionsIsOwnCard(card?.createdByUserId === getCurrentActivityUserId());
+      moderation.openCardOptions(cardId, card?.createdByUserId === getCurrentActivityUserId());
     },
-    [allCardsForTagFilterFiltered]
+    [allCardsForTagFilterFiltered, moderation]
   );
 
   useEffect(() => {
@@ -828,7 +671,7 @@ function SearchContent() {
         {...(isTagFilterView && {
           onFavoriteClick: (tag) => {
             toggleFavoriteTag(tag);
-            setFavoriteTags(getFavoriteTags());
+            refreshFavoriteTags();
           },
           isFavorite: isFavoriteTag(searchValue.trim()),
         })}
@@ -837,14 +680,13 @@ function SearchContent() {
       {/* ハッシュタグから開いたとき：従来のカード一覧（新着順・投票済みを表示） */}
       {isTagFilterView && (
         <>
-          <div className="sticky top-[64px] z-10 flex items-center justify-between border-b border-gray-200 bg-[#F1F1F1] px-[5.333vw] py-3">
-            <NewestOldestSortDropdown value={tagListSortOrder} onChange={setTagListSortOrder} />
-            <Checkbox
-              checked={showVoted}
-              onChange={handleShowVotedChange}
-              label="投票済みを表示"
-            />
-          </div>
+          <ShowVotedFilterBar
+            className="sticky top-[64px] z-10 bg-[#F1F1F1] px-[5.333vw] py-3"
+            sortOrder={tagListSortOrder}
+            onSortOrderChange={setTagListSortOrder}
+            showVoted={showVoted}
+            onShowVotedChange={handleShowVotedChange}
+          />
           <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-6">
             <VoteCardList>
               {cardsToShow.length === 0 ? (
@@ -921,7 +763,7 @@ function SearchContent() {
                   ) : (
                     <>
                       {displayedTrendingTags.slice(0, trendingTagsVisibleCount).map((t) => (
-                        <TagRow
+                        <TagListRow
                           key={t.tag}
                           tag={t.tag}
                           count={t.count}
@@ -1001,7 +843,7 @@ function SearchContent() {
                       }))
                       .sort((a, b) => b.count - a.count)
                       .map(({ tag, count }) => (
-                        <TagRow
+                        <TagListRow
                           key={tag}
                           tag={tag}
                           count={count}
@@ -1026,7 +868,7 @@ function SearchContent() {
                       <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
                     ) : (
                       matchedTags.map((t) => (
-                        <TagRow
+                        <TagListRow
                           key={t.tag}
                           tag={t.tag}
                           count={t.count}
@@ -1080,7 +922,7 @@ function SearchContent() {
                                 activity: act,
                                 currentUser,
                                 surface: "participate",
-                                backgroundImageUrl: backgroundForSearchCard(card, cardId),
+                                backgroundImageUrl: resolveCardBackgroundUrl(card, cardId),
                                 bookmarked: isCardBookmarked(cardId),
                                 hasCommented: commentedCardIdSet.has(cardId),
                                 onVote: handleVote,
@@ -1105,32 +947,22 @@ function SearchContent() {
         </>
       )}
 
-      {cardOptionsCardId != null && (
-        <CardOptionsModal
-          cardId={cardOptionsCardId}
-          isOwnCard={cardOptionsIsOwnCard}
-          onClose={() => setCardOptionsCardId(null)}
-          onHide={(cardId) => {
-            const card = allCardsForTagFilter.find((c) => resolveStableVoteCardId(c) === cardId);
-            if (card?.createdByUserId) {
-              addHiddenUser(card.createdByUserId);
-              setHiddenUserIds(getHiddenUserIds());
-            }
-            setCardOptionsCardId(null);
-          }}
-          onReport={(cardId) => {
-            setReportCardId(cardId);
-            setCardOptionsCardId(null);
-          }}
-        />
-      )}
-
-      {reportCardId != null && (
-        <ReportViolationModal
-          cardId={reportCardId}
-          onClose={() => setReportCardId(null)}
-        />
-      )}
+      <CardModerationModals
+        cardOptionsCardId={moderation.cardOptionsCardId}
+        cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
+        reportCardId={moderation.reportCardId}
+        onCloseOptions={moderation.closeCardOptions}
+        onHideCard={(cardId) => {
+          const card = allCardsForTagFilter.find((c) => resolveStableVoteCardId(c) === cardId);
+          if (card?.createdByUserId) {
+            addHiddenUser(card.createdByUserId);
+            setHiddenUserIds(getHiddenUserIds());
+          }
+          moderation.closeCardOptions();
+        }}
+        onReportCard={moderation.openReport}
+        onCloseReport={moderation.closeReport}
+      />
 
       {modalCardId != null && (
         <BookmarkCollectionModal
@@ -1146,7 +978,7 @@ function SearchContent() {
           variant={tagMenu.variant}
           onClose={() => setTagMenu(null)}
           onHiddenTagsUpdated={() => setHiddenTagsVersion((v) => v + 1)}
-          onFavoriteTagsUpdated={() => setFavoriteTags(getFavoriteTags())}
+          onFavoriteTagsUpdated={refreshFavoriteTags}
         />
       )}
     </div>
