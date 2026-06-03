@@ -30,7 +30,7 @@ import {
 } from "../../data/collections";
 import { isCardBookmarked } from "../../data/bookmarks";
 import { getCollectionGradientClass } from "../../data/search";
-import { voteCardsData } from "../../data/voteCards";
+import { voteCardsData, resolveStableVoteCardId } from "../../data/voteCards";
 import { getCurrentActivityUserId } from "../../data/auth";
 import {
   addCollectionScopedVote,
@@ -44,7 +44,16 @@ import {
   parseMemberCollectionVotesPayload,
   type CollectionScopedParticipant,
 } from "../../data/collectionVoteActivity";
-import { addHiddenUser } from "../../data/hiddenUsers";
+import {
+  getHiddenUserIds,
+  addHiddenUser,
+  getHiddenUsersUpdatedEventName,
+} from "../../data/hiddenUsers";
+import {
+  getHiddenCardIds,
+  addHiddenCard,
+  getHiddenCardsUpdatedEventName,
+} from "../../data/hiddenCards";
 import { useShowVotedPreference } from "../../hooks/useShowVotedPreference";
 import { useAuthState } from "../../hooks/useAuthState";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
@@ -193,6 +202,10 @@ export default function CollectionPage() {
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const { showVoted, handleShowVotedChange } = useShowVotedPreference();
   const moderation = useCardModerationFlow();
+  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
+  const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
+  const hiddenCardIdSet = useMemo(() => new Set(hiddenCardIds), [hiddenCardIds]);
+  const hiddenUserIdSet = useMemo(() => new Set(hiddenUserIds), [hiddenUserIds]);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [sharePreparing, setSharePreparing] = useState(false);
@@ -212,6 +225,16 @@ export default function CollectionPage() {
     setShareSheetOpen(false);
     setCardSortOrder("newest");
   }, [id]);
+  useEffect(() => {
+    const onHiddenUsers = () => setHiddenUserIds(getHiddenUserIds());
+    window.addEventListener(getHiddenUsersUpdatedEventName(), onHiddenUsers);
+    return () => window.removeEventListener(getHiddenUsersUpdatedEventName(), onHiddenUsers);
+  }, []);
+  useEffect(() => {
+    const onHiddenCards = () => setHiddenCardIds(getHiddenCardIds());
+    window.addEventListener(getHiddenCardsUpdatedEventName(), onHiddenCards);
+    return () => window.removeEventListener(getHiddenCardsUpdatedEventName(), onHiddenCards);
+  }, []);
   useEffect(() => {
     const handler = () => {
       setCollections(getCollections());
@@ -549,8 +572,14 @@ export default function CollectionPage() {
         const card = getCardByStableId(cardId, createdVotesForTimeline);
         return card ? { card, cardId } : null;
       })
-      .filter((x): x is { card: VoteCardData; cardId: string } => x != null);
-  }, [collection, createdVotesForTimeline]);
+      .filter((x): x is { card: VoteCardData; cardId: string } => x != null)
+      .filter(({ card, cardId }) => {
+        const stableId = resolveStableVoteCardId(card);
+        if (hiddenCardIdSet.has(cardId) || hiddenCardIdSet.has(stableId)) return false;
+        if (card.createdByUserId && hiddenUserIdSet.has(card.createdByUserId)) return false;
+        return true;
+      });
+  }, [collection, createdVotesForTimeline, hiddenCardIdSet, hiddenUserIdSet]);
 
   const sortedCardsInCollection = useMemo(() => {
     const list = [...cardsInCollection];
@@ -898,9 +927,10 @@ export default function CollectionPage() {
         onCloseOptions={moderation.closeCardOptions}
         onHideCard={(cardId) => {
           const entry = cardsInCollection.find(({ cardId: cid }) => cid === cardId);
-          if (entry?.card.createdByUserId) {
-            addHiddenUser(entry.card.createdByUserId);
-          }
+          if (entry?.card.createdByUserId) addHiddenUser(entry.card.createdByUserId);
+          addHiddenCard(entry ? resolveStableVoteCardId(entry.card) : cardId);
+          setHiddenUserIds(getHiddenUserIds());
+          setHiddenCardIds(getHiddenCardIds());
           moderation.closeCardOptions();
         }}
         onReportCard={moderation.openReport}

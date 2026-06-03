@@ -7,7 +7,6 @@ import { removeBookmarkFully } from "../data/bookmarkRemove";
 import { showAppToast } from "../lib/appToast";
 import TagSearchLink from "./TagSearchLink";
 import VoteCardShareSheet from "./VoteCardShareSheet";
-import VoteBeforeCommentModal from "./VoteBeforeCommentModal";
 import { getVotePeriodStatusText, isVotingAllowedNow } from "../data/votePeriod";
 import { getAvatarProxySrc } from "../lib/avatarProxy";
 import { isRemoteHttpUrl, resolveAvatarSrc } from "../lib/normalize";
@@ -167,8 +166,6 @@ function VoteCard({
   const readMoreRef = useRef<HTMLParagraphElement | null>(null);
   const [readMoreOverflows, setReadMoreOverflows] = useState(false);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
-  const [voteBeforeCommentOpen, setVoteBeforeCommentOpen] = useState(false);
-
   const periodAllowsVote = useMemo(
     () => isVotingAllowedNow(periodStart, periodEnd),
     [periodStart, periodEnd]
@@ -412,31 +409,19 @@ function VoteCard({
         {commentsDisabled ? (
           <span className="min-w-0 flex-1" aria-hidden />
         ) : cardId != null ? (
-          selectedOption != null || hasCommented ? (
-            <Link
-              href={commentsHref ?? `/comments/${cardId}`}
-              className="flex items-center gap-1 hover:opacity-80"
-              aria-label={`コメント ${commentCount}件、コメントページへ`}
-              onClick={handleNavigateToComments}
-            >
-              {hasCommented ? (
-                <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
-              ) : (
-                <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
-              )}
-              <span className="vote-card-footer-count">{commentCount}</span>
-            </Link>
-          ) : (
-            <button
-              type="button"
-              className="flex items-center gap-1 hover:opacity-80"
-              aria-label={`コメント ${commentCount}件（投票後にコメントできます）`}
-              onClick={() => setVoteBeforeCommentOpen(true)}
-            >
+          <Link
+            href={commentsHref ?? `/comments/${cardId}`}
+            className="flex items-center gap-1 hover:opacity-80"
+            aria-label={`コメント ${commentCount}件、みんなのコメントページへ`}
+            onClick={handleNavigateToComments}
+          >
+            {hasCommented ? (
+              <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
+            ) : (
               <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
-              <span className="vote-card-footer-count">{commentCount}</span>
-            </button>
-          )
+            )}
+            <span className="vote-card-footer-count">{commentCount}</span>
+          </Link>
         ) : (
           <span className="flex items-center gap-1" aria-label="コメント数">
             {hasCommented ? (
@@ -617,7 +602,6 @@ function VoteCard({
       {shareSheetOpen && cardId != null && !hideShare && (
         <VoteCardShareSheet open={shareSheetOpen} onClose={() => setShareSheetOpen(false)} cardId={cardId} />
       )}
-      <VoteBeforeCommentModal open={voteBeforeCommentOpen} onClose={() => setVoteBeforeCommentOpen(false)} />
     </article>
   );
 }

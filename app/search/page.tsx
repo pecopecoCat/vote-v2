@@ -46,6 +46,11 @@ import {
   getHiddenUsersUpdatedEventName,
 } from "../data/hiddenUsers";
 import {
+  getHiddenCardIds,
+  addHiddenCard,
+  getHiddenCardsUpdatedEventName,
+} from "../data/hiddenCards";
+import {
   getTrendingTagsByScore,
   getTrendingTagsFromCards,
   popularCollections,
@@ -133,6 +138,9 @@ function SearchContent() {
   const { collections, pinnedCollectionIds, refreshCollections } = useLocalCollections();
   const moderation = useCardModerationFlow();
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
+  const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
+  const hiddenCardIdSet = useMemo(() => new Set(hiddenCardIds), [hiddenCardIds]);
+  const hiddenUserIdSet = useMemo(() => new Set(hiddenUserIds), [hiddenUserIds]);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [tagMenu, setTagMenu] = useState<{ tag: string; variant: TagMenuVariant } | null>(null);
   const [hiddenTagsVersion, setHiddenTagsVersion] = useState(0);
@@ -417,14 +425,22 @@ function SearchContent() {
     window.addEventListener(getHiddenUsersUpdatedEventName(), handler);
     return () => window.removeEventListener(getHiddenUsersUpdatedEventName(), handler);
   }, []);
+  useEffect(() => {
+    const handler = () => setHiddenCardIds(getHiddenCardIds());
+    window.addEventListener(getHiddenCardsUpdatedEventName(), handler);
+    return () => window.removeEventListener(getHiddenCardsUpdatedEventName(), handler);
+  }, []);
 
-  /** 非表示ユーザーを除いたカード（タグフィルター・表示用） */
+  /** 非表示ユーザー・カードを除いた一覧（タグフィルター・注目タグ用） */
   const allCardsForTagsFiltered = useMemo(
     () =>
-      allCardsForTags.filter(
-        (c) => !c.createdByUserId || !hiddenUserIds.includes(c.createdByUserId)
-      ),
-    [allCardsForTags, hiddenUserIds]
+      allCardsForTags.filter((c) => {
+        const cardId = resolveStableVoteCardId(c);
+        if (hiddenCardIdSet.has(cardId)) return false;
+        if (c.createdByUserId && hiddenUserIdSet.has(c.createdByUserId)) return false;
+        return true;
+      }),
+    [allCardsForTags, hiddenUserIdSet, hiddenCardIdSet]
   );
 
   /** activity の高頻度更新で注目タグ計算が主スレッドを占有しないよう遅延反映 */
@@ -494,10 +510,13 @@ function SearchContent() {
 
   const allCardsForTagFilterFiltered = useMemo(
     () =>
-      allCardsForTagFilter.filter(
-        (c) => !c.createdByUserId || !hiddenUserIds.includes(c.createdByUserId)
-      ),
-    [allCardsForTagFilter, hiddenUserIds]
+      allCardsForTagFilter.filter((c) => {
+        const cardId = resolveStableVoteCardId(c);
+        if (hiddenCardIdSet.has(cardId)) return false;
+        if (c.createdByUserId && hiddenUserIdSet.has(c.createdByUserId)) return false;
+        return true;
+      }),
+    [allCardsForTagFilter, hiddenUserIdSet, hiddenCardIdSet]
   );
 
   const filteredCards = useMemo(
@@ -954,10 +973,10 @@ function SearchContent() {
         onCloseOptions={moderation.closeCardOptions}
         onHideCard={(cardId) => {
           const card = allCardsForTagFilter.find((c) => resolveStableVoteCardId(c) === cardId);
-          if (card?.createdByUserId) {
-            addHiddenUser(card.createdByUserId);
-            setHiddenUserIds(getHiddenUserIds());
-          }
+          if (card?.createdByUserId) addHiddenUser(card.createdByUserId);
+          addHiddenCard(cardId);
+          setHiddenUserIds(getHiddenUserIds());
+          setHiddenCardIds(getHiddenCardIds());
           moderation.closeCardOptions();
         }}
         onReportCard={moderation.openReport}

@@ -868,7 +868,6 @@ function ProfileContent() {
                         bookmarked: isCardBookmarked(cardId),
                         hasCommented: commentedCardIdSet.has(cardId),
                         onBookmarkClick: setModalCardId,
-                        onMoreClick: handleProfileCardMoreClick,
                       })}
                     />
                   );
