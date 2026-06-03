@@ -41,7 +41,7 @@ import {
   type VoteComment,
 } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
-import { isCardBookmarked } from "../../data/bookmarks";
+import { isCardBookmarked, getBookmarksUpdatedEventName } from "../../data/bookmarks";
 import { getCurrentActivityUserId } from "../../data/auth";
 import { addHiddenUser } from "../../data/hiddenUsers";
 import { addHiddenCard } from "../../data/hiddenCards";
@@ -101,6 +101,7 @@ export default function CommentsPage() {
   const currentUser = useCurrentUser(auth);
   const moderation = useCardModerationFlow();
   const [modalCardId, setModalCardId] = useState<string | null>(null);
+  const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const [commentReportCardId, setCommentReportCardId] = useState<string | null>(null);
   const [commentSortOrder, setCommentSortOrder] = useState<"newest" | "oldest">("newest");
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
@@ -114,6 +115,16 @@ export default function CommentsPage() {
   /** 遷移直後はコメント帯が画面上部に来るようスクロール（固定ヘッダ分は scroll-mt で確保） */
   const commentsSectionRef = useRef<HTMLDivElement>(null);
   const isLoggedIn = auth.isLoggedIn;
+  const headerBookmarked = useMemo(
+    () => isCardBookmarked(id),
+    [id, bookmarkRefreshKey]
+  );
+
+  useEffect(() => {
+    const handler = () => setBookmarkRefreshKey((k) => k + 1);
+    window.addEventListener(getBookmarksUpdatedEventName(), handler);
+    return () => window.removeEventListener(getBookmarksUpdatedEventName(), handler);
+  }, []);
   const memberCollectionFromUrl = useMemo(() => {
     if (!collectionIdFromUrl) return null;
     return getCollectionById(collectionIdFromUrl);
@@ -379,7 +390,7 @@ export default function CommentsPage() {
             hasCommented={commentedCardIds.includes(id)}
             onVote={handleVote}
             cardId={id}
-            bookmarked={isCardBookmarked(id)}
+            bookmarked={headerBookmarked}
             onBookmarkClick={setModalCardId}
             onMoreClick={() =>
               moderation.openCardOptions(id, (card?.createdByUserId ?? "") === activityUserId)

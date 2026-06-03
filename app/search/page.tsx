@@ -30,7 +30,7 @@ import { getMergedCounts, isCommentAuthoredByCurrentUser, type CardActivity } fr
 import { useSharedData } from "../context/SharedDataContext";
 import { toggleFavoriteTag, isFavoriteTag } from "../data/favoriteTags";
 import { isHiddenTag } from "../data/hiddenTags";
-import { getOtherUsersCollections } from "../data/collections";
+import { getOtherUsersCollections, isCollectionPinnable } from "../data/collections";
 import { isCardBookmarked } from "../data/bookmarks";
 import { getCurrentActivityUserId } from "../data/auth";
 import { useAuthState } from "../hooks/useAuthState";
@@ -367,7 +367,7 @@ function SearchContent() {
         id: c.id,
         title: c.name,
         gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
-        showPin: pinnedCollectionIds.includes(c.id),
+        showPin: isCollectionPinnable(c.visibility) && pinnedCollectionIds.includes(c.id),
         voteScore: 0,
       });
     }
@@ -821,7 +821,9 @@ function SearchContent() {
                             id={col.id}
                             title={col.name}
                             gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
-                            showPin={pinnedCollectionIds.includes(col.id)}
+                            showPin={
+                              isCollectionPinnable(col.visibility) && pinnedCollectionIds.includes(col.id)
+                            }
                             popularBanner
                             href={`/collection/${col.id}`}
                           />

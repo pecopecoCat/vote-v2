@@ -25,6 +25,7 @@ import {
   syncJoinedMemberCollectionCardIdsFromCanonical,
   syncCollectionToApiAndWait,
   togglePinnedCollection,
+  isCollectionPinnable,
   type Collection,
   type CollectionVisibility,
 } from "../../data/collections";
@@ -562,7 +563,8 @@ export default function CollectionPage() {
     return { name: auth.user.name.trim(), iconUrl: auth.user.iconUrl };
   }, [collection, activityUserId, auth.isLoggedIn, auth.user?.name, auth.user?.iconUrl]);
 
-  const isPinned = pinnedIds.includes(id);
+  const canPin = isCollectionPinnable(collection?.visibility ?? "private");
+  const isPinned = canPin && pinnedIds.includes(id);
 
   const cardsInCollection = useMemo(() => {
     if (!collection) return [];
@@ -778,20 +780,24 @@ export default function CollectionPage() {
         <h1 className="min-w-0 flex-1 truncate text-center text-base font-bold text-white drop-shadow-sm">
           {collection.name}
         </h1>
-        <button
-          type="button"
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isPinned ? "bg-[#FFE100]" : "bg-white/90"}`}
-          aria-label={isPinned ? "ピン留めを外す" : "検索画面にピン留め"}
-          onClick={handleTogglePin}
-        >
-          <img
-            src="/icons/icon_pin.svg"
-            alt=""
-            className="h-5 w-5"
-            width={22}
-            height={22}
-          />
-        </button>
+        {canPin ? (
+          <button
+            type="button"
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isPinned ? "bg-[#FFE100]" : "bg-white/90"}`}
+            aria-label={isPinned ? "ピン留めを外す" : "検索画面にピン留め"}
+            onClick={handleTogglePin}
+          >
+            <img
+              src="/icons/icon_pin.svg"
+              alt=""
+              className="h-5 w-5"
+              width={22}
+              height={22}
+            />
+          </button>
+        ) : (
+          <div className="h-10 w-10 shrink-0" aria-hidden />
+        )}
       </header>
 
       <main

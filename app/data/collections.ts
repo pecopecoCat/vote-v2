@@ -249,6 +249,11 @@ export function isMemberOnlyCollection(collectionId: string | null | undefined):
   return col?.visibility === "member";
 }
 
+/** 検索画面へのピン留めは公開コレクションのみ */
+export function isCollectionPinnable(visibility: CollectionVisibility): boolean {
+  return visibility === "public";
+}
+
 /** 現在のユーザーが作ったコレクション＋参加したメンバー限定（マイページで表示する用） */
 export function getCollections(): Collection[] {
   return load(getCurrentActivityUserId());
@@ -782,6 +787,10 @@ export function updateCollection(
   if (updates.gradient !== undefined) col.gradient = updates.gradient;
   if (updates.visibility !== undefined) col.visibility = updates.visibility;
   save(userId, cols);
+  if (!isCollectionPinnable(col.visibility)) {
+    const pinned = loadPinnedIds(userId).filter((pid) => pid !== id);
+    if (pinned.length < loadPinnedIds(userId).length) savePinnedIds(userId, pinned);
+  }
   if (col.visibility === "public" || col.visibility === "member") syncCollectionToApi(col);
   else if (updates.visibility === "private") deleteCollectionFromApi(id);
 }
@@ -874,9 +883,20 @@ function savePinnedIds(userId: string, ids: string[]): void {
   }
 }
 
-/** 検索画面にピン留めしたコレクションID一覧（現在ユーザー分） */
+function filterPinnablePinnedIds(userId: string, ids: string[]): string[] {
+  return ids.filter((collectionId) => {
+    const col = getCollectionById(collectionId);
+    return col != null && isCollectionPinnable(col.visibility);
+  });
+}
+
+/** 検索画面にピン留めしたコレクションID一覧（公開コレクションのみ） */
 export function getPinnedCollectionIds(): string[] {
-  return loadPinnedIds(getCurrentActivityUserId());
+  const userId = getCurrentActivityUserId();
+  const raw = loadPinnedIds(userId);
+  const filtered = filterPinnablePinnedIds(userId, raw);
+  if (filtered.length !== raw.length) savePinnedIds(userId, filtered);
+  return filtered;
 }
 
 /** コレクションがピン留めされているか */
@@ -889,8 +909,10 @@ export const MAX_PINNED_COLLECTIONS = 10;
 
 /** ピン留めをトグル（検索画面にピン留め）。最大 MAX_PINNED_COLLECTIONS 件で、超えた場合は古い順に解除。 */
 export function togglePinnedCollection(collectionId: string): void {
+  const col = getCollectionById(collectionId);
+  if (!col || !isCollectionPinnable(col.visibility)) return;
   const userId = getCurrentActivityUserId();
-  const current = loadPinnedIds(userId);
+  const current = getPinnedCollectionIds();
   const has = current.includes(collectionId);
   let next: string[];
   if (has) {

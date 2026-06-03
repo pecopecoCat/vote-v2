@@ -301,12 +301,15 @@ export default function VoteCardCompact({
             aria-label={bookmarked ? "ブックマークを外す" : "ブックマーク"}
             onClick={() => {
               if (cardId == null) return;
+              if (onBookmarkClick) {
+                onBookmarkClick(cardId);
+                return;
+              }
               if (bookmarked) {
                 removeBookmarkFully(cardId);
                 showAppToast("bookmarkを解除しました");
                 return;
               }
-              onBookmarkClick?.(cardId);
             }}
           >
             {bookmarked ? (
