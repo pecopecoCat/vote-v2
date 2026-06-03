@@ -11,6 +11,7 @@ import { CARD_BACKGROUND_IMAGES, recommendedTagList } from "../../data/voteCards
 import { useSharedData } from "../../context/SharedDataContext";
 import { addDraft, getDraftById } from "../../data/drafts";
 import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "../../lib/appToast";
+import { compressImageFile } from "../../lib/compressImageFile";
 
 const QUESTION_MAX = 80;
 const OPTION_MAX = 30; // A/Bの回答の文字数上限（画像の「00文字以内」はここで表示）
@@ -26,12 +27,14 @@ function OptionAnswerImageControl({
   fileInputRef,
   onSelect,
   onRemove,
+  busy = false,
 }: {
   side: "A" | "B";
   imageUrl?: string;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemove: () => void;
+  busy?: boolean;
 }) {
   const label = side === "A" ? "A" : "B";
   return (
@@ -43,14 +46,16 @@ function OptionAnswerImageControl({
         className="sr-only"
         aria-label={`${label}の画像を選択`}
         onChange={onSelect}
+        disabled={busy}
       />
       {imageUrl ? (
         <div className="absolute right-5 top-1/2 z-10 -translate-y-1/2">
           <div className="relative h-10 w-10">
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex h-10 w-10 cursor-pointer overflow-hidden rounded-[10px] hover:opacity-90"
+              disabled={busy}
+              onClick={() => !busy && fileInputRef.current?.click()}
+              className="flex h-10 w-10 cursor-pointer overflow-hidden rounded-[10px] hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
               aria-label={`${label}の画像を変更`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -75,8 +80,9 @@ function OptionAnswerImageControl({
       ) : (
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] bg-[#D9D9D9] hover:opacity-90"
+          disabled={busy}
+          onClick={() => !busy && fileInputRef.current?.click()}
+          className="absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] bg-[#D9D9D9] hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
           aria-label={`${label}の画像を設定`}
         >
           <span
@@ -108,6 +114,7 @@ function CreateFormContent() {
   const [optionBImageUrl, setOptionBImageUrl] = useState<string | undefined>(undefined);
   const fileInputARef = useRef<HTMLInputElement>(null);
   const fileInputBRef = useRef<HTMLInputElement>(null);
+  const [imageCompressingSide, setImageCompressingSide] = useState<"A" | "B" | null>(null);
   const [reason, setReason] = useState("");
   const [noComments, setNoComments] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
@@ -305,21 +312,22 @@ function CreateFormContent() {
     router,
   ]);
 
-  const handleImageSelect = useCallback(
-    (side: "A" | "B", e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file || !file.type.startsWith("image/")) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = reader.result as string;
+  const handleImageSelect = useCallback((side: "A" | "B", e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImageCompressingSide(side);
+    void compressImageFile(file)
+      .then((dataUrl) => {
         if (side === "A") setOptionAImageUrl(dataUrl);
         else setOptionBImageUrl(dataUrl);
-      };
-      reader.readAsDataURL(file);
-      e.target.value = "";
-    },
-    []
-  );
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "画像の処理に失敗しました。";
+        showAppToast(msg, "error");
+      })
+      .finally(() => setImageCompressingSide(null));
+  }, []);
 
   const handleImageRemove = useCallback((side: "A" | "B") => {
     if (side === "A") setOptionAImageUrl(undefined);
@@ -387,6 +395,7 @@ function CreateFormContent() {
               fileInputRef={fileInputARef}
               onSelect={(e) => handleImageSelect("A", e)}
               onRemove={() => handleImageRemove("A")}
+              busy={imageCompressingSide === "A"}
             />
           </div>
         </section>
@@ -410,6 +419,7 @@ function CreateFormContent() {
               fileInputRef={fileInputBRef}
               onSelect={(e) => handleImageSelect("B", e)}
               onRemove={() => handleImageRemove("B")}
+              busy={imageCompressingSide === "B"}
             />
           </div>
         </section>
