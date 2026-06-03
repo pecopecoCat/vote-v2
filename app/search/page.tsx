@@ -848,7 +848,7 @@ function SearchContent() {
                       </p>
                       <Link
                         href="/profile/login?returnTo=/search"
-                        className="mt-6 block w-full max-w-md rounded-xl bg-[#FFE100] py-4 text-center text-base font-bold text-gray-900 hover:opacity-90"
+                        className="mt-6 block w-full max-w-md rounded-[10px] bg-[#FFE100] py-4 text-center text-base font-bold text-gray-900 hover:opacity-90"
                         aria-label="LINEでログインする"
                       >
                         LINEでログインする

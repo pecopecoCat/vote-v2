@@ -311,6 +311,11 @@ select {
   font-weight: 700;
 }
 
+/* 四角角丸ボタン共通（角丸 10px） */
+.btn-rect-10 {
+  border-radius: 10px;
+}
+
 /* VOTEを作成ボタン：角丸＋下方向の立体シャドウ */
 .btn-yellow-3d {
   border-radius: 10px;

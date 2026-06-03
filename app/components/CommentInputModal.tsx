@@ -156,7 +156,7 @@ export default function CommentInputModal({
           <div className="bg-[#F1F1F1] px-5 pb-6 pt-4">
             <Link
               href={href}
-              className="block w-full rounded-xl bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 hover:opacity-90"
+              className="block w-full rounded-[10px] bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 hover:opacity-90"
             >
               ログインしてコメントしよう!
             </Link>

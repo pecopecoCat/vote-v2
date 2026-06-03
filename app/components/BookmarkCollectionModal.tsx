@@ -189,7 +189,7 @@ export default function BookmarkCollectionModal({
           </p>
           <Link
             href="/profile/login"
-            className="rounded-xl bg-[#191919] px-6 py-3 text-center text-sm font-bold text-white hover:opacity-90"
+            className="rounded-[10px] bg-[#191919] px-6 py-3 text-center text-sm font-bold text-white hover:opacity-90"
             onClick={onClose}
           >
             ログインする

@@ -103,7 +103,7 @@ function MemberCollectionLoginGate({ collectionId }: { collectionId: string }) {
         </p>
         <Link
           href={`/profile/login?returnTo=${encodeURIComponent(returnTo)}`}
-          className="mt-10 block w-full max-w-sm mx-auto rounded-xl bg-[#FFE100] py-4 text-center text-base font-bold text-gray-900 hover:opacity-90"
+          className="mt-10 block w-full max-w-sm mx-auto rounded-[10px] bg-[#FFE100] py-4 text-center text-base font-bold text-gray-900 hover:opacity-90"
         >
           ログインする
         </Link>

@@ -645,7 +645,7 @@ function ProfileContent() {
             <div className="mt-[30px] w-full">
               <Link
                 href={returnTo ? `/profile/login?returnTo=${encodeURIComponent(returnTo)}` : "/profile/login"}
-                className="block w-full rounded-xl bg-gray-900 py-4 text-center text-base font-bold text-white hover:opacity-90"
+                className="block w-full rounded-[10px] bg-gray-900 py-4 text-center text-base font-bold text-white hover:opacity-90"
                 aria-label="LINEでログインする"
               >
                 LINEでログインする

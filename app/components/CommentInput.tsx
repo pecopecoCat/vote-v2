@@ -139,7 +139,7 @@ export default function CommentInput({
         <div className="relative z-10 mx-auto max-w-lg">
           <Link
             href={href}
-            className="block w-full rounded-xl bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 hover:opacity-90"
+            className="block w-full rounded-[10px] bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 hover:opacity-90"
           >
             ログインしてコメントしよう!
           </Link>

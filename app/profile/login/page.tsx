@@ -199,7 +199,7 @@ function ProfileLoginContent() {
                 type="button"
                 onClick={() => openUserChoice()}
                 disabled={openingUserChoice}
-                className="w-full rounded-xl bg-gray-900 py-4 text-center text-base font-bold text-white hover:opacity-90 touch-manipulation disabled:opacity-70 disabled:cursor-wait"
+                className="w-full rounded-[10px] bg-gray-900 py-4 text-center text-base font-bold text-white hover:opacity-90 touch-manipulation disabled:opacity-70 disabled:cursor-wait"
                 style={{ touchAction: "manipulation" }}
                 aria-label="LINEでログインする"
               >
@@ -233,7 +233,7 @@ function ProfileLoginContent() {
                         type="button"
                         onClick={() => handleLoginAs(userId)}
                         disabled={disabled}
-                        className="flex flex-col items-center gap-1 rounded-xl border-2 border-gray-300 bg-white py-3 hover:border-gray-900 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:bg-white touch-manipulation"
+                        className="flex flex-col items-center gap-1 rounded-[10px] border-2 border-gray-300 bg-white py-3 hover:border-gray-900 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:bg-white touch-manipulation"
                         style={{ touchAction: "manipulation" }}
                         aria-label={isLoggedInElsewhere ? `${displayUser.name}は別の端末でログイン中` : `${displayUser.name}でログイン`}
                       >

@@ -117,7 +117,7 @@ export default function CreateQuestionPage() {
               type="button"
               onClick={handleDecide}
               disabled={!isValid}
-              className={`rounded-xl px-6 py-2.5 text-sm font-bold ${
+              className={`rounded-[10px] px-6 py-2.5 text-sm font-bold ${
                 isValid ? "bg-[#FFE100] text-gray-900" : "bg-gray-200 text-gray-400"
               }`}
             >

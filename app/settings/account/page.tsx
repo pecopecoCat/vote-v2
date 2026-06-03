@@ -137,14 +137,14 @@ export default function AccountSettingsPage() {
           <button
             type="button"
             onClick={handleCancel}
-            className="flex-1 rounded-xl border border-gray-200 bg-gray-100 py-3.5 text-center text-sm font-bold text-gray-700 hover:bg-gray-200"
+            className="flex-1 rounded-[10px] border border-gray-200 bg-gray-100 py-3.5 text-center text-sm font-bold text-gray-700 hover:bg-gray-200"
           >
             キャンセル
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="flex-1 rounded-xl bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 hover:opacity-90"
+            className="flex-1 rounded-[10px] bg-[#FFE100] py-3.5 text-center text-sm font-bold text-gray-900 hover:opacity-90"
           >
             保存
           </button>

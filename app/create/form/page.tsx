@@ -343,7 +343,7 @@ function CreateFormContent() {
           <button
             type="button"
             onClick={handleSaveDraftAndGoToDrafts}
-            className="whitespace-nowrap rounded-[9999px] border-2 border-[#FFE100] bg-white px-3 py-2.5 text-sm font-bold text-gray-900"
+            className="whitespace-nowrap rounded-[10px] border-2 border-[#FFE100] bg-white px-3 py-2.5 text-sm font-bold text-gray-900"
           >
             下書き
           </button>

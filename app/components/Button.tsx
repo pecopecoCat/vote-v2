@@ -49,13 +49,13 @@ const variantStyles: Record<
         : "bg-[#E5E7EB] text-[#787878] cursor-not-allowed",
     ].join(" "),
   outline: [
-    "h-[60px] min-h-[60px] rounded-xl px-5",
+    "h-[60px] min-h-[60px] rounded-[10px] px-5",
     "bg-white border border-[#D9D9D9] text-[#191919]",
     "hover:bg-gray-50 active:bg-gray-100",
   ].join(" "),
   buttonS: (active = false) =>
     [
-      "flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-colors min-h-[44px]",
+      "flex-1 rounded-[10px] border-2 py-3 text-sm font-medium transition-colors min-h-[44px]",
       active
         ? "border-[#FFE100] bg-[#FFF9CC] text-gray-900"
         : "border-[#D9D9D9] bg-white text-gray-600 hover:bg-gray-50",

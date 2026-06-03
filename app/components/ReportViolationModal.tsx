@@ -77,7 +77,7 @@ export default function ReportViolationModal({
           <button
             type="button"
             onClick={handleSubmit}
-            className="w-full rounded-xl bg-black py-3.5 text-center text-sm font-bold text-white transition-opacity hover:opacity-90 active:opacity-90"
+            className="w-full rounded-[10px] bg-black py-3.5 text-center text-sm font-bold text-white transition-opacity hover:opacity-90 active:opacity-90"
           >
             違反報告
           </button>

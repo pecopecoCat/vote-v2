@@ -172,7 +172,7 @@ export default function CollectionSettingsModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="flex-1 rounded-[9999px] border border-gray-200 bg-gray-100 py-3 text-sm font-medium text-gray-700 disabled:opacity-50"
+            className="flex-1 rounded-[10px] border border-gray-200 bg-gray-100 py-3 text-sm font-medium text-gray-700 disabled:opacity-50"
           >
             キャンセル
           </button>
@@ -180,7 +180,7 @@ export default function CollectionSettingsModal({
             type="button"
             onClick={() => void handleSave()}
             disabled={saving}
-            className="btn-font flex-1 rounded-[9999px] bg-[#FFE100] py-3 text-sm font-bold text-[#191919] hover:opacity-90 active:opacity-95 disabled:opacity-50"
+            className="btn-font flex-1 rounded-[10px] bg-[#FFE100] py-3 text-sm font-bold text-[#191919] hover:opacity-90 active:opacity-95 disabled:opacity-50"
           >
             {saving ? "保存中…" : "保存"}
           </button>
