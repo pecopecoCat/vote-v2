@@ -11,23 +11,26 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 **データの保存について**
 
-- **何も設定しない場合**: ブックマーク・コレクション・投票結果・作成したVOTEなどはブラウザの **localStorage** に保存されます。端末ごとに別のデータになります（デモ・プレビュー用）。
-- **10人などで同じデータを共有してチェックしたい場合**: 下記の「共有ストア（Vercel KV）」を設定すると、**作成したVOTE・投票数・コメント**が全員で共有されます。
+| 環境 | 作成VOTE・投票・コメント | ブックマーク・コレクション |
+|------|--------------------------|----------------------------|
+| **本番（Vercel）** | **KV 必須** — 未設定だと保存できません | KV + localStorage |
+| **ローカル開発** | KV 未設定時は開発用インメモリ KV（再起動でリセット） | localStorage |
 
-### 共有ストア（Vercel KV）の設定（任意）
+本番デプロイでは **Vercel KV（Upstash Redis）の設定が必須** です。未設定の場合、アプリ上部に警告バナーが表示され、作成・投票などのサーバー保存は失敗します（端末の localStorage だけに頼らない設計）。
 
-複数ユーザーで同じVOTE一覧・投票結果を見たいときは、Vercel の Redis（Upstash）を用意し、環境変数を設定してください。
+### 共有ストア（Vercel KV）の設定
 
 1. [Vercel Dashboard](https://vercel.com) → プロジェクト → **Storage** で **Redis**（Upstash）を追加する  
    または [Upstash](https://upstash.com) で Redis を作成し、REST API の URL とトークンを取得する
-2. プロジェクトのルートに `.env.local` を作成し、次を記述する（値は Vercel / Upstash の画面からコピー）:
+2. Vercel の **Environment Variables** に `KV_REST_API_URL` と `KV_REST_API_TOKEN` が入っていることを確認する（Storage 連携で自動設定されることが多い）
+3. ローカル開発でも同じデータを共有したい場合は、`.env.example` をコピーして `.env.local` を作成し、同じ値を記述する:
    ```bash
-   KV_REST_API_URL=https://xxxxx.upstash.io
-   KV_REST_API_TOKEN=AXxx...
+   cp .env.example .env.local
+   # KV_REST_API_URL / KV_REST_API_TOKEN を編集
    ```
-3. `npm run dev` で再起動する
+4. `npm run dev` で再起動する
 
-設定後は、**作成したVOTE**と**投票・コメントの集計**が KV に保存され、同じURLにアクセスした全員で同じデータが表示されます。ブックマーク・コレクション・ログイン状態は従来どおり各端末の localStorage です。
+設定後は、**作成したVOTE**と**投票・コメントの集計**が KV に保存され、同じ URL にアクセスした全員で同じデータが表示されます。ストレージ状態は `/api/kv-status` で確認できます。
 
 **ローカルで試すだけなら**
 

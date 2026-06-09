@@ -219,6 +219,9 @@ function mergeActivityFromApiFetch(
 export type VoteEvent = { cardId: string; date: string; option?: "A" | "B" };
 export type BookmarkEvent = { cardId: string; date: string };
 
+/** shared = KV 稼働中 / local-only = 本番 KV 未設定（端末のみ） / loading = 初回判定中 */
+export type StorageMode = "shared" | "local-only" | "loading";
+
 export interface SharedDataContextValue {
   /** タイムライン用：全ユーザーの作成VOTE（API 時は全員分・未設定時は localStorage の user1+user2） */
   createdVotesForTimeline: VoteCardData[];
@@ -232,6 +235,8 @@ export interface SharedDataContextValue {
   memberJoinEvents: MemberJoinOwnerEvent[];
   /** true = KV 経由で他ユーザーと共有中 */
   isRemote: boolean;
+  /** サーバーストレージの状態（本番 KV 未設定時は local-only） */
+  storageMode: StorageMode;
   /** 作成VOTEを追加（API 時は POST してから再取得） */
   addCreatedVote: (card: VoteCardData) => Promise<void>;
   /** 投票（API 時は POST してから再取得） */
@@ -279,6 +284,7 @@ export function useSharedData(): SharedDataContextValue {
       bookmarkEvents: [],
       memberJoinEvents: [],
       isRemote: false,
+      storageMode: "loading",
       addCreatedVote: async (card) => {
         if (typeof window === "undefined") return;
         addCreatedVoteLocal(card);
@@ -321,11 +327,15 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [bookmarkEvents, setBookmarkEvents] = useState<BookmarkEvent[]>([]);
   const [memberJoinEvents, setMemberJoinEvents] = useState<MemberJoinOwnerEvent[]>([]);
   const [isRemote, setIsRemote] = useState(false);
+  const [storageMode, setStorageMode] = useState<StorageMode>("loading");
   const [activityBootstrapDone, setActivityBootstrapDone] = useState(() =>
     typeof window !== "undefined" ? hasTimelineLocalCache() : false
   );
   const isRemoteRef = useRef(false);
   isRemoteRef.current = isRemote;
+
+  /** KV 稼働中、または本番 KV 未設定でサーバー書き込みのみ許可する場合 */
+  const preferServerStorage = storageMode === "shared" || storageMode === "local-only";
 
   /** 認証イベントが短時間に複数飛ぶとき activity GET を1回にまとめる（同一ユーザー時のみ） */
   const authActivityTimerRef = useRef<number | null>(null);
@@ -526,15 +536,28 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        const bootOk = await runInitialRemoteBootstrap();
-        if (mounted && bootOk) {
-          setIsRemote(true);
-        } else if (mounted) {
-          const [createdOk, activityOk] = await Promise.all([
-            fetchCreatedVotes(),
-            fetchActivity({ force: true }),
-          ]);
-          if (createdOk && activityOk) setIsRemote(true);
+        const [statusRes, bootOk] = await Promise.all([
+          fetch("/api/kv-status"),
+          runInitialRemoteBootstrap(),
+        ]);
+
+        let mode: StorageMode = "local-only";
+        if (statusRes.ok) {
+          const status = (await statusRes.json()) as { serverStorageAvailable?: boolean };
+          mode = status.serverStorageAvailable ? "shared" : "local-only";
+        }
+        if (mounted) setStorageMode(mode);
+
+        if (mode === "shared") {
+          if (mounted && bootOk) {
+            setIsRemote(true);
+          } else if (mounted) {
+            const [createdOk, activityOk] = await Promise.all([
+              fetchCreatedVotes(),
+              fetchActivity({ force: true }),
+            ]);
+            if (createdOk && activityOk) setIsRemote(true);
+          }
         }
       } finally {
         if (mounted) setActivityBootstrapDone(true);
@@ -646,7 +669,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const addCreatedVote = useCallback(
     async (card: VoteCardData) => {
       const userId = getCurrentActivityUserId();
-      if (isRemote) {
+      if (preferServerStorage || isRemote) {
         const cardWithMeta: VoteCardData = {
           ...card,
           id: card.id ?? `created-${Date.now()}`,
@@ -685,21 +708,22 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       addCreatedVoteLocal(card);
       setCreatedVotesForTimeline(mapDemoCreatorDisplayForTimeline(getCreatedVotesForTimeline()));
     },
-    [isRemote, fetchCreatedVotes]
+    [preferServerStorage, isRemote, fetchCreatedVotes]
   );
 
   const addVote = useCallback(
     async (rawCardId: string, option: "A" | "B") => {
       const cardId = normalizeCardIdKey(rawCardId);
       const userId = getCurrentActivityUserId();
-      const timeline = isRemote
+      const useServer = preferServerStorage || isRemote;
+      const timeline = useServer
         ? createdVotesForTimelineRef.current
         : getCreatedVotesForTimeline();
       const meta = resolveCardForVotePeriod(cardId, timeline);
       if (meta && !isVotingAllowedNow(meta.periodStart, meta.periodEnd)) {
         return;
       }
-      if (isRemote) {
+      if (useServer) {
         // 体感改善：POST/再取得を待たずに「投票済み」+ 票数を即反映（結果表示・コメント導線の遅延を防ぐ）
         const votedAt = new Date().toISOString();
         setActivity((prev) => {
@@ -741,7 +765,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       addVoteLocal(cardId, option);
       setActivity((prev) => ({ ...prev, ...getAllActivity() }));
     },
-    [isRemote, fetchActivity, tryApplyActivityPostSync]
+    [preferServerStorage, isRemote, fetchActivity, tryApplyActivityPostSync]
   );
 
   const addComment = useCallback(
@@ -753,7 +777,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       collectionId?: string
     ) => {
       const cardId = normalizeCardIdKey(rawCardId);
-      const timeline = isRemote
+      const useServer = preferServerStorage || isRemote;
+      const timeline = useServer
         ? createdVotesForTimelineRef.current
         : getCreatedVotesForTimeline();
       if (isCommentsDisabledOnCard(cardId, timeline)) {
@@ -762,7 +787,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       if (isMemberOnlyCollection(collectionId)) {
         return;
       }
-      if (isRemote) {
+      if (useServer) {
         const authorUserId = getCurrentActivityUserId();
         // 体感改善：送信後に即表示（POST/再取得待ちの遅延をなくす）
         const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -834,7 +859,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       addCommentLocal(cardId, comment, parentCommentId, commenterVoteOption, collectionId);
       setActivity((prev) => ({ ...prev, ...getAllActivity() }));
     },
-    [isRemote, fetchActivity, tryApplyActivityPostSync]
+    [preferServerStorage, isRemote, fetchActivity, tryApplyActivityPostSync]
   );
 
   const removeComment = useCallback(
@@ -844,7 +869,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       currentCard?: Pick<CardActivity, "countA" | "countB" | "comments">
     ) => {
       const cardId = normalizeCardIdKey(rawCardId);
-      if (isRemote) {
+      if (preferServerStorage || isRemote) {
         const auth = getAuth();
         const authorName =
           auth.isLoggedIn && typeof auth.user?.name === "string" && auth.user.name.trim()
@@ -871,14 +896,14 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       if (ok) setActivity((prev) => ({ ...prev, ...getAllActivity() }));
       return ok;
     },
-    [isRemote, fetchActivity, tryApplyActivityPostSync]
+    [preferServerStorage, isRemote, fetchActivity, tryApplyActivityPostSync]
   );
 
   const recentBookmarkActivityAtRef = useRef<Map<string, number>>(new Map());
 
   const recordBookmarkEvent = useCallback(
     async (cardId: string) => {
-      if (!isRemote) return;
+      if (!preferServerStorage && !isRemote) return;
       const now = Date.now();
       const last = recentBookmarkActivityAtRef.current.get(cardId) ?? 0;
       if (now - last < 3000) return;
@@ -903,7 +928,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         // ignore
       }
     },
-    [isRemote, fetchActivity, tryApplyActivityPostSync]
+    [preferServerStorage, isRemote, fetchActivity, tryApplyActivityPostSync]
   );
 
   const removeCreatedVote = useCallback((cardId: string) => {
@@ -920,6 +945,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       bookmarkEvents,
       memberJoinEvents,
       isRemote,
+      storageMode,
       addCreatedVote,
       addVote,
       addComment,
@@ -939,6 +965,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       bookmarkEvents,
       memberJoinEvents,
       isRemote,
+      storageMode,
       addCreatedVote,
       addVote,
       addComment,

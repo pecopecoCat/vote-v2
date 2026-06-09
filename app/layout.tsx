@@ -4,6 +4,7 @@ import "./globals.css";
 import { SharedDataProvider } from "./context/SharedDataContext";
 import AppToastHost from "./components/AppToastHost";
 import AppBottomNav from "./components/AppBottomNav";
+import ServerStorageBanner from "./components/ServerStorageBanner";
 
 const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",
@@ -34,6 +35,7 @@ export default function RootLayout({
       >
         <div className="min-h-dvh w-full bg-[var(--color-bg)]">
           <SharedDataProvider>
+            <ServerStorageBanner />
             {children}
             <AppBottomNav />
             <AppToastHost />
