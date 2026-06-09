@@ -207,7 +207,10 @@ function mergeActivityFromApiFetch(
         userVotedAt: b.userVotedAt ?? p.userVotedAt,
       };
     } else if (b) {
-      merged[cardId] = b;
+      merged[cardId] = {
+        ...b,
+        comments: mergeCommentsForActivitySync(p.comments, b.comments),
+      };
     } else if (hasP) {
       merged[cardId] = p;
     }
@@ -373,7 +376,28 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       const userChanged = lastActivityFetchUserIdRef.current !== userId;
       if (userChanged) lastActivityFetchUserIdRef.current = userId;
       /** ログイン直後は guest→user の local 引き継ぎを消さない（build のみだと未投票に見える） */
-      const base = userChanged ? getAllActivity() : prev;
+      let base = userChanged ? getAllActivity() : prev;
+      if (userChanged) {
+        // POST 直後の local-* など、まだ localStorage に載っていない React 上のコメントを残す
+        base = collapseActivityByCardId(
+          Object.fromEntries(
+            [...new Set([...Object.keys(base), ...Object.keys(prev)])].map((rawId) => {
+              const nk = normalizeCardIdKey(rawId);
+              const fromStorage = resolveActivityForCard(base, nk);
+              const fromReact = resolveActivityForCard(prev, nk);
+              const optimistic = (fromReact.comments ?? []).filter((c) => isOptimisticCommentId(c.id));
+              if (optimistic.length === 0) return [nk, fromStorage] as const;
+              return [
+                nk,
+                {
+                  ...fromStorage,
+                  comments: mergeVoteComments(fromStorage.comments, optimistic),
+                },
+              ] as const;
+            })
+          )
+        );
+      }
       const next = mergeActivityFromApiFetch(base, global, userSelections);
       persistAllActivityToLocalStorage(next);
       return next;
@@ -508,8 +532,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
             ...p,
             countA: Math.max(p.countA ?? 0, s.card!.countA!),
             countB: Math.max(p.countB ?? 0, s.card!.countB!),
-            // サーバー確定一覧を正とする（楽観 local-* と二重表示しない）
-            comments,
+            comments: mergeCommentsForActivitySync(p.comments, comments),
             userSelectedOption: p.userSelectedOption,
             userVotedAt: p.userVotedAt,
           },
@@ -838,7 +861,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           } catch {
             /* ignore */
           }
-          if (!usedSync) void fetchActivity();
+          if (!usedSync) void fetchActivity({ force: true });
         } else {
           // 失敗時は追加した分だけ取り消し（楽観コメントの残存を避ける）
           setActivity((prev) => {

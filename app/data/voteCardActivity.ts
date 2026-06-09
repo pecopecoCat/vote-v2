@@ -554,20 +554,45 @@ export type PersistActivityOptions = {
   includeOptimisticComments?: boolean;
 };
 
+function isSameCommentPayload(a: VoteComment, b: VoteComment): boolean {
+  return (
+    a.text === b.text &&
+    a.user?.name === b.user?.name &&
+    (a.parentId ?? "") === (b.parentId ?? "")
+  );
+}
+
+/** 楽観 local-* がサーバー確定コメントに置き換わったか（リロード時の誤削除防止） */
+function isOptimisticCommentConfirmedOnServer(
+  optimistic: VoteComment,
+  serverComments: VoteComment[]
+): boolean {
+  const optTime = new Date(optimistic.date ?? 0).getTime();
+  return serverComments.some((s) => {
+    if (!s?.id || isOptimisticCommentId(s.id)) return false;
+    if (!isSameCommentPayload(optimistic, s)) return false;
+    const serverTime = new Date(s.date ?? 0).getTime();
+    if (Number.isNaN(optTime) || Number.isNaN(serverTime)) return true;
+    return Math.abs(serverTime - optTime) < 10 * 60 * 1000;
+  });
+}
+
 /**
  * API 取得結果とローカル state のコメントをマージ。
- * サーバー側に確定コメントがあるときは local-* を捨てて二重表示を防ぐ。
+ * local-* はサーバーに同内容の確定コメントがあるときだけ除去（他カードのコメントがあるだけでは捨てない）。
  */
 export function mergeCommentsForActivitySync(
   prevComments: VoteComment[] | undefined,
   nextComments: VoteComment[] | undefined
 ): VoteComment[] {
+  const prev = prevComments ?? [];
   const next = nextComments ?? [];
-  const hasServerComments = next.some((c) => c?.id && !isOptimisticCommentId(c.id));
-  const prevFiltered = hasServerComments
-    ? (prevComments ?? []).filter((c) => !isOptimisticCommentId(c.id))
-    : (prevComments ?? []);
-  return mergeVoteComments(prevFiltered, next);
+  const serverComments = next.filter((c) => c?.id && !isOptimisticCommentId(c.id));
+  const prevKept = prev.filter((c) => {
+    if (!isOptimisticCommentId(c.id)) return true;
+    return !isOptimisticCommentConfirmedOnServer(c, serverComments);
+  });
+  return mergeVoteComments(prevKept, next);
 }
 
 /**
