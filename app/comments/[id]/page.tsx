@@ -13,7 +13,8 @@ import ReportViolationModal from "../../components/ReportViolationModal";
 import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import { getCollectionById } from "../../data/collections";
 import RecommendedTags from "../../components/RecommendedTags";
-import NewestOldestSortDropdown from "../../components/NewestOldestSortDropdown";
+import CommentSortSegment from "../../components/CommentSortSegment";
+import { sortTopLevelComments, type CommentSortOrder } from "../../lib/commentSort";
 import CommentThreadGroup from "../../components/CommentThreadGroup";
 import Button from "../../components/Button";
 import CommentInputModal from "../../components/CommentInputModal";
@@ -103,7 +104,7 @@ export default function CommentsPage() {
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const [commentReportCardId, setCommentReportCardId] = useState<string | null>(null);
-  const [commentSortOrder, setCommentSortOrder] = useState<"newest" | "oldest">("newest");
+  const [commentSortOrder, setCommentSortOrder] = useState<CommentSortOrder>("newest");
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(stableId));
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
@@ -409,12 +410,7 @@ export default function CommentsPage() {
         >
           <div className="flex items-center justify-between bg-[var(--color-bg)] px-[5.333vw] py-3">
             <h2 className="text-base font-bold text-[#191919]">コメント</h2>
-            <NewestOldestSortDropdown
-              value={commentSortOrder}
-              onChange={setCommentSortOrder}
-              menuAlign="right"
-              arrowStroke="#787878"
-            />
+            <CommentSortSegment value={commentSortOrder} onChange={setCommentSortOrder} />
           </div>
           <div className="bg-white">
           {activity.comments.length === 0 ? (
@@ -426,11 +422,7 @@ export default function CommentsPage() {
           ) : (
             (() => {
               const topLevel = activity.comments.filter((c) => !c.parentId);
-              const sortedTop = [...topLevel].sort((a, b) =>
-                commentSortOrder === "newest"
-                  ? (b.date ?? "").localeCompare(a.date ?? "")
-                  : (a.date ?? "").localeCompare(b.date ?? "")
-              );
+              const sortedTop = sortTopLevelComments(topLevel, commentSortOrder);
               return sortedTop.map((c) => {
                 const replies = activity.comments
                   .filter((r) => r.parentId === c.id)
