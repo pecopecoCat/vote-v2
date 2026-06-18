@@ -207,14 +207,14 @@ export function waitForCollectionsRemoteQueue(): Promise<void> {
   return collectionsWriteChain;
 }
 
-/** 定番の2択（デモ用の固定コレクション。作成者: ryo） */
+/** 入門の2択（デモ用の固定コレクション。作成者: ryo） */
 export const SEED_CLASSIC_COLLECTION_ID = "col-seed-classic";
 
 /** 他ユーザー作成のコレクション（デモ用の固定分をここで差し込む） */
 export const OTHER_USERS_COLLECTIONS: Collection[] = [
   {
     id: SEED_CLASSIC_COLLECTION_ID,
-    name: "定番の2択",
+    name: "POPカルチャー入門",
     color: "#C4B5FD",
     gradient: "purple-pink",
     visibility: "public",
