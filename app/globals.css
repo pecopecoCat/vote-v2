@@ -180,7 +180,7 @@ select {
   mask: url("/icons/comment.svg") no-repeat center / contain;
 }
 
-/* タブ（急上昇・新着・myTimeline）：Noto Sans JP・中央揃え（太さは選択状態で FeedTabs 側指定） */
+/* タブ（急上昇・新着・コミュニティ）：Noto Sans JP・中央揃え（太さは選択状態で FeedTabs 側指定） */
 .feed-tab-label {
   font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
   text-align: center;

@@ -28,7 +28,6 @@ import {
 } from "./data/voteCards";
 import {
   getMergedCounts,
-  getVoteEvents,
   isCommentAuthoredByCurrentUser,
   resetAllVoteCounts,
   type CardActivity,
@@ -104,46 +103,6 @@ function sortByNewest(cards: VoteCardData[]): VoteCardData[] {
   return [...cards].sort((a, b) =>
     (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0")
   );
-}
-
-/** myTimeline: カードへの最新投票 or コメントの日時（どちらも無ければ作成日） */
-function myTimelineLastUpdateMs(
-  card: VoteCardData,
-  activity: Record<string, CardActivity>,
-  latestVoteMsByCardId: Map<string, number>
-): number {
-  const cardId = resolveStableVoteCardId(card);
-  const act = activity[cardId];
-  let max = latestVoteMsByCardId.get(cardId) ?? 0;
-  if (act?.comments?.length) {
-    for (const c of act.comments) {
-      const t = new Date(c.date ?? 0).getTime();
-      if (!Number.isNaN(t)) max = Math.max(max, t);
-    }
-  }
-  if (max > 0) return max;
-  const created = new Date(card.createdAt ?? 0).getTime();
-  return Number.isNaN(created) ? 0 : created;
-}
-
-function sortMyTimelineCards(
-  cards: VoteCardData[],
-  bookmarkedIds: Set<string>,
-  memberCollectionCardIdSet: Set<string>,
-  activity: Record<string, CardActivity>,
-  latestVoteMsByCardId: Map<string, number>
-): VoteCardData[] {
-  return cards
-    .filter((card) => {
-      const id = resolveStableVoteCardId(card);
-      return bookmarkedIds.has(id) && !memberCollectionCardIdSet.has(id);
-    })
-    .sort((a, b) => {
-      const tb = myTimelineLastUpdateMs(b, activity, latestVoteMsByCardId);
-      const ta = myTimelineLastUpdateMs(a, activity, latestVoteMsByCardId);
-      if (tb !== ta) return tb - ta;
-      return (b.createdAt ?? "0").localeCompare(a.createdAt ?? "0");
-    });
 }
 
 
@@ -237,11 +196,6 @@ function getTimelineCollectionPool(
       gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
     }));
   return [...popularCollections, ...other, ...mine];
-}
-
-/** myTimeline 用：VOTE カードのみ（コレクション・タグ・PR は差し込まない） */
-function buildVoteOnlyTimelineItems(cards: VoteCardData[]): TimelineItem[] {
-  return cards.map((card) => ({ type: "vote", card }));
 }
 
 /** タイムライン配列を組み立て（5/10/15ルール・コレクションは位置で安定選択） */
@@ -435,13 +389,7 @@ function HomeContent() {
   const router = useRouter();
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<FeedTabId>(() =>
-    tabFromUrl === "new"
-      ? "new"
-      : tabFromUrl === "community"
-        ? "community"
-        : tabFromUrl === "myTimeline"
-          ? "myTimeline"
-          : "trending"
+    tabFromUrl === "new" ? "new" : tabFromUrl === "community" ? "community" : "trending"
   );
 
   /** VOTE作成完了後、HOME の新着タブ表示時に一度だけトースト */
@@ -514,21 +462,18 @@ function HomeContent() {
       setActiveTab("community");
       return;
     }
-    if (tabFromUrl === "myTimeline" && currentUser.type === "sns") {
-      setActiveTab("myTimeline");
-      return;
-    }
     setActiveTab("trending");
-  }, [tabFromUrl, currentUser.type]);
+  }, [tabFromUrl]);
 
-  /** 未ログインなのに ?tab=myTimeline のときだけクエリを外す */
+  /** 廃止した ?tab=myTimeline を急上昇中へ戻す */
   useEffect(() => {
-    if (currentUser.type === "sns" || tabFromUrl !== "myTimeline") return;
+    if (tabFromUrl !== "myTimeline") return;
     const params = new URLSearchParams(searchParamsKey);
     params.delete("tab");
     const qs = params.toString();
     void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [currentUser.type, tabFromUrl, pathname, router, searchParamsKey]);
+    setActiveTab("trending");
+  }, [tabFromUrl, pathname, router, searchParamsKey]);
 
   const selectFeedTab = useCallback(
     (id: FeedTabId) => {
@@ -619,31 +564,6 @@ function HomeContent() {
     [collections, bookmarkRefreshKey, auth]
   );
 
-  /** myTimeline から除外：メンバー限定コレクションに含まれる VOTE */
-  const memberCollectionCardIdSet = useMemo(() => {
-    const set = new Set<string>();
-    for (const col of collections) {
-      if (col.visibility !== "member") continue;
-      for (const rawId of col.cardIds ?? []) {
-        if (typeof rawId !== "string") continue;
-        set.add(rawId);
-      }
-    }
-    return set;
-  }, [collections]);
-
-  /** カードごとの最新投票日時（全ユーザーの投票イベントから） */
-  const latestVoteMsByCardId = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of getVoteEvents()) {
-      const t = new Date(e.date).getTime();
-      if (Number.isNaN(t)) continue;
-      const prev = map.get(e.cardId) ?? 0;
-      if (t > prev) map.set(e.cardId, t);
-    }
-    return map;
-  }, [activity]);
-
   /**
    * 急上昇・新着：投票済みは通常除外。投票直後だけ ID を入れて結果表示のまま残す。
    * リロード相当は「HOME 内タブ切替」「HOME 以外へページ遷移」のときのみ。
@@ -674,7 +594,7 @@ function HomeContent() {
     [sharedAddVote]
   );
 
-  /** 急上昇・新着：投票済みは除外。myTimeline は cardsForTab 側で全件 */
+  /** 急上昇・新着：投票済みは除外 */
   const cardsForFeed = useMemo(
     () =>
       publicCards.filter((c) => {
@@ -698,13 +618,6 @@ function HomeContent() {
   const bumpTrendingOrder = useCallback(() => {
     setTrendingOrderTick((t) => t + 1);
   }, []);
-
-  /** myTimeline: 並び替えタイミングは「タブ切替」「ページ離脱→復帰」「リロード相当」のみ */
-  const [myTimelineOrderTick, setMyTimelineOrderTick] = useState(0);
-  const [myTimelineFrozenIds, setMyTimelineFrozenIds] = useState<string[] | null>(null);
-  const bumpMyTimelineOrder = useCallback(() => {
-    setMyTimelineOrderTick((t) => t + 1);
-  }, []);
   const prevPathnameRef = useRef(pathname);
 
   useLayoutEffect(() => {
@@ -723,10 +636,7 @@ function HomeContent() {
     if (pathname === "/" && prev !== "/" && activeTabRef.current === "trending") {
       bumpTrendingOrder();
     }
-    if (pathname === "/" && prev !== "/" && activeTabRef.current === "myTimeline") {
-      bumpMyTimelineOrder();
-    }
-  }, [pathname, bumpTrendingOrder, bumpMyTimelineOrder]);
+  }, [pathname, bumpTrendingOrder]);
 
   useEffect(() => {
     let wasHidden = document.visibilityState === "hidden";
@@ -738,30 +648,19 @@ function HomeContent() {
       if (!wasHidden) return;
       wasHidden = false;
       if (activeTabRef.current === "trending") bumpTrendingOrder();
-      if (activeTabRef.current === "myTimeline") bumpMyTimelineOrder();
       void shared.refreshActivityIfStale();
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [bumpTrendingOrder, bumpMyTimelineOrder, shared.refreshActivityIfStale]);
+  }, [bumpTrendingOrder, shared.refreshActivityIfStale]);
 
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted && activeTabRef.current === "trending") bumpTrendingOrder();
-      if (e.persisted && activeTabRef.current === "myTimeline") bumpMyTimelineOrder();
     };
     window.addEventListener("pageshow", onPageShow as EventListener);
     return () => window.removeEventListener("pageshow", onPageShow as EventListener);
   }, [bumpTrendingOrder]);
-
-  useEffect(() => {
-    if (activeTab !== "myTimeline") {
-      setMyTimelineFrozenIds(null);
-      return;
-    }
-    bumpMyTimelineOrder();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
 
   const cardsForTab = useMemo(() => {
     switch (activeTab) {
@@ -789,34 +688,6 @@ function HomeContent() {
       }
       case "new":
         return sortByNewest(cardsForFeed);
-      case "myTimeline": {
-        const sortedNow = sortMyTimelineCards(
-          allCardsFiltered,
-          bookmarkedIds,
-          memberCollectionCardIdSet,
-          activity,
-          latestVoteMsByCardId
-        );
-        if (myTimelineFrozenIds == null || myTimelineFrozenIds.length === 0) return sortedNow;
-        const byId = new Map(sortedNow.map((c) => [resolveStableVoteCardId(c), c]));
-        const out: VoteCardData[] = [];
-        const used = new Set<string>();
-        for (const id of myTimelineFrozenIds) {
-          const c = byId.get(id);
-          if (c) {
-            out.push(c);
-            used.add(id);
-          }
-        }
-        for (const c of sortedNow) {
-          const id = resolveStableVoteCardId(c);
-          if (!used.has(id)) {
-            out.push(c);
-            used.add(id);
-          }
-        }
-        return out;
-      }
       case "community":
         return [];
       default:
@@ -824,35 +695,10 @@ function HomeContent() {
     }
   }, [
     activeTab,
-    bookmarkedIds,
-    allCardsFiltered,
     cardsForFeed,
     activity,
-    memberCollectionCardIdSet,
-    latestVoteMsByCardId,
     publicCards,
     trendingFrozenIds,
-    myTimelineFrozenIds,
-  ]);
-
-  useLayoutEffect(() => {
-    if (activeTab !== "myTimeline") return;
-    const sortedNow = sortMyTimelineCards(
-      allCardsFiltered,
-      bookmarkedIds,
-      memberCollectionCardIdSet,
-      activity,
-      latestVoteMsByCardId
-    );
-    setMyTimelineFrozenIds(sortedNow.map((c) => resolveStableVoteCardId(c)));
-  }, [
-    activeTab,
-    myTimelineOrderTick,
-    allCardsFiltered,
-    activity,
-    bookmarkedIds,
-    memberCollectionCardIdSet,
-    latestVoteMsByCardId,
   ]);
 
   /** 実際にあるコレクションからランダム表示用プール */
@@ -906,13 +752,11 @@ function HomeContent() {
     return () => obs.disconnect();
   }, [activeTab, communitiesForSection.length, communityVisibleCount]);
 
-  /** 急上昇・新着: VOTE＋差し込み / myTimeline: 自分の活動 VOTE のみ */
-  const timelineItems = useMemo(() => {
-    if (activeTab === "myTimeline") {
-      return buildVoteOnlyTimelineItems(cardsForTab);
-    }
-    return buildTimelineItems(cardsForTab, timelineCollectionPool);
-  }, [activeTab, cardsForTab, timelineCollectionPool]);
+  /** 急上昇・新着: VOTE＋差し込み */
+  const timelineItems = useMemo(
+    () => buildTimelineItems(cardsForTab, timelineCollectionPool),
+    [cardsForTab, timelineCollectionPool]
+  );
 
   /** シードVOTE廃止後も、カードが無いときは固定おすすめタグで埋める */
   const homeTagList = useMemo(() => {
@@ -925,12 +769,8 @@ function HomeContent() {
     <div className="min-h-screen bg-[#F1F1F1]">
       <AppHeader type="logo" />
 
-      {/* タブ：急上昇中 / 新着 / コミュニティ / myTimeline */}
-      <FeedTabs
-        activeId={activeTab}
-        onSelect={selectFeedTab}
-        isLoggedIn={currentUser.type === "sns"}
-      />
+      {/* タブ：急上昇中 / 新着 / コミュニティ */}
+      <FeedTabs activeId={activeTab} onSelect={selectFeedTab} />
 
       {/* メインコンテンツ（下ナビ分の余白を確保） */}
       <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
@@ -983,13 +823,7 @@ function HomeContent() {
               </p>
             )}
             <VoteCardList>
-              {activeTab === "myTimeline" && cardsForTab.length === 0 ? (
-                <div className="vote-card-outer px-6 py-12 text-center">
-                  <p className="text-sm text-gray-600">
-                    ブックマークしたVOTEが、投票やコメントの新しい順に表示されます。
-                  </p>
-                </div>
-              ) : (activeTab === "trending" || activeTab === "new") && cardsForTab.length === 0 ? (
+              {(activeTab === "trending" || activeTab === "new") && cardsForTab.length === 0 ? (
                 <div className="vote-card-outer px-6 py-12 text-center">
                   <p className="text-sm text-gray-600">
                     まだ投票できる投稿がありません。
@@ -997,20 +831,18 @@ function HomeContent() {
                 </div>
               ) : null}
 
-              {(activeTab !== "myTimeline" || cardsForTab.length > 0) && (
-                <HomeTimelineFeed
-                  key={activeTab}
-                  timelineItems={timelineItems}
-                  timelineTagList={homeTagList}
-                  activity={activity}
-                  commentedCardIdSet={commentedCardIdSet}
-                  bookmarkedIds={bookmarkedIds}
-                  currentUser={currentUser}
-                  handleVote={handleVote}
-                  onBookmarkClick={setModalCardId}
-                  onMoreClick={handleCardMoreClick}
-                />
-              )}
+              <HomeTimelineFeed
+                key={activeTab}
+                timelineItems={timelineItems}
+                timelineTagList={homeTagList}
+                activity={activity}
+                commentedCardIdSet={commentedCardIdSet}
+                bookmarkedIds={bookmarkedIds}
+                currentUser={currentUser}
+                handleVote={handleVote}
+                onBookmarkClick={setModalCardId}
+                onMoreClick={handleCardMoreClick}
+              />
             </VoteCardList>
           </>
         ) : (
