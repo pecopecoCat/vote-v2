@@ -2,7 +2,7 @@
 
 import UnderlineTabBar, { type UnderlineTabItem } from "./UnderlineTabBar";
 
-export type FeedTabId = "trending" | "new" | "myTimeline";
+export type FeedTabId = "trending" | "new" | "community" | "myTimeline";
 
 export interface FeedTabsProps {
   activeId: FeedTabId;
@@ -25,6 +25,11 @@ const FEED_TAB_ITEMS: UnderlineTabItem<FeedTabId>[] = [
     icon: { type: "mask", src: "/icons/fire.svg", width: 16, height: 16 },
   },
   { id: "new", label: "新着" },
+  {
+    id: "community",
+    label: "コミュニティ",
+    icon: { type: "mask", src: "/icons/icon_community.png", width: 16, height: 14 },
+  },
   { id: "myTimeline", label: "myTimeline" },
 ];
 
@@ -42,9 +47,9 @@ export default function FeedTabs({
         activeId={activeId}
         onSelect={onSelect}
         ariaLabel="フィード切り替え"
-        layout="center"
+        layout={items.length >= 4 ? "scroll" : "center"}
         backgroundClassName="bg-[#F1F1F1]"
-        navStyle={feedTabNavStyle}
+        navStyle={items.length >= 4 ? undefined : feedTabNavStyle}
       />
     </div>
   );

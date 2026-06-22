@@ -4,12 +4,12 @@ import { startTransition, useEffect, useState } from "react";
 import { hydrateUserOwnedCollectionsFromRemote } from "../data/collections";
 import { fetchCollectionsIndex, type CollectionsIndexRow } from "../lib/fetchCollectionsIndex";
 
-type SearchTabId = "trending" | "collections" | "favorite";
+type CollectionsWarmTabId = "trending" | "favorite" | "community" | "collections";
 
-/** 検索画面：KV index の warm と（ログイン時）自分のコレ同期 */
+/** 検索画面・HOME：KV index の warm と（ログイン時）自分のコレ同期 */
 export function useSearchCollectionsWarm(
   isLoggedIn: boolean,
-  activeTab: SearchTabId,
+  activeTab: CollectionsWarmTabId,
   onOwnedCollectionsSynced?: () => void
 ): {
   remotePopularCollections: CollectionsIndexRow[];
@@ -41,7 +41,7 @@ export function useSearchCollectionsWarm(
   }, [isLoggedIn, onOwnedCollectionsSynced]);
 
   useEffect(() => {
-    if (activeTab !== "collections") return;
+    if (activeTab !== "collections" && activeTab !== "community") return;
     let cancelled = false;
     void fetchCollectionsIndex().then((rows) => {
       if (!cancelled) startTransition(() => setRemotePopularCollections(rows));

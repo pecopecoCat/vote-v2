@@ -35,6 +35,8 @@ import {
 } from "./data/voteCardActivity";
 import { useSharedData } from "./context/SharedDataContext";
 import { useEnsureCollectionsHydrated } from "./hooks/useEnsureCollectionsHydrated";
+import { useSearchCollectionsWarm } from "./hooks/useSearchCollectionsWarm";
+import { sortCollectionsByPinned } from "./lib/sortCollectionsByPinned";
 import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "./lib/appToast";
 import { buildVoteCardProps } from "./lib/buildVoteCardProps";
 import { resolveCardBackgroundUrl } from "./lib/resolveCardBackgroundUrl";
@@ -42,7 +44,7 @@ import { useAuthState } from "./hooks/useAuthState";
 import { useCurrentUser } from "./hooks/useCurrentUser";
 import { useCardModerationFlow } from "./hooks/useCardModerationFlow";
 import CardModerationModals from "./components/CardModerationModals";
-import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, resetUser1AndUser2Collections } from "./data/collections";
+import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, getPinnedCollectionIds, isCollectionPinnable, PINNED_UPDATED_EVENT, resetUser1AndUser2Collections } from "./data/collections";
 import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
 import { getCurrentActivityUserId } from "./data/auth";
 import {
@@ -279,6 +281,19 @@ const RESET_COLLECTIONS_FLAG = "vote_collections_reset_v3";
 const TIMELINE_INITIAL_VISIBLE = 12;
 const TIMELINE_LOAD_MORE = 10;
 
+/** コミュニティ一覧用グラデーションのローテーション */
+const COMMUNITY_GRADIENTS: CollectionGradient[] = [
+  "blue-cyan",
+  "pink-purple",
+  "purple-pink",
+  "orange-yellow",
+  "green-yellow",
+  "cyan-aqua",
+];
+
+const COMMUNITY_INITIAL_VISIBLE = 8;
+const COMMUNITY_LOAD_MORE = 8;
+
 /** HOME の Suspense / KV ブートストラップ待ちで共通（文言は1種類のみ） */
 function HomeLoadingMessage() {
   return (
@@ -420,7 +435,13 @@ function HomeContent() {
   const router = useRouter();
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<FeedTabId>(() =>
-    tabFromUrl === "new" ? "new" : tabFromUrl === "myTimeline" ? "myTimeline" : "trending"
+    tabFromUrl === "new"
+      ? "new"
+      : tabFromUrl === "community"
+        ? "community"
+        : tabFromUrl === "myTimeline"
+          ? "myTimeline"
+          : "trending"
   );
 
   /** VOTE作成完了後、HOME の新着タブ表示時に一度だけトースト */
@@ -436,6 +457,9 @@ function HomeContent() {
     showAppToast("VOTEを作成しました");
   }, [activeTab]);
   const [collections, setCollections] = useState(() => getCollections());
+  const [pinnedCollectionIds, setPinnedCollectionIds] = useState(() => getPinnedCollectionIds());
+  const [communityVisibleCount, setCommunityVisibleCount] = useState(COMMUNITY_INITIAL_VISIBLE);
+  const communityLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const shared = useSharedData();
   const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
   useEnsureCollectionsHydrated();
@@ -446,6 +470,19 @@ function HomeContent() {
   const hiddenCardIdSet = useMemo(() => new Set(hiddenCardIds), [hiddenCardIds]);
   const hiddenUserIdSet = useMemo(() => new Set(hiddenUserIds), [hiddenUserIds]);
   const auth = useAuthState();
+  const isLoggedIn = auth.isLoggedIn;
+
+  const refreshCollections = useCallback(() => {
+    setCollections(getCollections());
+    setPinnedCollectionIds(getPinnedCollectionIds());
+  }, []);
+
+  const collectionsWarmTab = activeTab === "community" ? "community" : "trending";
+  const { remotePopularCollections, collectionsIndexLoading } = useSearchCollectionsWarm(
+    isLoggedIn,
+    collectionsWarmTab,
+    refreshCollections
+  );
 
   useEffect(() => {
     const handler = () => setHiddenUserIds(getHiddenUserIds());
@@ -471,6 +508,10 @@ function HomeContent() {
   useEffect(() => {
     if (tabFromUrl === "new") {
       setActiveTab("new");
+      return;
+    }
+    if (tabFromUrl === "community") {
+      setActiveTab("community");
       return;
     }
     if (tabFromUrl === "myTimeline" && currentUser.type === "sns") {
@@ -506,10 +547,20 @@ function HomeContent() {
 
   useEffect(() => {
     const eventName = getCollectionsUpdatedEventName();
-    const handler = () => setCollections(getCollections());
+    const handler = () => refreshCollections();
     window.addEventListener(eventName, handler);
-    return () => window.removeEventListener(eventName, handler);
-  }, []);
+    window.addEventListener(PINNED_UPDATED_EVENT, handler);
+    return () => {
+      window.removeEventListener(eventName, handler);
+      window.removeEventListener(PINNED_UPDATED_EVENT, handler);
+    };
+  }, [refreshCollections]);
+
+  useEffect(() => {
+    if (activeTab !== "community") {
+      setCommunityVisibleCount(COMMUNITY_INITIAL_VISIBLE);
+    }
+  }, [activeTab]);
 
   const allCards = useMemo(() => {
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
@@ -766,6 +817,8 @@ function HomeContent() {
         }
         return out;
       }
+      case "community":
+        return [];
       default:
         return publicCards;
     }
@@ -805,6 +858,54 @@ function HomeContent() {
   /** 実際にあるコレクションからランダム表示用プール */
   const timelineCollectionPool = useMemo(() => getTimelineCollectionPool(collections), [collections]);
 
+  /** コミュニティタブ：公開コレクション（ピン留めを上に表示） */
+  const communitiesForSection = useMemo(() => {
+    const remotePublic = remotePopularCollections
+      .filter((c) => c.visibility === "public")
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        color: c.color,
+        gradient: c.gradient as CollectionGradient | undefined,
+        visibility: "public" as const,
+        cardIds: c.cardIds,
+      }));
+    const other = getOtherUsersCollections();
+    const mine = collections.filter((c) => c.visibility !== "member");
+    const seen = new Set<string>();
+    const combined = [...remotePublic, ...other, ...mine].filter((c) => {
+      if (!c?.id) return false;
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+    return sortCollectionsByPinned(combined, pinnedCollectionIds);
+  }, [collections, pinnedCollectionIds, remotePopularCollections]);
+
+  const displayedCommunities = useMemo(
+    () => communitiesForSection.slice(0, communityVisibleCount),
+    [communitiesForSection, communityVisibleCount]
+  );
+
+  useEffect(() => {
+    if (activeTab !== "community") return;
+    const root = communityLoadSentinelRef.current;
+    if (!root) return;
+    if (communitiesForSection.length <= communityVisibleCount) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setCommunityVisibleCount((prev) =>
+            Math.min(prev + COMMUNITY_LOAD_MORE, communitiesForSection.length)
+          );
+        }
+      },
+      { root: null, rootMargin: "280px 0px", threshold: 0 }
+    );
+    obs.observe(root);
+    return () => obs.disconnect();
+  }, [activeTab, communitiesForSection.length, communityVisibleCount]);
+
   /** 急上昇・新着: VOTE＋差し込み / myTimeline: 自分の活動 VOTE のみ */
   const timelineItems = useMemo(() => {
     if (activeTab === "myTimeline") {
@@ -824,7 +925,7 @@ function HomeContent() {
     <div className="min-h-screen bg-[#F1F1F1]">
       <AppHeader type="logo" />
 
-      {/* タブ：急上昇中 / 新着 / myTimeline */}
+      {/* タブ：急上昇中 / 新着 / コミュニティ / myTimeline */}
       <FeedTabs
         activeId={activeTab}
         onSelect={selectFeedTab}
@@ -833,46 +934,85 @@ function HomeContent() {
 
       {/* メインコンテンツ（下ナビ分の余白を確保） */}
       <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
-        {!activityBootstrapDone && (
-          <p
-            className="mb-3 text-center text-xs leading-relaxed text-[#787878]"
-            role="status"
-            aria-live="polite"
-          >
-            最新を取得中…
-          </p>
-        )}
-        {allCardsFiltered.length > 0 ? (
-          <VoteCardList>
-            {activeTab === "myTimeline" && cardsForTab.length === 0 ? (
-              <div className="vote-card-outer px-6 py-12 text-center">
-                <p className="text-sm text-gray-600">
-                  ブックマークしたVOTEが、投票やコメントの新しい順に表示されます。
-                </p>
-              </div>
-            ) : (activeTab === "trending" || activeTab === "new") && cardsForTab.length === 0 ? (
-              <div className="vote-card-outer px-6 py-12 text-center">
-                <p className="text-sm text-gray-600">
-                  まだ投票できる投稿がありません。
-                </p>
-              </div>
-            ) : null}
-
-            {(activeTab !== "myTimeline" || cardsForTab.length > 0) && (
-              <HomeTimelineFeed
-                key={activeTab}
-                timelineItems={timelineItems}
-                timelineTagList={homeTagList}
-                activity={activity}
-                commentedCardIdSet={commentedCardIdSet}
-                bookmarkedIds={bookmarkedIds}
-                currentUser={currentUser}
-                handleVote={handleVote}
-                onBookmarkClick={setModalCardId}
-                onMoreClick={handleCardMoreClick}
-              />
+        {activeTab === "community" ? (
+          <section className="flex flex-col gap-3">
+            {collectionsIndexLoading && remotePopularCollections.length === 0 ? (
+              <p className="py-6 text-center text-sm text-gray-500" role="status" aria-live="polite">
+                コミュニティを読み込み中…
+              </p>
+            ) : communitiesForSection.length === 0 ? (
+              <p className="py-6 text-center text-sm text-gray-500">
+                {isLoggedIn
+                  ? "コミュニティがありません。マイページで作成しよう。"
+                  : "コミュニティはありません。"}
+              </p>
+            ) : (
+              <>
+                {displayedCommunities.map((col, i) => (
+                  <div
+                    key={col.id}
+                    className="[content-visibility:auto] [contain-intrinsic-size:auto_88px]"
+                  >
+                    <CollectionCard
+                      id={col.id}
+                      title={col.name}
+                      gradient={col.gradient ?? COMMUNITY_GRADIENTS[i % COMMUNITY_GRADIENTS.length]}
+                      showPin={
+                        isCollectionPinnable(col.visibility) && pinnedCollectionIds.includes(col.id)
+                      }
+                      popularBanner
+                      href={`/collection/${col.id}`}
+                    />
+                  </div>
+                ))}
+                {communitiesForSection.length > displayedCommunities.length ? (
+                  <div ref={communityLoadSentinelRef} className="h-8 w-full shrink-0" aria-hidden />
+                ) : null}
+              </>
             )}
-          </VoteCardList>
+          </section>
+        ) : allCardsFiltered.length > 0 ? (
+          <>
+            {!activityBootstrapDone && (
+              <p
+                className="mb-3 text-center text-xs leading-relaxed text-[#787878]"
+                role="status"
+                aria-live="polite"
+              >
+                最新を取得中…
+              </p>
+            )}
+            <VoteCardList>
+              {activeTab === "myTimeline" && cardsForTab.length === 0 ? (
+                <div className="vote-card-outer px-6 py-12 text-center">
+                  <p className="text-sm text-gray-600">
+                    ブックマークしたVOTEが、投票やコメントの新しい順に表示されます。
+                  </p>
+                </div>
+              ) : (activeTab === "trending" || activeTab === "new") && cardsForTab.length === 0 ? (
+                <div className="vote-card-outer px-6 py-12 text-center">
+                  <p className="text-sm text-gray-600">
+                    まだ投票できる投稿がありません。
+                  </p>
+                </div>
+              ) : null}
+
+              {(activeTab !== "myTimeline" || cardsForTab.length > 0) && (
+                <HomeTimelineFeed
+                  key={activeTab}
+                  timelineItems={timelineItems}
+                  timelineTagList={homeTagList}
+                  activity={activity}
+                  commentedCardIdSet={commentedCardIdSet}
+                  bookmarkedIds={bookmarkedIds}
+                  currentUser={currentUser}
+                  handleVote={handleVote}
+                  onBookmarkClick={setModalCardId}
+                  onMoreClick={handleCardMoreClick}
+                />
+              )}
+            </VoteCardList>
+          </>
         ) : (
           <HomeLoadingMessage />
         )}
@@ -883,7 +1023,7 @@ function HomeContent() {
           cardId={modalCardId}
           onClose={() => setModalCardId(null)}
           isLoggedIn={currentUser.type === "sns"}
-          onCollectionsUpdated={() => setCollections(getCollections())}
+          onCollectionsUpdated={refreshCollections}
         />
       )}
 

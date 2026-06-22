@@ -64,16 +64,6 @@ import { buildVoteCardProps } from "../lib/buildVoteCardProps";
 import { resolveCardBackgroundUrl } from "../lib/resolveCardBackgroundUrl";
 import { sortCollectionsByPinned } from "../lib/sortCollectionsByPinned";
 
-/** ピン留めコレクション用グラデーションのローテーション（検索画面はグラデーション表示に統一） */
-const PINNED_GRADIENTS: CollectionGradient[] = [
-  "blue-cyan",
-  "pink-purple",
-  "purple-pink",
-  "orange-yellow",
-  "green-yellow",
-  "cyan-aqua",
-];
-
 /** タグでフィルター（tag 指定時）、新着順／古い順でソート */
 function filterCardsByTag(
   cards: VoteCardData[],
@@ -98,10 +88,11 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
   );
 }
 
-type SearchTabId = "trending" | "collections" | "favorite";
+type SearchTabId = "trending" | "favorite";
 
 function parseSearchTabFromUrl(tab: string | null): SearchTabId {
-  if (tab === "collections" || tab === "favorite") return tab;
+  if (tab === "favorite") return tab;
+  if (tab === "collections") return "trending";
   return "trending";
 }
 
@@ -146,15 +137,12 @@ function SearchContent() {
   const [hiddenTagsVersion, setHiddenTagsVersion] = useState(0);
   /** 注目タグの表示件数（スクロールで段階的に追加） */
   const [trendingTagsVisibleCount, setTrendingTagsVisibleCount] = useState(5);
-  /** コレクションタブ：初回件数＋スクロールで追加 */
-  const [popularCollectionsVisibleCount, setPopularCollectionsVisibleCount] = useState(8);
   /** VOTE 検索結果の段階表示 */
   const [voteSearchVisibleCount, setVoteSearchVisibleCount] = useState(8);
   const restoredUiStateRef = useRef(false);
   const trendingLoadSentinelRef = useRef<HTMLDivElement | null>(null);
-  const collectionsLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const voteSearchLoadSentinelRef = useRef<HTMLDivElement | null>(null);
-  const { remotePopularCollections, collectionsIndexLoading } = useSearchCollectionsWarm(
+  const { remotePopularCollections } = useSearchCollectionsWarm(
     isLoggedIn,
     activeTab,
     refreshCollections
@@ -254,7 +242,6 @@ function SearchContent() {
     try {
       const state = {
         trendingTagsVisibleCount,
-        popularCollectionsVisibleCount,
         voteSearchVisibleCount,
         scrollY: window.scrollY,
       };
@@ -262,7 +249,7 @@ function SearchContent() {
     } catch {
       // ignore
     }
-  }, [isTagFilterView, trendingTagsVisibleCount, popularCollectionsVisibleCount, voteSearchVisibleCount]);
+  }, [isTagFilterView, trendingTagsVisibleCount, voteSearchVisibleCount]);
 
   // 戻るで復元（TOP表示のときだけ）
   useEffect(() => {
@@ -274,17 +261,13 @@ function SearchContent() {
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<{
         trendingTagsVisibleCount: number;
-        popularCollectionsVisibleCount: number;
         voteSearchVisibleCount: number;
         scrollY: number;
       }>;
       // 旧 sessionStorage の activeTab を URL に移行（戻る復元用）
       const legacyActiveTab = (parsed as { activeTab?: string }).activeTab;
-      if (
-        !tabFromUrl &&
-        (legacyActiveTab === "collections" || legacyActiveTab === "favorite")
-      ) {
-        setActiveTab(legacyActiveTab);
+      if (!tabFromUrl && legacyActiveTab === "favorite") {
+        setActiveTab("favorite");
         const params = new URLSearchParams(searchParamsKey);
         params.set("tab", legacyActiveTab);
         const qs = params.toString();
@@ -292,9 +275,6 @@ function SearchContent() {
       }
       if (typeof parsed.trendingTagsVisibleCount === "number" && parsed.trendingTagsVisibleCount > 0) {
         setTrendingTagsVisibleCount(parsed.trendingTagsVisibleCount);
-      }
-      if (typeof parsed.popularCollectionsVisibleCount === "number" && parsed.popularCollectionsVisibleCount > 0) {
-        setPopularCollectionsVisibleCount(parsed.popularCollectionsVisibleCount);
       }
       if (typeof parsed.voteSearchVisibleCount === "number" && parsed.voteSearchVisibleCount > 0) {
         setVoteSearchVisibleCount(parsed.voteSearchVisibleCount);
@@ -334,7 +314,6 @@ function SearchContent() {
       restoredUiStateRef.current = false;
       return;
     }
-    setPopularCollectionsVisibleCount(8);
     setTrendingTagsVisibleCount(5);
     setVoteSearchVisibleCount(8);
   }, [tagFromUrl, qFromUrl, activeTab, committedVoteQuery]);
@@ -382,36 +361,6 @@ function SearchContent() {
   const matchedCollections = useMemo(
     () => sortCollectionsByPinned(matchedCollectionsRaw, pinnedCollectionIds),
     [matchedCollectionsRaw, pinnedCollectionIds]
-  );
-
-  /** 人気コレクション（他＋自分の）：ピン留めを上に表示 */
-  const collectionsForSection = useMemo(() => {
-    const other = getOtherUsersCollections();
-    // KVから取れたらそれを優先（メンバー限定はリンク共有前提なので人気枠では public のみ表示）
-    const remotePublic = remotePopularCollections
-      .filter((c) => c.visibility === "public")
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        color: c.color,
-        gradient: c.gradient as CollectionGradient | undefined,
-        visibility: "public" as const,
-        cardIds: c.cardIds,
-      }));
-    const mine = collections.filter((c) => c.visibility !== "member");
-    // 同じコレが remote + local 両方に存在すると二重表示になるので id で重複排除（remote を優先）
-    const seen = new Set<string>();
-    const combined = [...remotePublic, ...other, ...mine].filter((c) => {
-      if (!c?.id) return false;
-      if (seen.has(c.id)) return false;
-      seen.add(c.id);
-      return true;
-    });
-    return sortCollectionsByPinned(combined, pinnedCollectionIds);
-  }, [collections, pinnedCollectionIds, remotePopularCollections]);
-  const displayedCollectionsForSection = useMemo(
-    () => collectionsForSection.slice(0, popularCollectionsVisibleCount),
-    [collectionsForSection, popularCollectionsVisibleCount]
   );
 
   /** 注目タグ用の全カード（作成VOTE + シード） */
@@ -474,11 +423,6 @@ function SearchContent() {
         id: "trending",
         label: "注目タグ",
         icon: { type: "mask", src: "/icons/icon_chumoku.svg", width: 18, height: 9 },
-      },
-      {
-        id: "collections",
-        label: "コレクション",
-        icon: { type: "mask", src: "/icons/bookmark.svg", width: 16, height: 16 },
       },
       {
         id: "favorite",
@@ -644,23 +588,6 @@ function SearchContent() {
   }, [activeTab, displayedTrendingTags.length, trendingTagsVisibleCount]);
 
   useEffect(() => {
-    if (activeTab !== "collections") return;
-    const root = collectionsLoadSentinelRef.current;
-    if (!root) return;
-    if (collectionsForSection.length <= popularCollectionsVisibleCount) return;
-    const obs = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setPopularCollectionsVisibleCount((prev) => Math.min(prev + 8, collectionsForSection.length));
-        }
-      },
-      { root: null, rootMargin: "280px 0px", threshold: 0 }
-    );
-    obs.observe(root);
-    return () => obs.disconnect();
-  }, [activeTab, collectionsForSection.length, popularCollectionsVisibleCount]);
-
-  useEffect(() => {
     if (committedVoteQuery.length === 0) return;
     const root = voteSearchLoadSentinelRef.current;
     if (!root) return;
@@ -754,10 +681,10 @@ function SearchContent() {
         </>
       )}
 
-      {/* 虫眼鏡タップで開いたとき：新しい検索画面（注目タグ / コレクション / お気に入りタグ） */}
+      {/* 虫眼鏡タップで開いたとき：新しい検索画面（注目タグ / お気に入りタグ） */}
       {!isTagFilterView && (
         <>
-          {/* タブ：注目タグ / コレクション / お気に入りタグ */}
+          {/* タブ：注目タグ / お気に入りタグ */}
           {!isSearching && (
             <>
               <UnderlineTabBar
@@ -792,45 +719,6 @@ function SearchContent() {
                       ))}
                       {displayedTrendingTags.length > trendingTagsVisibleCount ? (
                         <div ref={trendingLoadSentinelRef} className="h-8 w-full shrink-0" aria-hidden />
-                      ) : null}
-                    </>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {activeTab === "collections" && (
-              <section className="border-b border-gray-200 pt-2.5">
-                <div className="flex flex-col gap-3 px-[5.333vw] pb-5 pt-1">
-                  {collectionsIndexLoading && remotePopularCollections.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-gray-500" role="status" aria-live="polite">
-                      コレクションを読み込み中…
-                    </p>
-                  ) : collectionsForSection.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-gray-500">
-                      {isLoggedIn ? "コレクションがありません。マイページで作成しよう。" : "コレクションはありません。"}
-                    </p>
-                  ) : (
-                    <>
-                      {displayedCollectionsForSection.map((col, i) => (
-                        <div
-                          key={col.id}
-                          className="[content-visibility:auto] [contain-intrinsic-size:auto_88px]"
-                        >
-                          <CollectionCard
-                            id={col.id}
-                            title={col.name}
-                            gradient={col.gradient ?? PINNED_GRADIENTS[i % PINNED_GRADIENTS.length]}
-                            showPin={
-                              isCollectionPinnable(col.visibility) && pinnedCollectionIds.includes(col.id)
-                            }
-                            popularBanner
-                            href={`/collection/${col.id}`}
-                          />
-                        </div>
-                      ))}
-                      {collectionsForSection.length > displayedCollectionsForSection.length ? (
-                        <div ref={collectionsLoadSentinelRef} className="h-8 w-full shrink-0" aria-hidden />
                       ) : null}
                     </>
                   )}
