@@ -18,29 +18,9 @@ const feedTabNavStyle = {
 } as const;
 
 const FEED_TAB_ITEMS: UnderlineTabItem<FeedTabId>[] = [
-  {
-    id: "trending",
-    label: "急上昇中",
-    icon: {
-      type: "mask",
-      src: "/icons/icon_tree.svg",
-      width: 16,
-      height: 16,
-      maskClassName: "feed-tab-icon-trending",
-    },
-  },
+  { id: "trending", label: "急上昇中" },
   { id: "new", label: "新着" },
-  {
-    id: "community",
-    label: "コミュニティ",
-    icon: {
-      type: "mask",
-      src: "/icons/icon_tree_grove.svg",
-      width: 18,
-      height: 16,
-      maskClassName: "feed-tab-icon-community",
-    },
-  },
+  { id: "community", label: "コミュニティ" },
 ];
 
 export default function FeedTabs({ activeId, onSelect }: FeedTabsProps) {

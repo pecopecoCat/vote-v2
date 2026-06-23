@@ -202,16 +202,6 @@ select {
   text-align: center;
 }
 
-/* HOME フィードタブ：木アイコン（急上昇=1本 / コミュニティ=森） */
-.feed-tab-icon-trending {
-  -webkit-mask-image: url("/icons/icon_tree.svg");
-  mask-image: url("/icons/icon_tree.svg");
-}
-.feed-tab-icon-community {
-  -webkit-mask-image: url("/icons/icon_tree_grove.svg");
-  mask-image: url("/icons/icon_tree_grove.svg");
-}
-
 /* マイページ等（UnderlineTabBar layout=equal）：Safari でもラベルをセル中央に */
 .profile-tab-bar button {
   display: flex;
