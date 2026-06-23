@@ -338,7 +338,9 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
   }, [tagFromUrl]);
 
   const query = searchValue.trim();
+  /** 入力中・1回目Enter後は検索候補表示。タブは VOTE 結果表示時のみ非表示 */
   const isSearching = query.length > 0;
+  const showSearchTabs = !isTagFilterView && committedVoteQuery.length === 0;
 
   /** 人気コレ（デモ）＋自分・他人の登録コレクション名の部分一致 */
   const matchedCollectionsRaw = useMemo(() => {
@@ -711,8 +713,8 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
       {/* 虫眼鏡タップで開いたとき：新しい検索画面（注目タグ / お気に入りタグ） */}
       {!isTagFilterView && (
         <>
-          {/* タブ：注目タグ / お気に入りタグ */}
-          {!isSearching && (
+          {/* タブ：注目タグ / お気に入りタグ（VOTE結果表示時以外は常に表示） */}
+          {showSearchTabs && (
             <>
               <UnderlineTabBar
                 items={searchTabItems}
