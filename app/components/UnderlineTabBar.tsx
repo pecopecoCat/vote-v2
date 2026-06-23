@@ -13,6 +13,8 @@ export type UnderlineTabIcon =
       src: string;
       width: number;
       height: number;
+      /** mask-image を CSS クラス側で指定する場合（HOME フィードタブ等） */
+      maskClassName?: string;
     }
   | {
       type: "img";
@@ -64,14 +66,21 @@ function TabIcon({ icon, active }: { icon: UnderlineTabIcon; active: boolean }) 
   }
 
   if (icon.type === "mask") {
+    const maskClass = icon.maskClassName
+      ? `tab-bar-icon-mask ${icon.maskClassName}`
+      : "tab-bar-icon-mask";
     return (
       <span
-        className="tab-bar-icon-mask inline-block flex-none"
+        className={`${maskClass} inline-block flex-none`}
         style={{
           width: icon.width,
           height: icon.height,
-          WebkitMaskImage: `url(${icon.src})`,
-          maskImage: `url(${icon.src})`,
+          ...(icon.maskClassName
+            ? {}
+            : {
+                WebkitMaskImage: `url(${icon.src})`,
+                maskImage: `url(${icon.src})`,
+              }),
         }}
         data-active={active ? "true" : "false"}
         aria-hidden
