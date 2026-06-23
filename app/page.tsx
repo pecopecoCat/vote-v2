@@ -332,15 +332,14 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
         if (item.type === "collection") {
           const { id, title, gradient } = item.collection;
           return (
-            <div key={`col-${id}-${idx}`} className="home-feed-masonry__tile home-feed-masonry__tile--full">
+            <div key={`col-${id}-${idx}`} className="home-feed-masonry__tile">
               <CollectionCard
                 id={id}
                 title={title}
                 gradient={gradient}
                 titleVariant="blackBlock"
                 href={`/collection/${id}`}
-                timelineBanner
-                label="コレクション"
+                feedTile
               />
             </div>
           );

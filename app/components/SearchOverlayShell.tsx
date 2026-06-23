@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { navigateBack } from "../lib/navigateBack";
 import { SearchPanelWithSuspense } from "./SearchPanel";
 
 type SearchOverlayShellProps = {
@@ -11,10 +12,13 @@ type SearchOverlayShellProps = {
 
 export default function SearchOverlayShell({ mode = "intercept" }: SearchOverlayShellProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [entered, setEntered] = useState(false);
   const [closing, setClosing] = useState(false);
+  const isInterceptActive = mode === "intercept" && pathname.startsWith("/search");
 
   useEffect(() => {
+    if (!isInterceptActive && mode === "intercept") return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const id = requestAnimationFrame(() => {
@@ -24,15 +28,22 @@ export default function SearchOverlayShell({ mode = "intercept" }: SearchOverlay
       cancelAnimationFrame(id);
       document.body.style.overflow = prev;
     };
-  }, []);
+  }, [isInterceptActive, mode]);
+
+  useEffect(() => {
+    if (mode === "intercept" && !pathname.startsWith("/search")) {
+      document.body.style.overflow = "";
+    }
+  }, [pathname, mode]);
 
   const close = useCallback(() => {
     if (closing) return;
     setClosing(true);
     setEntered(false);
+    document.body.style.overflow = "";
     window.setTimeout(() => {
       if (mode === "intercept") {
-        router.back();
+        navigateBack(router, { fallbackHref: "/" });
       } else {
         router.push("/");
       }
@@ -47,9 +58,14 @@ export default function SearchOverlayShell({ mode = "intercept" }: SearchOverlay
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [close]);
 
+  /** ブラウザ戻る等で URL が /search 以外になったら即非表示（透明レイヤーで操作不能になるのを防ぐ） */
+  if (mode === "intercept" && !pathname.startsWith("/search")) {
+    return null;
+  }
+
   return (
     <div
-      className="fixed inset-0 z-[60] overflow-hidden"
+      className={`fixed inset-0 z-[60] overflow-hidden${closing ? " pointer-events-none" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label="検索"

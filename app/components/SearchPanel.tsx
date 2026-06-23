@@ -155,6 +155,18 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
   /** ハッシュタグタップで開いたとき（?tag=xxx）→ 従来のカード一覧。虫眼鏡タップ（/search）→ 新しい検索画面 */
   const isTagFilterView = tagFromUrl.length > 0;
 
+  /** オーバーレイ時は router.replace しない（並列ルート破綻・透明レイヤー残り防止） */
+  const replaceSearchUrl = useCallback(
+    (href: string) => {
+      if (isOverlay) {
+        window.history.replaceState(window.history.state, "", href);
+        return;
+      }
+      router.replace(href, { scroll: false });
+    },
+    [isOverlay, router]
+  );
+
   /** ブラウザの戻る／進む・URL直打ちでタブを URL と一致させる */
   useEffect(() => {
     if (isTagFilterView) return;
@@ -173,14 +185,9 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
       }
       const qs = params.toString();
       const nextUrl = qs ? `${pathname}?${qs}` : pathname;
-      /** オーバーレイ時は router.replace しない（パネル再マウント＝スライドアニメーション防止） */
-      if (isOverlay) {
-        window.history.replaceState(window.history.state, "", nextUrl);
-        return;
-      }
-      router.replace(nextUrl, { scroll: false });
+      replaceSearchUrl(nextUrl);
     },
-    [isTagFilterView, pathname, router, searchParamsKey, isOverlay]
+    [isTagFilterView, pathname, searchParamsKey, replaceSearchUrl]
   );
 
   /** URL の tag / q と入力欄を同期（?tag= の画面で別キーワードに変えたら /search?q= に遷移してキーワード検索へ） */
@@ -201,7 +208,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
       setSearchValue(v);
       if (isTagFilterView && v.trim() !== tagFromUrl.trim()) {
         const t = v.trim();
-        router.replace(t ? `/search?q=${encodeURIComponent(t)}` : "/search");
+        replaceSearchUrl(t ? `/search?q=${encodeURIComponent(t)}` : "/search");
         return;
       }
       if (!isTagFilterView) {
@@ -210,10 +217,10 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
         setCommittedVoteQuery((prev) => (t === prev ? prev : ""));
       }
       if (!isTagFilterView && qFromUrl.length > 0 && v.trim() === "") {
-        router.replace("/search");
+        replaceSearchUrl("/search");
       }
     },
-    [isTagFilterView, tagFromUrl, qFromUrl, router]
+    [isTagFilterView, tagFromUrl, qFromUrl, replaceSearchUrl]
   );
 
   const handleKeywordSearchSubmit = useCallback(
@@ -223,7 +230,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
       if (!t) {
         setConfirmedKeywordForBrowse("");
         setCommittedVoteQuery("");
-        router.replace("/search");
+        replaceSearchUrl("/search");
         return;
       }
       if (committedVoteQuery === t) {
@@ -231,14 +238,14 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
       }
       if (confirmedKeywordForBrowse === t && committedVoteQuery === "") {
         setCommittedVoteQuery(t);
-        router.replace(`/search?q=${encodeURIComponent(t)}&vote=1`);
+        replaceSearchUrl(`/search?q=${encodeURIComponent(t)}&vote=1`);
         return;
       }
       setConfirmedKeywordForBrowse(t);
       setCommittedVoteQuery("");
-      router.replace(`/search?q=${encodeURIComponent(t)}`);
+      replaceSearchUrl(`/search?q=${encodeURIComponent(t)}`);
     },
-    [isTagFilterView, router, confirmedKeywordForBrowse, committedVoteQuery]
+    [isTagFilterView, replaceSearchUrl, confirmedKeywordForBrowse, committedVoteQuery]
   );
 
   useEffect(() => {
@@ -281,7 +288,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
         const params = new URLSearchParams(searchParamsKey);
         params.set("tab", legacyActiveTab);
         const qs = params.toString();
-        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+        replaceSearchUrl(qs ? `${pathname}?${qs}` : pathname);
       }
       if (typeof parsed.trendingTagsVisibleCount === "number" && parsed.trendingTagsVisibleCount > 0) {
         setTrendingTagsVisibleCount(parsed.trendingTagsVisibleCount);
@@ -303,7 +310,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
     committedVoteQuery,
     tabFromUrl,
     pathname,
-    router,
+    replaceSearchUrl,
     searchParamsKey,
   ]);
 

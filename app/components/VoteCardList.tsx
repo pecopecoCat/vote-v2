@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 type VoteCardListProps = {
   children: ReactNode;
   className?: string;
-  /** HOME と同じ横埋めグリッド（640px〜で2列…）。各カードは VoteCardMasonryTile で包む */
+  /** HOME と同じカラムマasonry（縦横 gap 統一）。各カードは VoteCardMasonryTile で包む */
   masonry?: boolean;
 };
 

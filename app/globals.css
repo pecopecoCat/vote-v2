@@ -316,8 +316,7 @@ select {
   gap: 5.333vw;
 }
 
-/* VOTEカード一覧：広い画面で横いっぱいに並べてから次の行へ（行優先グリッド） */
-.home-feed-masonry.vote-card-list,
+/* コレクション一覧（行優先グリッド） */
 .collections-list-grid {
   display: grid;
   width: 100%;
@@ -326,7 +325,6 @@ select {
 }
 
 @media (min-width: 640px) {
-  .home-feed-masonry.vote-card-list,
   .collections-list-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: clamp(12px, 2vw, 20px);
@@ -334,23 +332,54 @@ select {
 }
 
 @media (min-width: 1024px) {
-  .home-feed-masonry.vote-card-list,
   .collections-list-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1280px) {
-  .home-feed-masonry.vote-card-list,
   .collections-list-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1536px) {
-  .home-feed-masonry.vote-card-list,
   .collections-list-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* VOTEカード一覧：カラムマasonry（縦・横の余白を gap で統一） */
+.home-feed-masonry.vote-card-list {
+  display: block;
+  width: 100%;
+  --masonry-gap: 5.333vw;
+  column-gap: var(--masonry-gap);
+  columns: 1;
+}
+
+@media (min-width: 640px) {
+  .home-feed-masonry.vote-card-list {
+    --masonry-gap: clamp(12px, 2vw, 20px);
+    columns: 2;
+  }
+}
+
+@media (min-width: 1024px) {
+  .home-feed-masonry.vote-card-list {
+    columns: 3;
+  }
+}
+
+@media (min-width: 1280px) {
+  .home-feed-masonry.vote-card-list {
+    columns: 4;
+  }
+}
+
+@media (min-width: 1536px) {
+  .home-feed-masonry.vote-card-list {
+    columns: 5;
   }
 }
 
@@ -358,13 +387,23 @@ select {
   min-width: 0;
   container-type: inline-size;
   container-name: home-vote-card;
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+  display: inline-block;
+  width: 100%;
+  margin-bottom: var(--masonry-gap);
+  vertical-align: top;
 }
 
 .home-feed-masonry__tile .vote-card-outer {
   --vote-u: min(100cqw, 375px);
 }
 
-.home-feed-masonry__tile--full,
+.home-feed-masonry__tile--full {
+  column-span: all;
+}
+
 .collections-list-grid__sentinel {
   grid-column: 1 / -1;
 }
