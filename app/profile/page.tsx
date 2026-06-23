@@ -53,7 +53,6 @@ import {
 import type { VoteCardData } from "../data/voteCards";
 import type { CurrentUser } from "../components/VoteCard";
 import VoteCardMini from "../components/VoteCardMini";
-import BookmarkCollectionModal from "../components/BookmarkCollectionModal";
 import Button from "../components/Button";
 import CollectionSettingsModal from "../components/CollectionSettingsModal";
 import CollectionOptionsModal from "../components/CollectionOptionsModal";
@@ -79,9 +78,9 @@ const MOCK_USER = {
 const PROFILE_COMMENT_CONTENT_WIDTH_CLASS =
   "mx-auto w-[min(100%,calc(100vw*335/375))]";
 
-type ProfileTabId = "myVOTE" | "vote" | "bookmark" | "comment";
+type ProfileTabId = "myVOTE" | "vote" | "bookmark" | "myCommunity" | "comment";
 
-const PROFILE_TAB_IDS: ProfileTabId[] = ["myVOTE", "vote", "bookmark", "comment"];
+const PROFILE_TAB_IDS: ProfileTabId[] = ["myVOTE", "vote", "bookmark", "myCommunity", "comment"];
 
 function parseProfileTabFromUrl(raw: string | null): ProfileTabId {
   if (raw && PROFILE_TAB_IDS.includes(raw as ProfileTabId)) return raw as ProfileTabId;
@@ -205,6 +204,7 @@ function ProfileContent() {
   const searchParamsKey = searchParams.toString();
   const tabFromUrl = searchParams.get("tab");
   const bookmarkFromUrl = searchParams.get("bookmark");
+  const communityFromUrl = searchParams.get("community");
   const returnTo = searchParams.get("returnTo"); // 未ログインでVOTE作成から来た場合の戻り先
   const [activeTab, setActiveTab] = useState<ProfileTabId>(() => parseProfileTabFromUrl(tabFromUrl));
   const auth = useAuthState();
@@ -220,27 +220,11 @@ function ProfileContent() {
     removeCreatedVote: sharedRemoveCreatedVote,
     refetchCreatedVotes,
   } = shared;
-  /** Bookmark タブでコレクション or ALL を選択中。null = TOP（リスト表示） */
-  const [selectedBookmarkId, setSelectedBookmarkId] = useState<null | "all" | string>(() => {
-    if (bookmarkFromUrl === "all") return "all";
-    if (bookmarkFromUrl) return bookmarkFromUrl;
+  /** マイコミュニティタブで一覧 or 個別を選択中。null = TOP */
+  const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(() => {
+    if (communityFromUrl) return communityFromUrl;
     return null;
   });
-
-  /** ブラウザの戻る／進む・URL直打ちでタブ・Bookmark 内階層を URL と一致させる */
-  useEffect(() => {
-    const tab = parseProfileTabFromUrl(tabFromUrl);
-    setActiveTab(tab);
-    if (bookmarkFromUrl === "all") {
-      setSelectedBookmarkId("all");
-      return;
-    }
-    if (bookmarkFromUrl) {
-      setSelectedBookmarkId(bookmarkFromUrl);
-      return;
-    }
-    setSelectedBookmarkId(null);
-  }, [tabFromUrl, bookmarkFromUrl]);
 
   const replaceProfileQuery = useCallback(
     (mutate: (params: URLSearchParams) => void) => {
@@ -252,43 +236,66 @@ function ProfileContent() {
     [pathname, router, searchParamsKey]
   );
 
+  /** 旧URL ?tab=bookmark&bookmark=<id> をマイコミュニティへ誘導 */
+  useEffect(() => {
+    if (tabFromUrl !== "bookmark" || !bookmarkFromUrl || bookmarkFromUrl === "all") return;
+    replaceProfileQuery((params) => {
+      params.set("tab", "myCommunity");
+      params.set("community", bookmarkFromUrl);
+      params.delete("bookmark");
+    });
+  }, [tabFromUrl, bookmarkFromUrl, replaceProfileQuery]);
+
+  /** ブラウザの戻る／進む・URL直打ちでタブ・マイコミュニティ内階層を URL と一致させる */
+  useEffect(() => {
+    const tab = parseProfileTabFromUrl(tabFromUrl);
+    setActiveTab(tab);
+    if (communityFromUrl) {
+      setSelectedCommunityId(communityFromUrl);
+      return;
+    }
+    setSelectedCommunityId(null);
+  }, [tabFromUrl, communityFromUrl]);
+
   const selectProfileTab = useCallback(
     (id: ProfileTabId) => {
       setActiveTab(id);
-      if (id !== "bookmark") setSelectedBookmarkId(null);
+      if (id !== "myCommunity") setSelectedCommunityId(null);
       replaceProfileQuery((params) => {
         if (id === "vote") {
           params.delete("tab");
           params.delete("bookmark");
+          params.delete("community");
         } else {
           params.set("tab", id);
-          if (id !== "bookmark") params.delete("bookmark");
+          if (id !== "myCommunity") params.delete("community");
+          params.delete("bookmark");
         }
       });
     },
     [replaceProfileQuery]
   );
 
-  const openBookmarkView = useCallback(
-    (bookmarkId: "all" | string) => {
-      setSelectedBookmarkId(bookmarkId);
+  const openCommunityView = useCallback(
+    (communityId: string) => {
+      setSelectedCommunityId(communityId);
       replaceProfileQuery((params) => {
-        params.set("tab", "bookmark");
-        params.set("bookmark", bookmarkId);
+        params.set("tab", "myCommunity");
+        params.set("community", communityId);
       });
     },
     [replaceProfileQuery]
   );
 
-  const closeBookmarkView = useCallback(() => {
-    setSelectedBookmarkId(null);
+  const closeCommunityView = useCallback(() => {
+    setSelectedCommunityId(null);
     replaceProfileQuery((params) => {
-      params.set("tab", "bookmark");
-      params.delete("bookmark");
+      params.set("tab", "myCommunity");
+      params.delete("community");
     });
   }, [replaceProfileQuery]);
 
-  /** bookmark タブ3点リーダー「シェアする」→ コレ画面の飛行機アイコンと同じ半モーダル */
+  /** マイコミュニティタブ3点リーダー「シェアする」→ コレ画面の飛行機アイコンと同じ半モーダル */
   const handleCollectionMenuShare = useCallback(
     async (collectionId: string) => {
       const col = collections.find((c) => c.id === collectionId);
@@ -298,18 +305,16 @@ function ProfileContent() {
     },
     [collections]
   );
-  /** ブックマーク先選択モーダルを開くカードID */
-  const [modalCardId, setModalCardId] = useState<string | null>(null);
-  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
-  const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
   /** コレクション設定モーダル（新規追加 or 編集） */
   const [showCollectionSettings, setShowCollectionSettings] = useState(false);
   /** 編集中のコレクション（null = 新規追加） */
   const [editingCollectionForSettings, setEditingCollectionForSettings] = useState<Collection | null>(null);
   /** 3点リーダーメニューを開いているコレクションID */
   const [collectionMenuOpenId, setCollectionMenuOpenId] = useState<string | null>(null);
-  /** メンバー限定コレのシェア半モーダル（bookmark タブの3点リーダーから） */
+  /** メンバー限定コレのシェア半モーダル（マイコミュニティタブの3点リーダーから） */
   const [shareSheetCollectionId, setShareSheetCollectionId] = useState<string | null>(null);
+  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
+  const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
   /** myVOTE 編集モード（カード削除用） */
   const [isMyVoteEditMode, setIsMyVoteEditMode] = useState(false);
   /** お気に入りタグ編集モード（タグ削除用） */
@@ -488,44 +493,14 @@ function ProfileContent() {
     return list;
   }, [votedCardsRaw, voteTabSortOrder]);
 
-  /**
-   * Bookmark ALL: ブックマーク + 自分のコレクションに入れたカード。
-   * メンバー限定は「自分が作ったもの」は除外（コレ画面で管理）、参加中（他人のメンバー限定に参加したもの）は ALL に含める。
-   */
-  const allBookmarkedIds = useMemo(() => {
-    const ids = new Set<string>(getBookmarkIds());
-    for (const col of collections) {
-      if (col.visibility === "member" && !col.joinedParticipation) continue;
-      for (const cid of col.cardIds ?? []) {
-        if (typeof cid === "string" && cid.length > 0) ids.add(cid);
-      }
-    }
-    return Array.from(ids);
-  }, [collections, bookmarkRefreshKey, auth]);
-  const allBookmarkedIdSet = useMemo(() => new Set(allBookmarkedIds), [allBookmarkedIds]);
-  const bookmarkedCards = useMemo(
-    () => allCardsFiltered.filter((c) => allBookmarkedIdSet.has(resolveStableVoteCardId(c))),
-    [allCardsFiltered, allBookmarkedIdSet]
-  );
-
-  const bookmarkedCardsMap = useMemo(() => {
-    const map = new Map<string, VoteCardData>();
-    for (const c of bookmarkedCards) {
-      map.set(resolveStableVoteCardId(c), c);
-    }
-    return map;
-  }, [bookmarkedCards]);
+  /** Bookmarkタブ: ブックマーク登録のみ（コミュニティとは別） */
+  const bookmarkOnlyIds = useMemo(() => getBookmarkIds(), [bookmarkRefreshKey, auth]);
 
   const bookmarkListViewModels = useMemo(() => {
     return perfMeasure("profile.bookmarkListViewModels", () => {
-      if (selectedBookmarkId == null) return [];
-      const ids =
-        selectedBookmarkId === "all"
-          ? allBookmarkedIds
-          : (collections.find((c) => c.id === selectedBookmarkId)?.cardIds ?? []);
       const out: Array<{ card: VoteCardData; cardId: string; bgUrl: string }> = [];
-      for (const cardId of ids) {
-        const card = bookmarkedCardsMap.get(cardId);
+      for (const cardId of bookmarkOnlyIds) {
+        const card = allCardsFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
         if (!card) continue;
         out.push({
           card,
@@ -535,7 +510,23 @@ function ProfileContent() {
       }
       return out;
     });
-  }, [selectedBookmarkId, allBookmarkedIds, collections, bookmarkedCardsMap, activity]);
+  }, [bookmarkOnlyIds, allCardsFiltered]);
+
+  const communityListViewModels = useMemo(() => {
+    if (selectedCommunityId == null) return [];
+    const ids = collections.find((c) => c.id === selectedCommunityId)?.cardIds ?? [];
+    const out: Array<{ card: VoteCardData; cardId: string; bgUrl: string }> = [];
+    for (const cardId of ids) {
+      const card = allCardsFiltered.find((c) => resolveStableVoteCardId(c) === cardId);
+      if (!card) continue;
+      out.push({
+        card,
+        cardId,
+        bgUrl: resolveCardBackgroundUrl(card, cardId),
+      });
+    }
+    return out;
+  }, [selectedCommunityId, collections, allCardsFiltered]);
 
   const commentedCardIds = useMemo(
     () =>
@@ -589,6 +580,7 @@ function ProfileContent() {
       { id: "myVOTE", label: "myVOTE" },
       { id: "vote", label: "投票" },
       { id: "bookmark", label: "Bookmark" },
+      { id: "myCommunity", label: "マイコミュニティ" },
       { id: "comment", label: "コメント" },
     ],
     []
@@ -682,7 +674,7 @@ function ProfileContent() {
                 <span className="text-[16px]">{voteCount}</span>
                 <span className="text-[12px]"> VOTE</span>
                 <span className="text-[16px]"> · {collectionCount}</span>
-                <span className="text-[12px]"> COLLECTION</span>
+                <span className="text-[12px]"> コミュニティ</span>
               </p>
             </div>
           </div>
@@ -826,7 +818,6 @@ function ProfileContent() {
                           bookmarked: isCardBookmarked(cardId),
                           hasCommented: commentedCardIdSet.has(cardId),
                           onVote: handleProfileParticipateVote,
-                          onBookmarkClick: setModalCardId,
                         })}
                       />
                     </div>
@@ -867,7 +858,6 @@ function ProfileContent() {
                         backgroundImageUrl: resolveCardBackgroundUrl(card, cardId),
                         bookmarked: isCardBookmarked(cardId),
                         hasCommented: commentedCardIdSet.has(cardId),
-                        onBookmarkClick: setModalCardId,
                       })}
                     />
                   );
@@ -879,55 +869,73 @@ function ProfileContent() {
 
         {activeTab === "bookmark" && (
           <>
-            {selectedBookmarkId == null ? (
-              /* Bookmark TOP: コレクションリスト */
-              <div className="flex flex-col gap-0">
-                {/* ALL 行（コレクション行と同じ高さに合わせる） */}
-                <button
-                  type="button"
-                  className="flex min-h-[64px] w-full items-center rounded-xl bg-white px-4 py-3"
-                  onClick={() => openBookmarkView("all")}
-                >
-                  <span className="text-sm font-bold text-gray-900">ALL</span>
-                </button>
-                <p className="mb-2 mt-3 text-sm font-bold text-gray-900">コミュニティ</p>
-                <div className="flex flex-col gap-2">
-                  {collections.map((col) => (
-                    <div
-                      key={col.id}
-                      className="flex w-full items-center gap-3 rounded-xl bg-white pl-4 pr-[10px] py-3"
+            {bookmarkListViewModels.length === 0 ? (
+              <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
+                <p className="text-sm text-gray-500">ブックマークした投稿がここに表示されます。</p>
+              </div>
+            ) : (
+              <VoteCardList>
+                {bookmarkListViewModels.map(({ card, cardId, bgUrl }) => {
+                  const act = activity[cardId];
+                  return (
+                    <VoteCard
+                      key={cardId}
+                      {...buildVoteCardProps({
+                        card,
+                        cardId,
+                        activity: act,
+                        currentUser,
+                        surface: "participate",
+                        backgroundImageUrl: bgUrl,
+                        bookmarked: isCardBookmarked(cardId),
+                        hasCommented: commentedCardIdSet.has(cardId),
+                        onVote: handleProfileParticipateVote,
+                        onMoreClick: handleProfileCardMoreClick,
+                      })}
+                    />
+                  );
+                })}
+              </VoteCardList>
+            )}
+          </>
+        )}
+
+        {activeTab === "myCommunity" && (
+          <>
+            {selectedCommunityId == null ? (
+              <div className="flex flex-col gap-2">
+                {collections.map((col) => (
+                  <div
+                    key={col.id}
+                    className="flex w-full items-center gap-3 rounded-xl bg-white pl-4 pr-[10px] py-3"
+                  >
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      onClick={() => openCommunityView(col.id)}
                     >
-                      <Link
-                        href={`/collection/${col.id}`}
-                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                      >
-                        <span
-                          className="h-10 w-10 shrink-0 rounded-full"
-                          style={getCollectionGradientStyle(col.gradient, col.color)}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold text-[#191919]">{col.name}</p>
-                          <p className="text-xs text-gray-500">
-                            登録数 {col.cardIds.length}件 · {VISIBILITY_LABEL[col.visibility]}
-                            {col.joinedParticipation ? " · 参加中" : ""}
-                          </p>
-                        </div>
-                      </Link>
-                      <button
-                        type="button"
-                        className="flex h-9 w-9 shrink-0 items-center justify-center text-[#666666]"
-                        aria-label="コミュニティの設定"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setCollectionMenuOpenId(col.id);
-                        }}
-                      >
-                        <img src="/icons/icon_3ten.svg" alt="" className="h-6 w-6" width={24} height={24} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                      <span
+                        className="h-10 w-10 shrink-0 rounded-full"
+                        style={getCollectionGradientStyle(col.gradient, col.color)}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-[#191919]">{col.name}</p>
+                        <p className="text-xs text-gray-500">
+                          登録数 {col.cardIds.length}件 · {VISIBILITY_LABEL[col.visibility]}
+                          {col.joinedParticipation ? " · 参加中" : ""}
+                        </p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center text-[#666666]"
+                      aria-label="コミュニティの設定"
+                      onClick={() => setCollectionMenuOpenId(col.id)}
+                    >
+                      <img src="/icons/icon_3ten.svg" alt="" className="h-6 w-6" width={24} height={24} />
+                    </button>
+                  </div>
+                ))}
                 <Button
                   variant="outline"
                   className="mt-4 w-full"
@@ -940,59 +948,50 @@ function ProfileContent() {
                 </Button>
               </div>
             ) : (
-              /* コレクション or ALL 選択時: カード一覧 */
               <>
                 <div className="mb-3 flex items-center gap-2">
                   <button
                     type="button"
                     className="flex h-9 w-9 items-center justify-center text-gray-600"
                     aria-label="戻る"
-                    onClick={closeBookmarkView}
+                    onClick={closeCommunityView}
                   >
                     <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
                     </svg>
                   </button>
                   <span className="text-sm font-bold text-gray-900">
-                    {selectedBookmarkId === "all" ? "ALL" : collections.find((c) => c.id === selectedBookmarkId)?.name ?? "コミュニティ"}
+                    {collections.find((c) => c.id === selectedCommunityId)?.name ?? "マイコミュニティ"}
                   </span>
                 </div>
-                {(() => {
-                  if (bookmarkListViewModels.length === 0) {
-                    return (
-                      <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
-                        <p className="text-sm text-gray-500">
-                          {selectedBookmarkId === "all" ? "ブックマークした投稿がここに表示されます。" : "このコミュニティにはまだ投稿がありません。"}
-                        </p>
-                      </div>
-                    );
-                  }
-                  return (
-                    <VoteCardList>
-                      {bookmarkListViewModels.map(({ card, cardId, bgUrl }) => {
-                        const act = activity[cardId];
-                        return (
-                          <VoteCard
-                            key={cardId}
-                            {...buildVoteCardProps({
-                              card,
-                              cardId,
-                              activity: act,
-                              currentUser,
-                              surface: "participate",
-                              backgroundImageUrl: bgUrl,
-                              bookmarked: isCardBookmarked(cardId),
-                              hasCommented: commentedCardIdSet.has(cardId),
-                              onVote: handleProfileParticipateVote,
-                              onBookmarkClick: setModalCardId,
-                              onMoreClick: handleProfileCardMoreClick,
-                            })}
-                          />
-                        );
-                      })}
-                    </VoteCardList>
-                  );
-                })()}
+                {communityListViewModels.length === 0 ? (
+                  <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
+                    <p className="text-sm text-gray-500">このコミュニティにはまだ投稿がありません。</p>
+                  </div>
+                ) : (
+                  <VoteCardList>
+                    {communityListViewModels.map(({ card, cardId, bgUrl }) => {
+                      const act = activity[cardId];
+                      return (
+                        <VoteCard
+                          key={cardId}
+                          {...buildVoteCardProps({
+                            card,
+                            cardId,
+                            activity: act,
+                            currentUser,
+                            surface: "participate",
+                            backgroundImageUrl: bgUrl,
+                            bookmarked: isCardBookmarked(cardId),
+                            hasCommented: commentedCardIdSet.has(cardId),
+                            onVote: handleProfileParticipateVote,
+                            onMoreClick: handleProfileCardMoreClick,
+                          })}
+                        />
+                      );
+                    })}
+                  </VoteCardList>
+                )}
               </>
             )}
           </>
@@ -1104,20 +1103,16 @@ function ProfileContent() {
         </div>
       ) : null}
 
-      {modalCardId != null && (
-        <BookmarkCollectionModal
-          cardId={modalCardId}
-          onClose={() => setModalCardId(null)}
-          isLoggedIn={auth.isLoggedIn}
-          onCollectionsUpdated={refreshCollections}
-        />
-      )}
-
       <CardModerationModals
         cardOptionsCardId={moderation.cardOptionsCardId}
         cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
         reportCardId={moderation.reportCardId}
+        addToCommunityCardId={moderation.addToCommunityCardId}
+        isLoggedIn={auth.isLoggedIn}
         onCloseOptions={moderation.closeCardOptions}
+        onAddToCommunity={moderation.openAddToCommunity}
+        onCloseAddToCommunity={moderation.closeAddToCommunity}
+        onCollectionsUpdated={refreshCollections}
         onHideCard={(cardId) => {
           const target = allCards.find((c) => resolveStableVoteCardId(c) === cardId);
           if (target?.createdByUserId) addHiddenUser(target.createdByUserId);
@@ -1150,6 +1145,9 @@ function ProfileContent() {
           onDelete={() => {
             deleteCollection(collectionMenuOpenId);
             setCollections(getCollections());
+            if (selectedCommunityId === collectionMenuOpenId) {
+              closeCommunityView();
+            }
             setCollectionMenuOpenId(null);
           }}
         />

@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useMemo, useLayoutEffect } from "react";
 import { memo } from "react";
 import Link from "next/link";
-import { removeBookmarkFully } from "../data/bookmarkRemove";
-import { showAppToast } from "../lib/appToast";
+import { useRouter } from "next/navigation";
+import { toggleBookmark } from "../lib/toggleBookmark";
+import { useSharedData } from "../context/SharedDataContext";
 import TagSearchLink from "./TagSearchLink";
 import VoteCardShareSheet from "./VoteCardShareSheet";
 import { getVotePeriodStatusText, isVotingAllowedNow } from "../data/votePeriod";
@@ -131,6 +132,8 @@ function VoteCard({
   periodStart,
   periodEnd,
 }: VoteCardProps) {
+  const router = useRouter();
+  const shared = useSharedData();
   const patternClass = patternClasses[patternType];
   const useImage = Boolean(backgroundImageUrl);
 
@@ -443,15 +446,21 @@ function VoteCard({
                 onBookmarkClick(cardId);
                 return;
               }
-              if (isBookmarked) {
-                removeBookmarkFully(cardId);
-                setIsBookmarked(false);
-                showAppToast("bookmarkを解除しました");
+              const result = toggleBookmark(cardId, {
+                onAdded: () => {
+                  if (shared.isRemote) void shared.recordBookmarkEvent(cardId);
+                },
+              });
+              if (result === "login_required") {
+                const returnTo =
+                  typeof window !== "undefined"
+                    ? `${window.location.pathname}${window.location.search}`
+                    : "/";
+                router.push(`/profile/login?returnTo=${encodeURIComponent(returnTo)}`);
                 return;
               }
-              const next = !isBookmarked;
-              setIsBookmarked(next);
-              if (onBookmarkToggle) onBookmarkToggle(cardId, next);
+              setIsBookmarked(result === "added");
+              onBookmarkToggle?.(cardId, result === "added");
             }}
           >
             {isBookmarked ? (

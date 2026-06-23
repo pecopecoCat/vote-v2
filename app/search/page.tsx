@@ -17,7 +17,6 @@ import CollectionCard from "../components/CollectionCard";
 import RecommendedTags from "../components/RecommendedTags";
 import VoteCard from "../components/VoteCard";
 import { VoteCardList } from "../components/VoteCardList";
-import BookmarkCollectionModal from "../components/BookmarkCollectionModal";
 import CardModerationModals from "../components/CardModerationModals";
 import TagListRow from "../components/TagListRow";
 import TagMenuModal, { type TagMenuVariant } from "../components/TagMenuModal";
@@ -132,7 +131,6 @@ function SearchContent() {
   const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
   const hiddenCardIdSet = useMemo(() => new Set(hiddenCardIds), [hiddenCardIds]);
   const hiddenUserIdSet = useMemo(() => new Set(hiddenUserIds), [hiddenUserIds]);
-  const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [tagMenu, setTagMenu] = useState<{ tag: string; variant: TagMenuVariant } | null>(null);
   const [hiddenTagsVersion, setHiddenTagsVersion] = useState(0);
   /** 注目タグの表示件数（スクロールで段階的に追加） */
@@ -656,7 +654,6 @@ function SearchContent() {
                         bookmarked: isCardBookmarked(cardId),
                         hasCommented: commentedCardIdSet.has(cardId),
                         onVote: handleVote,
-                        onBookmarkClick: setModalCardId,
                         onMoreClick: handleTagFilterCardMoreClick,
                       })}
                     />
@@ -835,7 +832,6 @@ function SearchContent() {
                                 bookmarked: isCardBookmarked(cardId),
                                 hasCommented: commentedCardIdSet.has(cardId),
                                 onVote: handleVote,
-                                onBookmarkClick: setModalCardId,
                                 onMoreClick: handleTagFilterCardMoreClick,
                               })}
                             />
@@ -860,7 +856,12 @@ function SearchContent() {
         cardOptionsCardId={moderation.cardOptionsCardId}
         cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
         reportCardId={moderation.reportCardId}
+        addToCommunityCardId={moderation.addToCommunityCardId}
+        isLoggedIn={isLoggedIn}
         onCloseOptions={moderation.closeCardOptions}
+        onAddToCommunity={moderation.openAddToCommunity}
+        onCloseAddToCommunity={moderation.closeAddToCommunity}
+        onCollectionsUpdated={refreshCollections}
         onHideCard={(cardId) => {
           const card = allCardsForTagFilter.find((c) => resolveStableVoteCardId(c) === cardId);
           if (card?.createdByUserId) addHiddenUser(card.createdByUserId);
@@ -873,13 +874,6 @@ function SearchContent() {
         onCloseReport={moderation.closeReport}
       />
 
-      {modalCardId != null && (
-        <BookmarkCollectionModal
-          cardId={modalCardId}
-          onClose={() => setModalCardId(null)}
-          isLoggedIn={isLoggedIn}
-        />
-      )}
 
       {tagMenu != null && (
         <TagMenuModal

@@ -8,12 +8,21 @@ export function useCardModerationFlow() {
   const [cardOptionsIsOwnCard, setCardOptionsIsOwnCard] = useState(false);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
 
+  const [addToCommunityCardId, setAddToCommunityCardId] = useState<string | null>(null);
+
   const openCardOptions = useCallback((cardId: string, isOwnCard: boolean) => {
     setCardOptionsCardId(cardId);
     setCardOptionsIsOwnCard(isOwnCard);
   }, []);
 
   const closeCardOptions = useCallback(() => setCardOptionsCardId(null), []);
+
+  const openAddToCommunity = useCallback((cardId: string) => {
+    setAddToCommunityCardId(cardId);
+    setCardOptionsCardId(null);
+  }, []);
+
+  const closeAddToCommunity = useCallback(() => setAddToCommunityCardId(null), []);
 
   const openReport = useCallback((cardId: string) => {
     setReportCardId(cardId);
@@ -26,8 +35,11 @@ export function useCardModerationFlow() {
     cardOptionsCardId,
     cardOptionsIsOwnCard,
     reportCardId,
+    addToCommunityCardId,
     openCardOptions,
     closeCardOptions,
+    openAddToCommunity,
+    closeAddToCommunity,
     openReport,
     closeReport,
   };

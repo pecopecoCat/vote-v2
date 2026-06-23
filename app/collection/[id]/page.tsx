@@ -8,7 +8,6 @@ import VoteCard from "../../components/VoteCard";
 import { VoteCardList } from "../../components/VoteCardList";
 import CardModerationModals from "../../components/CardModerationModals";
 import ShowVotedFilterBar from "../../components/ShowVotedFilterBar";
-import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import MemberCollectionShareSheet from "../../components/MemberCollectionShareSheet";
 import MemberParticipantAvatar from "../../components/MemberParticipantAvatar";
 import AppHeader from "../../components/AppHeader";
@@ -207,7 +206,6 @@ export default function CollectionPage() {
   const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
   const hiddenCardIdSet = useMemo(() => new Set(hiddenCardIds), [hiddenCardIds]);
   const hiddenUserIdSet = useMemo(() => new Set(hiddenUserIds), [hiddenUserIds]);
-  const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [sharePreparing, setSharePreparing] = useState(false);
   const [cardSortOrder, setCardSortOrder] = useState<NewestOldestSortOrder>("newest");
@@ -901,7 +899,6 @@ export default function CollectionPage() {
                     bookmarked: isMemberCollectionParticipant ? false : isCardBookmarked(cardId),
                     hasCommented: false,
                     onVote: handleCollectionVote,
-                    onBookmarkClick: isMemberCollectionParticipant ? undefined : setModalCardId,
                     onMoreClick: isMemberCollection ? undefined : handleCollectionCardMoreClick,
                     commentsDisabled: isMemberCollection || card.commentsDisabled === true,
                     hideShare: isMemberCollection,
@@ -930,7 +927,12 @@ export default function CollectionPage() {
         cardOptionsCardId={moderation.cardOptionsCardId}
         cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
         reportCardId={moderation.reportCardId}
+        addToCommunityCardId={moderation.addToCommunityCardId}
+        isLoggedIn={auth.isLoggedIn}
         onCloseOptions={moderation.closeCardOptions}
+        onAddToCommunity={moderation.openAddToCommunity}
+        onCloseAddToCommunity={moderation.closeAddToCommunity}
+        onCollectionsUpdated={() => setCollections(getCollections())}
         onHideCard={(cardId) => {
           const entry = cardsInCollection.find(({ cardId: cid }) => cid === cardId);
           if (entry?.card.createdByUserId) addHiddenUser(entry.card.createdByUserId);
@@ -943,13 +945,6 @@ export default function CollectionPage() {
         onCloseReport={moderation.closeReport}
       />
 
-      {modalCardId != null && (
-        <BookmarkCollectionModal
-          cardId={modalCardId}
-          onClose={() => setModalCardId(null)}
-          isLoggedIn={auth.isLoggedIn}
-        />
-      )}
     </div>
   );
 }

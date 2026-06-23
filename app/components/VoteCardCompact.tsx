@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import type { VoteCardPattern } from "./VoteCard";
 import VoteCardShareSheet from "./VoteCardShareSheet";
-import { removeBookmarkFully } from "../data/bookmarkRemove";
-import { showAppToast } from "../lib/appToast";
+import { toggleBookmark } from "../lib/toggleBookmark";
+import { useSharedData } from "../context/SharedDataContext";
 import { getVotePeriodStatusText, isVotingAllowedNow } from "../data/votePeriod";
 
 const patternClasses: Record<VoteCardPattern, string> = {
@@ -85,6 +86,8 @@ export default function VoteCardCompact({
   flatOuterShadow = false,
   hideFooterIconRow = false,
 }: VoteCardCompactProps) {
+  const router = useRouter();
+  const shared = useSharedData();
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const periodAllowsVote = useMemo(
     () => isVotingAllowedNow(periodStart, periodEnd),
@@ -305,10 +308,17 @@ export default function VoteCardCompact({
                 onBookmarkClick(cardId);
                 return;
               }
-              if (bookmarked) {
-                removeBookmarkFully(cardId);
-                showAppToast("bookmarkを解除しました");
-                return;
+              const result = toggleBookmark(cardId, {
+                onAdded: () => {
+                  if (shared.isRemote) void shared.recordBookmarkEvent(cardId);
+                },
+              });
+              if (result === "login_required") {
+                const returnTo =
+                  typeof window !== "undefined"
+                    ? `${window.location.pathname}${window.location.search}`
+                    : "/";
+                router.push(`/profile/login?returnTo=${encodeURIComponent(returnTo)}`);
               }
             }}
           >

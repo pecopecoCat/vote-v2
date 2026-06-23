@@ -18,7 +18,6 @@ import AdCard from "./components/AdCard";
 import RecommendedTags from "./components/RecommendedTags";
 import CollectionCard from "./components/CollectionCard";
 import FeedTabs from "./components/FeedTabs";
-import BookmarkCollectionModal from "./components/BookmarkCollectionModal";
 import type { FeedTabId } from "./components/FeedTabs";
 import type { VoteCardData } from "./data/voteCards";
 import {
@@ -280,7 +279,6 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
   bookmarkedIds,
   currentUser,
   handleVote,
-  onBookmarkClick,
   onMoreClick,
 }: {
   timelineItems: TimelineItem[];
@@ -290,7 +288,6 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
   bookmarkedIds: Set<string>;
   currentUser: CurrentUser;
   handleVote: (id: string, option: "A" | "B") => void;
-  onBookmarkClick: (cardId: string) => void;
   onMoreClick: (cardId: string) => void;
 }) {
   const [loadMoreSteps, setLoadMoreSteps] = useState(0);
@@ -339,7 +336,6 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
                   bookmarked: bookmarkedIds.has(cardId),
                   hasCommented: commentedCardIdSet.has(cardId),
                   onVote: handleVote,
-                  onBookmarkClick,
                   onMoreClick,
                 })}
               />
@@ -422,7 +418,6 @@ function HomeContent() {
   const shared = useSharedData();
   const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
   useEnsureCollectionsHydrated();
-  const [modalCardId, setModalCardId] = useState<string | null>(null);
   const moderation = useCardModerationFlow();
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
@@ -859,7 +854,6 @@ function HomeContent() {
                 bookmarkedIds={bookmarkedIds}
                 currentUser={currentUser}
                 handleVote={handleVote}
-                onBookmarkClick={setModalCardId}
                 onMoreClick={handleCardMoreClick}
               />
             </VoteCardList>
@@ -869,20 +863,16 @@ function HomeContent() {
         )}
       </main>
 
-      {modalCardId != null && (
-        <BookmarkCollectionModal
-          cardId={modalCardId}
-          onClose={() => setModalCardId(null)}
-          isLoggedIn={currentUser.type === "sns"}
-          onCollectionsUpdated={refreshCollections}
-        />
-      )}
-
       <CardModerationModals
         cardOptionsCardId={moderation.cardOptionsCardId}
         cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
         reportCardId={moderation.reportCardId}
+        addToCommunityCardId={moderation.addToCommunityCardId}
+        isLoggedIn={isLoggedIn}
         onCloseOptions={moderation.closeCardOptions}
+        onAddToCommunity={moderation.openAddToCommunity}
+        onCloseAddToCommunity={moderation.closeAddToCommunity}
+        onCollectionsUpdated={refreshCollections}
         onHideCard={(cardId) => {
           const card = allCards.find((c) => resolveStableVoteCardId(c) === cardId);
           if (card?.createdByUserId) addHiddenUser(card.createdByUserId);

@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, getDisplayUserForDemo, fetchUserProfileFromApi, DEMO_USER_IDS, DEMO_USERS, type DemoUserId } from "../../data/auth";
+import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, getDisplayUserForDemo, fetchUserProfileFromApi, resolveStoredDemoUserId, releaseActiveUserOnServer, claimActiveUserOnServer, DEMO_USER_IDS, DEMO_USERS, type DemoUserId } from "../../data/auth";
 
 const USER_MEMOS: Record<DemoUserId, string> = {
   user1: "35歳",
@@ -53,13 +53,8 @@ function ProfileLoginContent() {
         // 解除が間に合わないと、直後の再ログインが 409 になることがあるため await で直列化する。
         const lastId = getLastLoggedInUserId();
         if (lastId && DEMO_USER_IDS.includes(lastId as DemoUserId)) {
-          try {
-            await fetch("/api/active-user", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ logoutUserId: lastId }),
-            });
-          } finally {
+          const released = await releaseActiveUserOnServer(lastId as DemoUserId);
+          if (released) {
             clearLastLoggedInUserId();
           }
         }
@@ -104,42 +99,33 @@ function ProfileLoginContent() {
       setLoginError(null);
       setLoading(true);
       try {
-        // キャッシュクリア後は lastLoggedInUserId が残らないため、サーバーに「ログイン中」が残ることがある。
-        // この端末で「このユーザーでログインする」と選んだ場合は、先にサーバー側を解除してからログインする（取りこぼし解消）。
-        const needTakeOver =
-          activeUserIds.includes(userId) && getLastLoggedInUserId() === null;
-        if (needTakeOver) {
-          await fetch("/api/active-user", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ logoutUserId: userId }),
-          });
+        const lastId = getLastLoggedInUserId();
+        const previousId =
+          (lastId && DEMO_USER_IDS.includes(lastId as DemoUserId) ? (lastId as DemoUserId) : null) ??
+          (getAuth().isLoggedIn ? resolveStoredDemoUserId(getAuth()) : undefined);
+
+        if (previousId && previousId !== userId) {
+          await releaseActiveUserOnServer(previousId);
         }
-        const register = () =>
-          fetch("/api/active-user", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId }),
-          });
-        let res = await register();
-        let data = (await res.json()) as { error?: string; code?: string };
-        if (res.status === 409) {
-          // ログアウト直後など KV の反映が遅いと同一端末でも 409 になることがあるため、一度 del して再試行する
-          await fetch("/api/active-user", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ logoutUserId: userId }),
-          });
-          res = await register();
-          data = (await res.json()) as { error?: string; code?: string };
+        if (activeUserIds.includes(userId)) {
+          await releaseActiveUserOnServer(userId);
         }
-        if (res.status === 409) {
-          setLoginError(data.error ?? "このアカウントは別の端末でログイン中です。");
+
+        const claim = await claimActiveUserOnServer(userId);
+        if (!claim.ok) {
+          setLoginError(
+            claim.error ??
+              (claim.code === "ALREADY_LOGGED_IN"
+                ? "このアカウントは別の端末でログイン中です。"
+                : "ログインに失敗しました。しばらくしてからお試しください。")
+          );
           return;
         }
-        if (!res.ok) return;
+
         await loginAsDemoUser(userId);
         router.replace(returnTo);
+      } catch {
+        setLoginError("ログインに失敗しました。通信環境を確認してお試しください。");
       } finally {
         setLoading(false);
       }

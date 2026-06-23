@@ -24,7 +24,7 @@ export default function SettingsPage() {
 
   const handleLogout = async () => {
     await logout();
-    router.replace("/profile");
+    router.replace("/profile/login");
   };
 
   return (

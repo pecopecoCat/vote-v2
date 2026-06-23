@@ -10,7 +10,6 @@ import { VoteCardList } from "../../components/VoteCardList";
 import CollectionCard from "../../components/CollectionCard";
 import CardModerationModals from "../../components/CardModerationModals";
 import ReportViolationModal from "../../components/ReportViolationModal";
-import BookmarkCollectionModal from "../../components/BookmarkCollectionModal";
 import { getCollectionById } from "../../data/collections";
 import RecommendedTags from "../../components/RecommendedTags";
 import CommentSortSegment from "../../components/CommentSortSegment";
@@ -101,7 +100,6 @@ export default function CommentsPage() {
   const auth = useAuthState();
   const currentUser = useCurrentUser(auth);
   const moderation = useCardModerationFlow();
-  const [modalCardId, setModalCardId] = useState<string | null>(null);
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const [commentReportCardId, setCommentReportCardId] = useState<string | null>(null);
   const [commentSortOrder, setCommentSortOrder] = useState<CommentSortOrder>("newest");
@@ -332,7 +330,6 @@ export default function CommentsPage() {
               });
               void sharedAddVote(cid, option);
             },
-            onBookmarkClick: setModalCardId,
             onMoreClick: () =>
               moderation.openCardOptions(relatedId, related.createdByUserId === activityUserId),
           })}
@@ -392,7 +389,6 @@ export default function CommentsPage() {
             onVote={handleVote}
             cardId={id}
             bookmarked={headerBookmarked}
-            onBookmarkClick={setModalCardId}
             onMoreClick={() =>
               moderation.openCardOptions(id, (card?.createdByUserId ?? "") === activityUserId)
             }
@@ -545,7 +541,11 @@ export default function CommentsPage() {
         cardOptionsCardId={moderation.cardOptionsCardId}
         cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
         reportCardId={moderation.reportCardId}
+        addToCommunityCardId={moderation.addToCommunityCardId}
+        isLoggedIn={isLoggedIn}
         onCloseOptions={moderation.closeCardOptions}
+        onAddToCommunity={moderation.openAddToCommunity}
+        onCloseAddToCommunity={moderation.closeAddToCommunity}
         onHideCard={(cid) => {
           const target = cid === id ? card : allCards.find((c) => (c.id ?? c.question) === cid);
           if (target?.createdByUserId) addHiddenUser(target.createdByUserId);
@@ -583,13 +583,6 @@ export default function CommentsPage() {
         />
       )}
 
-      {modalCardId != null && (
-        <BookmarkCollectionModal
-          cardId={modalCardId}
-          onClose={() => setModalCardId(null)}
-          isLoggedIn={isLoggedIn}
-        />
-      )}
     </div>
   );
 }

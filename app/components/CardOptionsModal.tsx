@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 
 export interface CardOptionsModalProps {
   cardId: string | null;
   onClose: () => void;
-  /** 自分で作ったカードのとき true。このとき「非表示する」「報告する」は表示しない（シェアはカード上のアイコン） */
+  /** 自分で作ったカードのとき true。このとき「非表示する」「報告する」は表示しない */
   isOwnCard?: boolean;
+  /** 指定時は「コミュニティに追加」を表示 */
+  onAddToCommunity?: (cardId: string) => void;
   onHide?: (cardId: string) => void;
   onReport?: (cardId: string) => void;
 }
@@ -15,46 +17,72 @@ export default function CardOptionsModal({
   cardId,
   onClose,
   isOwnCard = false,
+  onAddToCommunity,
   onHide,
   onReport,
 }: CardOptionsModalProps) {
   const items = useMemo(() => {
-    if (cardId == null || isOwnCard) return [];
-    return [
-    {
-      label: "非表示する",
-      icon: (
-        <img
-          src="/icons/icon_notshow.svg"
-          alt=""
-          className="h-5 w-auto shrink-0 object-contain"
-          width={22}
-          height={18}
-        />
-      ),
-      onClick: () => {
-        onHide?.(cardId);
-        onClose();
-      },
-    },
-    {
-      label: "報告する",
-      icon: (
-        <img
-          src="/icons/icon_alert.svg"
-          alt=""
-          className="h-5 w-5 shrink-0 object-contain"
-          width={20}
-          height={18}
-        />
-      ),
-      onClick: () => {
-        onReport?.(cardId);
-        onClose();
-      },
-    },
-  ];
-  }, [isOwnCard, cardId, onHide, onReport, onClose]);
+    if (cardId == null) return [];
+    const list: Array<{
+      label: string;
+      icon: ReactNode;
+      onClick: () => void;
+    }> = [];
+
+    if (onAddToCommunity) {
+      list.push({
+        label: "コミュニティに追加",
+        icon: (
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
+            <img src="/icons/icon_plus.svg" alt="" className="h-2.5 w-2.5" width={10} height={10} />
+          </span>
+        ),
+        onClick: () => {
+          onAddToCommunity(cardId);
+          onClose();
+        },
+      });
+    }
+
+    if (!isOwnCard) {
+      list.push(
+        {
+          label: "非表示する",
+          icon: (
+            <img
+              src="/icons/icon_notshow.svg"
+              alt=""
+              className="h-5 w-auto shrink-0 object-contain"
+              width={22}
+              height={18}
+            />
+          ),
+          onClick: () => {
+            onHide?.(cardId);
+            onClose();
+          },
+        },
+        {
+          label: "報告する",
+          icon: (
+            <img
+              src="/icons/icon_alert.svg"
+              alt=""
+              className="h-5 w-5 shrink-0 object-contain"
+              width={20}
+              height={18}
+            />
+          ),
+          onClick: () => {
+            onReport?.(cardId);
+            onClose();
+          },
+        }
+      );
+    }
+
+    return list;
+  }, [isOwnCard, cardId, onAddToCommunity, onHide, onReport, onClose]);
 
   useEffect(() => {
     if (cardId != null && items.length === 0) {

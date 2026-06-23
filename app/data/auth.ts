@@ -182,6 +182,75 @@ export function clearLastLoggedInUserId(): void {
   }
 }
 
+function rememberLastLoggedInUserId(userId: DemoUserId): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LAST_LOGGED_IN_USER_KEY, userId);
+  } catch {
+    // ignore
+  }
+}
+
+/** サーバー側の「ログイン中」フラグを解除する */
+export async function releaseActiveUserOnServer(userId: DemoUserId): Promise<boolean> {
+  try {
+    const res = await fetch("/api/active-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ logoutUserId: userId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export type ClaimActiveUserResult =
+  | { ok: true }
+  | { ok: false; error?: string; code?: string };
+
+/**
+ * サーバー側の「ログイン中」を確保する。KV 反映遅延で 409 になることがあるためリトライする。
+ */
+export async function claimActiveUserOnServer(
+  userId: DemoUserId,
+  opts?: { maxAttempts?: number; delayMs?: number }
+): Promise<ClaimActiveUserResult> {
+  const maxAttempts = opts?.maxAttempts ?? 3;
+  const delayMs = opts?.delayMs ?? 180;
+  let lastError: string | undefined;
+  let lastCode: string | undefined;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      await releaseActiveUserOnServer(userId);
+      await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+    }
+    try {
+      const res = await fetch("/api/active-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      const data = (await res.json()) as { error?: string; code?: string };
+      if (res.ok) return { ok: true };
+      lastError = data.error;
+      lastCode = data.code;
+      if (res.status !== 409) {
+        return { ok: false, error: lastError, code: lastCode };
+      }
+    } catch {
+      return { ok: false, error: "通信に失敗しました。" };
+    }
+  }
+
+  return {
+    ok: false,
+    error: lastError ?? "このアカウントは別の端末でログイン中です。",
+    code: lastCode,
+  };
+}
+
 /** ログイン選択画面用：保存済みプロフィールがあれば反映した表示名・アイコンを返す */
 export function getDisplayUserForDemo(userId: DemoUserId): { name: string; iconUrl: string } {
   const defaultUser = DEMO_USERS[userId];
@@ -359,20 +428,13 @@ export async function logout(): Promise<void> {
   if (typeof window !== "undefined") {
     const demoId = resolveStoredDemoUserId(load());
     if (demoId) {
-      try {
-        await fetch("/api/active-user", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ logoutUserId: demoId }),
-        });
-      } catch {
-        // KV 未設定・オフライン時は無視
-      }
+      await releaseActiveUserOnServer(demoId);
+      // ログイン画面でサーバー解除を再試行できるよう、成功・失敗にかかわらず保持する
+      rememberLastLoggedInUserId(demoId);
     }
   }
   regenerateGuestId();
   save({ isLoggedIn: false });
-  clearLastLoggedInUserId();
 }
 
 /**
