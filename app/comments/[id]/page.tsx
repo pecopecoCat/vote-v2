@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import AppHeader from "../../components/AppHeader";
 import VoteCard from "../../components/VoteCard";
 import VoteCardMini from "../../components/VoteCardMini";
@@ -111,8 +111,6 @@ export default function CommentsPage() {
    * 下部「関連VOTE／新着VOTE」：投票直後は一覧に残し、別ページ遷移やタブ復帰後に activity に合わせて非表示にする（HOME と同様）。
    */
   const [relatedKeepVotedVisibleIds, setRelatedKeepVotedVisibleIds] = useState<Set<string>>(() => new Set());
-  /** 遷移直後はコメント帯が画面上部に来るようスクロール（固定ヘッダ分は scroll-mt で確保） */
-  const commentsSectionRef = useRef<HTMLDivElement>(null);
   const isLoggedIn = auth.isLoggedIn;
   const headerBookmarked = useMemo(
     () => isCardBookmarked(id),
@@ -173,17 +171,6 @@ export default function CommentsPage() {
     document.addEventListener("visibilitychange", handler);
     return () => document.removeEventListener("visibilitychange", handler);
   }, []);
-
-  useLayoutEffect(() => {
-    if (!card) return;
-    const el = commentsSectionRef.current;
-    if (!el) return;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        el.scrollIntoView({ behavior: "auto", block: "start" });
-      });
-    });
-  }, [id, card?.id]);
 
   const allCards = useMemo(() => {
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
@@ -400,10 +387,7 @@ export default function CommentsPage() {
         </div>
 
         {/* コメント：グレー帯の見出し + 白背景の一覧（デザイン参照） */}
-        <div
-          ref={commentsSectionRef}
-          className="-mx-[5.333vw] scroll-mt-16 overflow-hidden border-t border-[#DADADA]"
-        >
+        <div className="-mx-[5.333vw] overflow-hidden border-t border-[#DADADA]">
           <div className="flex items-center justify-between bg-[var(--color-bg)] px-[5.333vw] py-3">
             <h2 className="text-base font-bold text-[#191919]">コメント</h2>
             <CommentSortSegment value={commentSortOrder} onChange={setCommentSortOrder} />
@@ -463,7 +447,7 @@ export default function CommentsPage() {
               titleVariant="blackBlock"
               href={`/collection/${randomCollectionForComments.id}`}
               timelineBanner
-              label="コミュニティ"
+              label="コレクション"
             />
           </div>
         )}

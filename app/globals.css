@@ -196,10 +196,20 @@ select {
   mask: url("/icons/comment.svg") no-repeat center / contain;
 }
 
-/* タブ（急上昇・新着・コミュニティ）：Noto Sans JP・中央揃え（太さは選択状態で FeedTabs 側指定） */
+/* タブ（急上昇・新着）：Noto Sans JP・中央揃え（太さは選択状態で FeedTabs 側指定） */
 .feed-tab-label {
   font-family: var(--font-lato), var(--font-noto-sans-jp), sans-serif;
   text-align: center;
+  padding-left: calc(100vw * 30 / 375);
+  padding-right: calc(100vw * 30 / 375);
+  padding-top: calc(100vw * 20 / 375);
+  padding-bottom: 0;
+}
+
+@media (min-width: 768px) {
+  .feed-tab-label {
+    padding-top: calc(100vw * 20 / 375 / 3);
+  }
 }
 
 /* マイページ等（UnderlineTabBar layout=equal）：Safari でもラベルをセル中央に */
@@ -207,8 +217,10 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
   text-align: center;
+}
+.profile-tab-bar--equal button {
+  width: 100%;
 }
 
 /* 共通タブバー（UnderlineTabBar）：未選択 #787878 / 選択 #191919 */
@@ -362,6 +374,48 @@ select {
 }
 
 .home-feed-main {
+  width: 100%;
+  max-width: min(100%, 1680px);
+}
+
+/* コレクション一覧：モバイル1列・広い画面は HOME 同様のグリッド */
+.collections-list-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5.333vw;
+}
+
+@media (min-width: 640px) {
+  .collections-list-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(12px, 2vw, 20px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .collections-list-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .collections-list-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1536px) {
+  .collections-list-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.collections-list-grid__sentinel {
+  grid-column: 1 / -1;
+}
+
+.collections-list-main {
   width: 100%;
   max-width: min(100%, 1680px);
 }

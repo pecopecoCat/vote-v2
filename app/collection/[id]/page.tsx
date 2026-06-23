@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMemo, useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
 import VoteCard from "../../components/VoteCard";
-import { VoteCardList } from "../../components/VoteCardList";
+import { VoteCardList, VoteCardMasonryTile } from "../../components/VoteCardList";
 import CardModerationModals from "../../components/CardModerationModals";
 import ShowVotedFilterBar from "../../components/ShowVotedFilterBar";
 import MemberCollectionShareSheet from "../../components/MemberCollectionShareSheet";
@@ -94,7 +94,7 @@ function MemberCollectionLoginGate({ collectionId }: { collectionId: string }) {
   const returnTo = `/collection/${collectionId}`;
   return (
     <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
-      <AppHeader type="title" title="コレクション" backHref="/search" />
+      <AppHeader type="title" title="コレクション" backHref="/collections" />
       <main className="mx-auto max-w-lg px-6 py-12 text-center">
         <p className="text-base font-bold text-[#191919]">ログインが必要です。</p>
         <p className="mt-3 text-sm leading-relaxed text-[#787878]">
@@ -767,7 +767,7 @@ export default function CollectionPage() {
           aria-label="1つ前のページに戻る"
           onClick={() =>
             navigateBack(router, {
-              fallbackHref: isFromApi || isOtherUsersCollection(id) ? "/search" : "/profile",
+              fallbackHref: isFromApi || isOtherUsersCollection(id) ? "/collections" : "/profile",
             })
           }
         >
@@ -799,7 +799,7 @@ export default function CollectionPage() {
       </header>
 
       <main
-        className={`mx-auto max-w-lg px-[5.333vw] pb-6 ${
+        className={`home-feed-main mx-auto px-[5.333vw] pb-6 sm:px-6 ${
           collection.visibility === "member" ? "pt-[2.6px]" : "pt-4"
         }`}
       >
@@ -884,11 +884,11 @@ export default function CollectionPage() {
             </p>
           </div>
         ) : (
-          <VoteCardList className="mt-4">
+          <VoteCardList className="mt-4" masonry>
             {voteCardViewModels.map(({ card, cardId, voteActivity, initialSelectedOption, backgroundImageUrl }) => {
               return (
+                <VoteCardMasonryTile key={cardId}>
                 <VoteCard
-                  key={cardId}
                   {...buildVoteCardProps({
                     card,
                     cardId,
@@ -909,6 +909,7 @@ export default function CollectionPage() {
                     },
                   })}
                 />
+                </VoteCardMasonryTile>
               );
             })}
           </VoteCardList>

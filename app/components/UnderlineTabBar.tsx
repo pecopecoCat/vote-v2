@@ -31,14 +31,14 @@ export type UnderlineTabItem<T extends string> = {
   icon?: UnderlineTabIcon;
 };
 
-export type UnderlineTabBarLayout = "scroll" | "equal" | "center";
+export type UnderlineTabBarLayout = "scroll" | "equal" | "equalScroll" | "center";
 
 export type UnderlineTabBarProps<T extends string> = {
   items: UnderlineTabItem<T>[];
   activeId: T;
   onSelect: (id: T) => void;
   ariaLabel: string;
-  /** scroll: 検索（横スクロール可） / equal: マイページ（等分） / center: HOME フィード */
+  /** scroll: 検索（横スクロール可） / equal: 等分（狭いと省略） / equalScroll: 等幅＋横スクロール / center: HOME フィード */
   layout?: UnderlineTabBarLayout;
   className?: string;
   /** タブ行の背景（デフォルト: layout により white または #F1F1F1） */
@@ -135,7 +135,7 @@ export default function UnderlineTabBar<T extends string>({
   labelClassName = "text-sm",
   navStyle,
 }: UnderlineTabBarProps<T>) {
-  const indicator = indicatorClassName ?? (layout === "equal" ? PROFILE_INDICATOR : DEFAULT_INDICATOR);
+  const indicator = indicatorClassName ?? (layout === "equal" || layout === "equalScroll" ? PROFILE_INDICATOR : DEFAULT_INDICATOR);
   const bg = backgroundClassName ?? (layout === "center" ? "bg-[#F1F1F1]" : "bg-white");
 
   const renderButton = (item: UnderlineTabItem<T>) => {
@@ -145,9 +145,19 @@ export default function UnderlineTabBar<T extends string>({
     const baseBtn =
       layout === "equal"
         ? `relative flex min-w-0 flex-1 items-center justify-center gap-1.5 pt-[14.4px] pb-[11.4px] font-bold w-full text-center ${labelClassName}`
-        : layout === "center"
-          ? `relative inline-flex items-center justify-center gap-1.5 pb-[8px] leading-snug text-[15px] ${active ? "font-bold" : "font-normal"}`
-          : `relative inline-flex min-h-[3.25rem] flex-none items-center gap-1.5 whitespace-nowrap font-bold ${labelClassName}`;
+        : layout === "equalScroll"
+          ? `relative flex shrink-0 items-center justify-center gap-1.5 pt-[14.4px] pb-[11.4px] font-bold whitespace-nowrap text-center ${labelClassName}`
+          : layout === "center"
+            ? `relative inline-flex items-center justify-center gap-1.5 pb-[8px] leading-snug text-[15px] ${active ? "font-bold" : "font-normal"}`
+            : `relative inline-flex min-h-[3.25rem] flex-none items-center gap-1.5 whitespace-nowrap font-bold ${labelClassName}`;
+
+    const equalScrollStyle =
+      layout === "equalScroll"
+        ? {
+            width: `calc(100% / ${items.length})`,
+            minWidth: "5.5rem",
+          }
+        : undefined;
 
     return (
       <button
@@ -155,11 +165,17 @@ export default function UnderlineTabBar<T extends string>({
         type="button"
         onClick={() => onSelect(item.id)}
         className={`${baseBtn} transition-colors`}
-        style={colorStyle}
+        style={{ ...colorStyle, ...equalScrollStyle }}
         aria-current={active ? "page" : undefined}
       >
         {item.icon ? <TabIcon icon={item.icon} active={active} /> : null}
-        <span className={layout === "scroll" ? "whitespace-nowrap" : "min-w-0 truncate"}>
+        <span
+          className={
+            layout === "scroll" || layout === "equalScroll"
+              ? "whitespace-nowrap"
+              : "min-w-0 truncate"
+          }
+        >
           {item.label}
         </span>
         {active ? <span className={indicator} aria-hidden /> : null}
@@ -182,10 +198,27 @@ export default function UnderlineTabBar<T extends string>({
     );
   }
 
+  if (layout === "equalScroll") {
+    const tabCount = items.length;
+    return (
+      <div
+        className={`w-full overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${bg} ${className}`}
+      >
+        <nav
+          className={`profile-tab-bar flex min-w-full ${bg}`}
+          style={{ width: `max(100%, calc(${tabCount} * 5.5rem))` }}
+          aria-label={ariaLabel}
+        >
+          {items.map(renderButton)}
+        </nav>
+      </div>
+    );
+  }
+
   if (layout === "equal") {
     return (
       <div className={`w-full min-w-0 ${className}`}>
-        <nav className={`profile-tab-bar flex w-full ${bg}`} aria-label={ariaLabel}>
+        <nav className={`profile-tab-bar profile-tab-bar--equal flex w-full ${bg}`} aria-label={ariaLabel}>
           {items.map(renderButton)}
         </nav>
       </div>

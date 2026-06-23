@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import VoteCard from "../components/VoteCard";
 import TagSearchLink from "../components/TagSearchLink";
-import { VoteCardList } from "../components/VoteCardList";
+import { VoteCardList, VoteCardMasonryTile } from "../components/VoteCardList";
 import { getCreatedVotes, deleteCreatedVote, getCreatedVotesUpdatedEventName } from "../data/createdVotes";
 import { voteCardsData, resolveStableVoteCardId } from "../data/voteCards";
 import {
@@ -580,7 +580,7 @@ function ProfileContent() {
       { id: "myVOTE", label: "myVOTE" },
       { id: "vote", label: "投票" },
       { id: "bookmark", label: "Bookmark" },
-      { id: "myCommunity", label: "マイコミュニティ" },
+      { id: "myCommunity", label: "コレクション" },
       { id: "comment", label: "コメント" },
     ],
     []
@@ -674,7 +674,7 @@ function ProfileContent() {
                 <span className="text-[16px]">{voteCount}</span>
                 <span className="text-[12px]"> VOTE</span>
                 <span className="text-[16px]"> · {collectionCount}</span>
-                <span className="text-[12px]"> コミュニティ</span>
+                <span className="text-[12px]"> コレクション</span>
               </p>
             </div>
           </div>
@@ -762,10 +762,10 @@ function ProfileContent() {
         activeId={activeTab}
         onSelect={selectProfileTab}
         ariaLabel="マイページタブ"
-        layout="equal"
+        layout="equalScroll"
       />
 
-      <main className="mx-auto max-w-lg bg-[#F1F1F1] px-[5.333vw] pb-6 pt-[20px]">
+      <main className="home-feed-main mx-auto bg-[#F1F1F1] px-[5.333vw] pb-6 pt-[20px] sm:px-6">
         {activeTab === "myVOTE" && (
           <>
             <div className="relative mb-5 flex items-center justify-between">
@@ -787,12 +787,13 @@ function ProfileContent() {
                 <p className="text-sm text-gray-500">作ったVOTEがまだありません。</p>
               </div>
             ) : (
-              <VoteCardList>
+              <VoteCardList masonry>
                 {createdVotes.map((card) => {
                   const cardId = resolveStableVoteCardId(card);
                   const act = activity[cardId];
                   return (
-                    <div key={cardId} className="relative">
+                    <VoteCardMasonryTile key={cardId}>
+                    <div className="relative">
                       {isMyVoteEditMode && (
                         <button
                           type="button"
@@ -821,6 +822,7 @@ function ProfileContent() {
                         })}
                       />
                     </div>
+                    </VoteCardMasonryTile>
                   );
                 })}
               </VoteCardList>
@@ -842,13 +844,13 @@ function ProfileContent() {
                 <p className="text-sm text-gray-500">投票したVOTEがここに表示されます。</p>
               </div>
             ) : (
-              <VoteCardList className="mt-4">
+              <VoteCardList className="mt-4" masonry>
                 {votedCards.map((card) => {
                   const cardId = resolveStableVoteCardId(card);
                   const act = activity[cardId];
                   return (
+                    <VoteCardMasonryTile key={cardId}>
                     <VoteCard
-                      key={cardId}
                       {...buildVoteCardProps({
                         card,
                         cardId,
@@ -860,6 +862,7 @@ function ProfileContent() {
                         hasCommented: commentedCardIdSet.has(cardId),
                       })}
                     />
+                    </VoteCardMasonryTile>
                   );
                 })}
               </VoteCardList>
@@ -874,12 +877,12 @@ function ProfileContent() {
                 <p className="text-sm text-gray-500">ブックマークした投稿がここに表示されます。</p>
               </div>
             ) : (
-              <VoteCardList>
+              <VoteCardList masonry>
                 {bookmarkListViewModels.map(({ card, cardId, bgUrl }) => {
                   const act = activity[cardId];
                   return (
+                    <VoteCardMasonryTile key={cardId}>
                     <VoteCard
-                      key={cardId}
                       {...buildVoteCardProps({
                         card,
                         cardId,
@@ -893,6 +896,7 @@ function ProfileContent() {
                         onMoreClick: handleProfileCardMoreClick,
                       })}
                     />
+                    </VoteCardMasonryTile>
                   );
                 })}
               </VoteCardList>
@@ -929,7 +933,7 @@ function ProfileContent() {
                     <button
                       type="button"
                       className="flex h-9 w-9 shrink-0 items-center justify-center text-[#666666]"
-                      aria-label="コミュニティの設定"
+                        aria-label="コレクションの設定"
                       onClick={() => setCollectionMenuOpenId(col.id)}
                     >
                       <img src="/icons/icon_3ten.svg" alt="" className="h-6 w-6" width={24} height={24} />
@@ -944,7 +948,7 @@ function ProfileContent() {
                     setShowCollectionSettings(true);
                   }}
                 >
-                  新しいコミュニティを追加
+                  新しいコレクションを追加
                 </Button>
               </div>
             ) : (
@@ -961,12 +965,12 @@ function ProfileContent() {
                     </svg>
                   </button>
                   <span className="text-sm font-bold text-gray-900">
-                    {collections.find((c) => c.id === selectedCommunityId)?.name ?? "マイコミュニティ"}
+                    {collections.find((c) => c.id === selectedCommunityId)?.name ?? "コレクション"}
                   </span>
                 </div>
                 {communityListViewModels.length === 0 ? (
                   <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
-                    <p className="text-sm text-gray-500">このコミュニティにはまだ投稿がありません。</p>
+                    <p className="text-sm text-gray-500">このコレクションにはまだ投稿がありません。</p>
                   </div>
                 ) : (
                   <VoteCardList>
@@ -1132,7 +1136,7 @@ function ProfileContent() {
           showShare={menuCol?.visibility === "member"}
           onShare={() => void handleCollectionMenuShare(collectionMenuOpenId)}
           hideEdit={Boolean(menuCol?.joinedParticipation)}
-          deleteLabel={menuCol?.joinedParticipation ? "マイリストから削除" : "コミュニティを削除"}
+          deleteLabel={menuCol?.joinedParticipation ? "マイリストから削除" : "コレクションを削除"}
           onClose={() => setCollectionMenuOpenId(null)}
           onEdit={() => {
             const col = collections.find((c) => c.id === collectionMenuOpenId);

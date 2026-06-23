@@ -81,7 +81,7 @@ export default function AddToCommunityModal({
       toggleCardInCollection(collectionId, cardId);
       setCollections(getCollections());
       onCollectionsUpdated?.();
-      showAppToast(wasIn ? "コミュニティから外しました" : "コミュニティに追加しました");
+      showAppToast(wasIn ? "コレクションから外しました" : "コレクションに追加しました");
     },
     [cardId, collections, onCollectionsUpdated]
   );
@@ -99,7 +99,7 @@ export default function AddToCommunityModal({
     setCollections(getCollections());
     onCollectionsUpdated?.();
     setShowSettingsModal(false);
-    showAppToast("コミュニティに追加しました");
+    showAppToast("コレクションに追加しました");
   };
 
   if (cardId == null) return null;
@@ -114,7 +114,7 @@ export default function AddToCommunityModal({
           aria-labelledby="add-to-community-title"
         >
           <p id="add-to-community-title" className="text-center text-sm font-bold text-[#191919]">
-            コミュニティに追加するには
+            コレクションに追加するには
             <br />
             ログインしてください。
           </p>
@@ -145,7 +145,7 @@ export default function AddToCommunityModal({
         <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-[#DADADA] px-5 py-3">
           <div />
           <h2 id="add-to-community-title" className="text-lg font-bold text-[#191919]">
-            コミュニティに追加
+            コレクションに追加
           </h2>
           <div className="flex justify-end">
             <button
@@ -162,7 +162,7 @@ export default function AddToCommunityModal({
         <div className="min-h-0 flex-1 overflow-y-auto">
           {manageableCollections.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-gray-500">
-              マイコミュニティがありません。下のボタンから作成できます。
+              コレクションがありません。下のボタンから作成できます。
             </p>
           ) : (
             <ul className="divide-y divide-[#DADADA]">
@@ -184,7 +184,7 @@ export default function AddToCommunityModal({
 
         <div className="shrink-0 border-t border-[#DADADA] px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] pt-4">
           <Button variant="outline" className="w-full" onClick={() => setShowSettingsModal(true)}>
-            新しいコミュニティを追加
+            新しいコレクションを追加
           </Button>
         </div>
       </div>

@@ -11,8 +11,8 @@ import {
 
 const DEFAULT_AVATAR = "/default-avatar.png";
 
-/** スマホメイン用・下部固定ナビ。左から n_home, n_search, n_vote, n_news, n_mypage */
-export type NavItemId = "home" | "search" | "add" | "notifications" | "profile";
+/** スマホメイン用・下部固定ナビ。左から n_home, コレクション, n_vote, n_news, n_mypage */
+export type NavItemId = "home" | "collection" | "add" | "notifications" | "profile";
 
 export interface BottomNavProps {
   activeId?: NavItemId;
@@ -20,10 +20,16 @@ export interface BottomNavProps {
 
 const navItems: { id: NavItemId; label: string; href?: string; src: string; srcOn: string }[] = [
   { id: "home", label: "ホーム", href: "/", src: "/icons/n_home.svg", srcOn: "/icons/n_home_on.svg" },
-  { id: "search", label: "検索", href: "/search", src: "/icons/n_search.svg", srcOn: "/icons/n_search_on.svg" },
+  {
+    id: "collection",
+    label: "コレクション",
+    href: "/collections",
+    src: "/icons/icon_collection.svg",
+    srcOn: "/icons/n_collection_on.svg",
+  },
   { id: "add", label: "作成", href: "/create/form", src: "/icons/n_vote.svg", srcOn: "/icons/n_vote_on.svg" },
-  { id: "notifications", label: "通知", href: "/notifications", src: "/icons/n_news.svg", srcOn: "/icons/n_news_on.svg" },
-  { id: "profile", label: "プロフィール", href: "/profile", src: "/icons/n_mypage.svg", srcOn: "/icons/n_mypage_on.svg" },
+  { id: "notifications", label: "お知らせ", href: "/notifications", src: "/icons/n_news.svg", srcOn: "/icons/n_news_on.svg" },
+  { id: "profile", label: "マイページ", href: "/profile", src: "/icons/n_mypage.svg", srcOn: "/icons/n_mypage_on.svg" },
 ];
 
 export default function BottomNav({ activeId = "home" }: BottomNavProps) {
@@ -55,13 +61,13 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 flex h-14 w-full items-center justify-around border-t border-gray-200 bg-white safe-area-pb"
+      className="fixed bottom-0 left-0 right-0 z-30 flex w-full items-stretch justify-around border-t border-gray-200 bg-white px-1 pt-1.5 safe-area-pb"
       aria-label="メインナビゲーション"
     >
       {navItems.map(({ id, label, href, src, srcOn }) => {
         const isActive = activeId === id;
         const className =
-          "flex flex-col items-center justify-center gap-0.5 py-2 transition-colors active:opacity-80 min-w-[56px]";
+          "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1 transition-colors active:opacity-80";
         const showUserIcon = id === "profile" && userIconUrl;
         /** プロフィールは円形クリップで実寸より小さく見えるため、他タブより一回り大きくして視覚的に揃える */
         const profilePx = 26;
@@ -124,6 +130,9 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
             />
           );
         })();
+        const labelEl = (
+          <span className="max-w-full truncate text-[10px] leading-none text-[#191919]">{label}</span>
+        );
         if (href) {
           const wrapIcon =
             id === "notifications" && announcementUnread ? (
@@ -149,12 +158,14 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
               aria-current={isActive ? "page" : undefined}
             >
               {wrapIcon}
+              {labelEl}
             </Link>
           );
         }
         return (
           <button key={id} type="button" className={className} aria-label={label}>
             {icon}
+            {labelEl}
           </button>
         );
       })}

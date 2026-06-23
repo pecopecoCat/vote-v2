@@ -11,6 +11,7 @@ import {
   memo,
 } from "react";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import AppHeader from "./components/AppHeader";
 import VoteCard, { type CurrentUser } from "./components/VoteCard";
 import { VoteCardList } from "./components/VoteCardList";
@@ -34,7 +35,6 @@ import {
 import { useSharedData } from "./context/SharedDataContext";
 import { useEnsureCollectionsHydrated } from "./hooks/useEnsureCollectionsHydrated";
 import { useSearchCollectionsWarm } from "./hooks/useSearchCollectionsWarm";
-import { sortCollectionsByPinned } from "./lib/sortCollectionsByPinned";
 import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "./lib/appToast";
 import { buildVoteCardProps } from "./lib/buildVoteCardProps";
 import { resolveCardBackgroundUrl } from "./lib/resolveCardBackgroundUrl";
@@ -42,7 +42,7 @@ import { useAuthState } from "./hooks/useAuthState";
 import { useCurrentUser } from "./hooks/useCurrentUser";
 import { useCardModerationFlow } from "./hooks/useCardModerationFlow";
 import CardModerationModals from "./components/CardModerationModals";
-import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, getPinnedCollectionIds, isCollectionPinnable, PINNED_UPDATED_EVENT, resetUser1AndUser2Collections } from "./data/collections";
+import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, resetUser1AndUser2Collections } from "./data/collections";
 import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
 import { getCurrentActivityUserId } from "./data/auth";
 import {
@@ -234,19 +234,6 @@ const RESET_COLLECTIONS_FLAG = "vote_collections_reset_v3";
 const TIMELINE_INITIAL_VISIBLE = 12;
 const TIMELINE_LOAD_MORE = 10;
 
-/** コミュニティ一覧用グラデーションのローテーション */
-const COMMUNITY_GRADIENTS: CollectionGradient[] = [
-  "blue-cyan",
-  "pink-purple",
-  "purple-pink",
-  "orange-yellow",
-  "green-yellow",
-  "cyan-aqua",
-];
-
-const COMMUNITY_INITIAL_VISIBLE = 8;
-const COMMUNITY_LOAD_MORE = 8;
-
 /** HOME の Suspense / KV ブートストラップ待ちで共通（文言は1種類のみ） */
 function HomeLoadingMessage() {
   return (
@@ -353,7 +340,7 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
                 titleVariant="blackBlock"
                 href={`/collection/${id}`}
                 timelineBanner
-                label="コミュニティ"
+                label="コレクション"
               />
             </div>
           );
@@ -396,7 +383,7 @@ function HomeContent() {
   const router = useRouter();
   const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<FeedTabId>(() =>
-    tabFromUrl === "new" ? "new" : tabFromUrl === "community" ? "community" : "trending"
+    tabFromUrl === "new" ? "new" : "trending"
   );
 
   /** VOTE作成完了後、HOME の新着タブ表示時に一度だけトースト */
@@ -412,9 +399,6 @@ function HomeContent() {
     showAppToast("VOTEを作成しました");
   }, [activeTab]);
   const [collections, setCollections] = useState(() => getCollections());
-  const [pinnedCollectionIds, setPinnedCollectionIds] = useState(() => getPinnedCollectionIds());
-  const [communityVisibleCount, setCommunityVisibleCount] = useState(COMMUNITY_INITIAL_VISIBLE);
-  const communityLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const shared = useSharedData();
   const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
   useEnsureCollectionsHydrated();
@@ -428,15 +412,9 @@ function HomeContent() {
 
   const refreshCollections = useCallback(() => {
     setCollections(getCollections());
-    setPinnedCollectionIds(getPinnedCollectionIds());
   }, []);
 
-  const collectionsWarmTab = activeTab === "community" ? "community" : "trending";
-  const { remotePopularCollections, collectionsIndexLoading } = useSearchCollectionsWarm(
-    isLoggedIn,
-    collectionsWarmTab,
-    refreshCollections
-  );
+  useSearchCollectionsWarm(isLoggedIn, "trending", refreshCollections);
 
   useEffect(() => {
     const handler = () => setHiddenUserIds(getHiddenUserIds());
@@ -464,12 +442,14 @@ function HomeContent() {
       setActiveTab("new");
       return;
     }
-    if (tabFromUrl === "community") {
-      setActiveTab("community");
-      return;
-    }
     setActiveTab("trending");
   }, [tabFromUrl]);
+
+  /** 廃止した HOME コレクションタブはマイページのコレクションへ */
+  useEffect(() => {
+    if (tabFromUrl !== "community") return;
+    void router.replace("/collections", { scroll: false });
+  }, [tabFromUrl, router]);
 
   /** 廃止した ?tab=myTimeline を急上昇中へ戻す */
   useEffect(() => {
@@ -500,18 +480,10 @@ function HomeContent() {
     const eventName = getCollectionsUpdatedEventName();
     const handler = () => refreshCollections();
     window.addEventListener(eventName, handler);
-    window.addEventListener(PINNED_UPDATED_EVENT, handler);
     return () => {
       window.removeEventListener(eventName, handler);
-      window.removeEventListener(PINNED_UPDATED_EVENT, handler);
     };
   }, [refreshCollections]);
-
-  useEffect(() => {
-    if (activeTab !== "community") {
-      setCommunityVisibleCount(COMMUNITY_INITIAL_VISIBLE);
-    }
-  }, [activeTab]);
 
   const allCards = useMemo(() => {
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
@@ -694,8 +666,6 @@ function HomeContent() {
       }
       case "new":
         return sortByNewest(cardsForFeed);
-      case "community":
-        return [];
       default:
         return publicCards;
     }
@@ -709,54 +679,6 @@ function HomeContent() {
 
   /** 実際にあるコレクションからランダム表示用プール */
   const timelineCollectionPool = useMemo(() => getTimelineCollectionPool(collections), [collections]);
-
-  /** コミュニティタブ：公開コレクション（ピン留めを上に表示） */
-  const communitiesForSection = useMemo(() => {
-    const remotePublic = remotePopularCollections
-      .filter((c) => c.visibility === "public")
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        color: c.color,
-        gradient: c.gradient as CollectionGradient | undefined,
-        visibility: "public" as const,
-        cardIds: c.cardIds,
-      }));
-    const other = getOtherUsersCollections();
-    const mine = collections.filter((c) => c.visibility !== "member");
-    const seen = new Set<string>();
-    const combined = [...remotePublic, ...other, ...mine].filter((c) => {
-      if (!c?.id) return false;
-      if (seen.has(c.id)) return false;
-      seen.add(c.id);
-      return true;
-    });
-    return sortCollectionsByPinned(combined, pinnedCollectionIds);
-  }, [collections, pinnedCollectionIds, remotePopularCollections]);
-
-  const displayedCommunities = useMemo(
-    () => communitiesForSection.slice(0, communityVisibleCount),
-    [communitiesForSection, communityVisibleCount]
-  );
-
-  useEffect(() => {
-    if (activeTab !== "community") return;
-    const root = communityLoadSentinelRef.current;
-    if (!root) return;
-    if (communitiesForSection.length <= communityVisibleCount) return;
-    const obs = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setCommunityVisibleCount((prev) =>
-            Math.min(prev + COMMUNITY_LOAD_MORE, communitiesForSection.length)
-          );
-        }
-      },
-      { root: null, rootMargin: "280px 0px", threshold: 0 }
-    );
-    obs.observe(root);
-    return () => obs.disconnect();
-  }, [activeTab, communitiesForSection.length, communityVisibleCount]);
 
   /** 急上昇・新着: VOTE＋差し込み */
   const timelineItems = useMemo(
@@ -775,55 +697,12 @@ function HomeContent() {
     <div className="min-h-screen bg-[#F1F1F1]">
       <AppHeader type="logo" />
 
-      {/* タブ：急上昇中 / 新着 / コミュニティ */}
+      {/* タブ：急上昇中 / 新着 */}
       <FeedTabs activeId={activeTab} onSelect={selectFeedTab} />
 
       {/* メインコンテンツ（下ナビ分の余白を確保） */}
-      <main
-        className={
-          activeTab === "community"
-            ? "mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4"
-            : "home-feed-main mx-auto px-[5.333vw] pb-[50px] pt-4 sm:px-6"
-        }
-      >
-        {activeTab === "community" ? (
-          <section className="flex flex-col gap-3">
-            {collectionsIndexLoading && remotePopularCollections.length === 0 ? (
-              <p className="py-6 text-center text-sm text-gray-500" role="status" aria-live="polite">
-                コミュニティを読み込み中…
-              </p>
-            ) : communitiesForSection.length === 0 ? (
-              <p className="py-6 text-center text-sm text-gray-500">
-                {isLoggedIn
-                  ? "コミュニティがありません。マイページで作成しよう。"
-                  : "コミュニティはありません。"}
-              </p>
-            ) : (
-              <>
-                {displayedCommunities.map((col, i) => (
-                  <div
-                    key={col.id}
-                    className="[content-visibility:auto] [contain-intrinsic-size:auto_88px]"
-                  >
-                    <CollectionCard
-                      id={col.id}
-                      title={col.name}
-                      gradient={col.gradient ?? COMMUNITY_GRADIENTS[i % COMMUNITY_GRADIENTS.length]}
-                      showPin={
-                        isCollectionPinnable(col.visibility) && pinnedCollectionIds.includes(col.id)
-                      }
-                      popularBanner
-                      href={`/collection/${col.id}`}
-                    />
-                  </div>
-                ))}
-                {communitiesForSection.length > displayedCommunities.length ? (
-                  <div ref={communityLoadSentinelRef} className="h-8 w-full shrink-0" aria-hidden />
-                ) : null}
-              </>
-            )}
-          </section>
-        ) : allCardsFiltered.length > 0 ? (
+      <main className="home-feed-main mx-auto px-[5.333vw] pb-[50px] pt-4 sm:px-6">
+        {allCardsFiltered.length > 0 ? (
           <>
             {!activityBootstrapDone && (
               <p
@@ -862,6 +741,15 @@ function HomeContent() {
           <HomeLoadingMessage />
         )}
       </main>
+
+      <Link
+        href="/search"
+        prefetch
+        className="fixed bottom-[calc(3.5rem+12px+env(safe-area-inset-bottom,0px))] right-[5.333vw] z-20 flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#191919] shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-opacity active:opacity-80"
+        aria-label="検索"
+      >
+        <img src="/icons/n_search.svg" alt="" className="h-[22px] w-[18px]" width={18} height={22} aria-hidden />
+      </Link>
 
       <CardModerationModals
         cardOptionsCardId={moderation.cardOptionsCardId}

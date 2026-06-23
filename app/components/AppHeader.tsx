@@ -15,6 +15,8 @@ export interface AppHeaderSearchProps {
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
   backHref?: string;
+  /** 指定時は戻るボタンでこちらを優先（検索オーバーレイの閉じる等） */
+  onBack?: () => void;
 }
 
 export interface AppHeaderHashtagProps {
@@ -23,6 +25,7 @@ export interface AppHeaderHashtagProps {
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
   backHref?: string;
+  onBack?: () => void;
   /** ハートタップでお気に入りに追加（タグ文字列を渡す） */
   onFavoriteClick?: (tag: string) => void;
   /** 現在のタグがお気に入りか（ハートを塗りつぶし表示） */
@@ -58,7 +61,7 @@ const HEADER_BASE = `sticky top-0 z-50 flex items-center bg-[#FFE100] px-[5.333v
 export default function AppHeader(props: AppHeaderProps) {
   const router = useRouter();
 
-  const renderBackButton = (fallbackHref?: string) => {
+  const renderBackButton = (fallbackHref?: string, onBack?: () => void) => {
     const className = "flex h-10 w-10 shrink-0 items-center justify-center text-[#191919]";
     const img = (
       <img
@@ -74,7 +77,13 @@ export default function AppHeader(props: AppHeaderProps) {
         type="button"
         className={className}
         aria-label="1つ前のページに戻る"
-        onClick={() => navigateBack(router, { fallbackHref: fallbackHref?.trim() || "/" })}
+        onClick={() => {
+          if (onBack) {
+            onBack();
+            return;
+          }
+          navigateBack(router, { fallbackHref: fallbackHref?.trim() || "/" });
+        }}
       >
         {img}
       </button>
@@ -124,7 +133,7 @@ export default function AppHeader(props: AppHeaderProps) {
       className={`sticky top-0 z-50 flex ${HEADER_HEIGHT} items-center gap-2 bg-[#FFE100] py-3 pl-2.5 pr-[5.333vw] shadow-sm`}
       aria-label={isSearch ? "検索" : "ハッシュタグ"}
     >
-      {renderBackButton(backFallback)}
+      {renderBackButton(backFallback, props.onBack)}
       <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-white px-3 py-2">
         {isSearch ? (
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200">

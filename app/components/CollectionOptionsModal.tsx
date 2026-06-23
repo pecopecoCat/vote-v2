@@ -18,7 +18,7 @@ export default function CollectionOptionsModal({
   showShare = false,
   onShare,
   hideEdit = false,
-  deleteLabel = "コミュニティを削除",
+  deleteLabel = "コレクションを削除",
   onClose,
   onEdit,
   onDelete,

@@ -31,7 +31,7 @@ export default function CardOptionsModal({
 
     if (onAddToCommunity) {
       list.push({
-        label: "コミュニティに追加",
+        label: "コレクションに追加",
         icon: (
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
             <img src="/icons/icon_plus.svg" alt="" className="h-2.5 w-2.5" width={10} height={10} />

@@ -48,7 +48,7 @@ export default function CollectionSettingsModal({
 
   const handleSave = async () => {
     if (saving) return;
-    const trimmed = name.trim() || (editingCollection ? editingCollection.name : "新しいコミュニティ");
+    const trimmed = name.trim() || (editingCollection ? editingCollection.name : "新しいコレクション");
     setSaving(true);
     try {
       await onSave(trimmed, gradient, visibility);
@@ -70,7 +70,7 @@ export default function CollectionSettingsModal({
       >
         <div className="flex items-center justify-between border-b border-gray-100 pb-3">
           <h2 id="collection-settings-title" className="text-lg font-bold text-gray-900">
-            コミュニティの設定
+            コレクションの設定
           </h2>
           <button
             type="button"
@@ -90,12 +90,12 @@ export default function CollectionSettingsModal({
 
         <div className="space-y-4 pt-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-900">コミュニティ名</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-900">コレクション名</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="コミュニティ名を入力"
+              placeholder="コレクション名を入力"
               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400"
             />
           </div>
