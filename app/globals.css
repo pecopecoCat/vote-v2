@@ -316,69 +316,8 @@ select {
   gap: 5.333vw;
 }
 
-/* HOME 急上昇・新着：広い画面で Pinterest 風タイル（他画面の vote-card-list は従来どおり） */
-.home-feed-masonry.vote-card-list {
-  display: block;
-  gap: 0;
-  column-count: 1;
-  column-gap: clamp(12px, 3vw, 20px);
-}
-
-@media (min-width: 640px) {
-  .home-feed-masonry.vote-card-list {
-    column-count: 2;
-  }
-}
-
-@media (min-width: 1024px) {
-  .home-feed-masonry.vote-card-list {
-    column-count: 3;
-  }
-}
-
-@media (min-width: 1280px) {
-  .home-feed-masonry.vote-card-list {
-    column-count: 4;
-  }
-}
-
-@media (min-width: 1536px) {
-  .home-feed-masonry.vote-card-list {
-    column-count: 5;
-  }
-}
-
-.home-feed-masonry__tile {
-  break-inside: avoid;
-  -webkit-column-break-inside: avoid;
-  page-break-inside: avoid;
-  display: inline-block;
-  width: 100%;
-  margin-bottom: 5.333vw;
-  container-type: inline-size;
-  container-name: home-vote-card;
-}
-
-.home-feed-masonry__tile .vote-card-outer {
-  --vote-u: min(100cqw, 375px);
-}
-
-@media (min-width: 640px) {
-  .home-feed-masonry__tile {
-    margin-bottom: clamp(12px, 2vw, 20px);
-  }
-}
-
-.home-feed-masonry__tile--full {
-  column-span: all;
-}
-
-.home-feed-main {
-  width: 100%;
-  max-width: min(100%, 1680px);
-}
-
-/* コレクション一覧：モバイル1列・広い画面は HOME 同様のグリッド */
+/* VOTEカード一覧：広い画面で横いっぱいに並べてから次の行へ（行優先グリッド） */
+.home-feed-masonry.vote-card-list,
 .collections-list-grid {
   display: grid;
   width: 100%;
@@ -387,6 +326,7 @@ select {
 }
 
 @media (min-width: 640px) {
+  .home-feed-masonry.vote-card-list,
   .collections-list-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: clamp(12px, 2vw, 20px);
@@ -394,27 +334,42 @@ select {
 }
 
 @media (min-width: 1024px) {
+  .home-feed-masonry.vote-card-list,
   .collections-list-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1280px) {
+  .home-feed-masonry.vote-card-list,
   .collections-list-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1536px) {
+  .home-feed-masonry.vote-card-list,
   .collections-list-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
+.home-feed-masonry__tile {
+  min-width: 0;
+  container-type: inline-size;
+  container-name: home-vote-card;
+}
+
+.home-feed-masonry__tile .vote-card-outer {
+  --vote-u: min(100cqw, 375px);
+}
+
+.home-feed-masonry__tile--full,
 .collections-list-grid__sentinel {
   grid-column: 1 / -1;
 }
 
+.home-feed-main,
 .collections-list-main {
   width: 100%;
   max-width: min(100%, 1680px);

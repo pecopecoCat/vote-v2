@@ -49,6 +49,8 @@ export type UnderlineTabBarProps<T extends string> = {
   labelClassName?: string;
   /** center レイアウト時の nav 余白（HOME 用） */
   navStyle?: CSSProperties;
+  /** false のとき色変化の transition を付けない（検索タブ等） */
+  transition?: boolean;
 };
 
 function TabIcon({ icon, active }: { icon: UnderlineTabIcon; active: boolean }) {
@@ -134,6 +136,7 @@ export default function UnderlineTabBar<T extends string>({
   indicatorClassName,
   labelClassName = "text-sm",
   navStyle,
+  transition = true,
 }: UnderlineTabBarProps<T>) {
   const indicator = indicatorClassName ?? (layout === "equal" || layout === "equalScroll" ? PROFILE_INDICATOR : DEFAULT_INDICATOR);
   const bg = backgroundClassName ?? (layout === "center" ? "bg-[#F1F1F1]" : "bg-white");
@@ -164,7 +167,7 @@ export default function UnderlineTabBar<T extends string>({
         key={item.id}
         type="button"
         onClick={() => onSelect(item.id)}
-        className={`${baseBtn} transition-colors`}
+        className={`${baseBtn}${transition ? " transition-colors" : ""}`}
         style={{ ...colorStyle, ...equalScrollStyle }}
         aria-current={active ? "page" : undefined}
       >

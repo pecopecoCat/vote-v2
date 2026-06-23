@@ -713,7 +713,7 @@ function HomeContent() {
                 最新を取得中…
               </p>
             )}
-            <VoteCardList className="home-feed-masonry">
+            <VoteCardList masonry>
               {(activeTab === "trending" || activeTab === "new") && cardsForTab.length === 0 ? (
                 <div className="home-feed-masonry__tile home-feed-masonry__tile--full">
                   <div className="vote-card-outer px-6 py-12 text-center">

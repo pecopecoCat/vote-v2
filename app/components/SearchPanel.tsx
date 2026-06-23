@@ -101,6 +101,7 @@ export type SearchPanelProps = {
 };
 
 function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) {
+  const isOverlay = presentation === "overlay";
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -171,9 +172,15 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
         params.set("tab", id);
       }
       const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      const nextUrl = qs ? `${pathname}?${qs}` : pathname;
+      /** オーバーレイ時は router.replace しない（パネル再マウント＝スライドアニメーション防止） */
+      if (isOverlay) {
+        window.history.replaceState(window.history.state, "", nextUrl);
+        return;
+      }
+      router.replace(nextUrl, { scroll: false });
     },
-    [isTagFilterView, pathname, router, searchParamsKey]
+    [isTagFilterView, pathname, router, searchParamsKey, isOverlay]
   );
 
   /** URL の tag / q と入力欄を同期（?tag= の画面で別キーワードに変えたら /search?q= に遷移してキーワード検索へ） */
@@ -319,7 +326,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
     }
     setTrendingTagsVisibleCount(5);
     setVoteSearchVisibleCount(8);
-  }, [tagFromUrl, qFromUrl, activeTab, committedVoteQuery]);
+  }, [tagFromUrl, qFromUrl, committedVoteQuery]);
 
   /**
    * 「投票済みを表示」OFF のとき、投票直後はカードをタイムラインに残す（結果表示のまま）。
@@ -607,8 +614,6 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
     return () => obs.disconnect();
   }, [committedVoteQuery, matchedVoteCardsFull.length, voteSearchVisibleCount]);
 
-  const isOverlay = presentation === "overlay";
-
   return (
     <div
       className={
@@ -714,7 +719,8 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
                 activeId={activeTab}
                 onSelect={selectSearchTab}
                 ariaLabel="検索タブ"
-                layout="scroll"
+                layout="equal"
+                transition={false}
               />
               <div className="h-px bg-[#E5E7EB]" aria-hidden />
             </>
@@ -729,69 +735,71 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
           >
         {!isSearching ? (
           <>
-            {activeTab === "trending" && (
-              <section className="border-b border-gray-200 pt-2.5">
-                <div className="px-[5.333vw]">
-                  {displayedTrendingTags.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
-                  ) : (
-                    <>
-                      {displayedTrendingTags.slice(0, trendingTagsVisibleCount).map((t) => (
-                        <TagListRow
-                          key={t.tag}
-                          tag={t.tag}
-                          count={t.count}
-                          variant="trending"
-                          onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
-                        />
-                      ))}
-                      {displayedTrendingTags.length > trendingTagsVisibleCount ? (
-                        <div ref={trendingLoadSentinelRef} className="h-8 w-full shrink-0" aria-hidden />
-                      ) : null}
-                    </>
-                  )}
-                </div>
-              </section>
-            )}
+            <section
+              className={`border-b border-gray-200 pt-2.5${activeTab === "trending" ? "" : " hidden"}`}
+              aria-hidden={activeTab !== "trending"}
+            >
+              <div className="px-[5.333vw]">
+                {displayedTrendingTags.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
+                ) : (
+                  <>
+                    {displayedTrendingTags.slice(0, trendingTagsVisibleCount).map((t) => (
+                      <TagListRow
+                        key={t.tag}
+                        tag={t.tag}
+                        count={t.count}
+                        variant="trending"
+                        onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
+                      />
+                    ))}
+                    {displayedTrendingTags.length > trendingTagsVisibleCount ? (
+                      <div ref={trendingLoadSentinelRef} className="h-8 w-full shrink-0" aria-hidden />
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </section>
 
-            {activeTab === "favorite" && (
-              <section className="border-b border-gray-200 pt-2.5">
-                <div className="px-[5.333vw]">
-                  {!isLoggedIn ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <p className="text-sm text-gray-700">
-                        LINEでログインするとお気に入りタグを保存できるよ
-                      </p>
-                      <Link
-                        href="/profile/login?returnTo=/search"
-                        className="mt-6 block w-full max-w-md rounded-[10px] bg-[#FFE100] py-4 text-center text-base font-bold text-gray-900 hover:opacity-90"
-                        aria-label="LINEでログインする"
-                      >
-                        LINEでログインする
-                      </Link>
-                    </div>
-                  ) : favoriteTags.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-gray-500">お気に入りタグはまだありません。</p>
-                  ) : (
-                    [...favoriteTags]
-                      .map((tag) => ({
-                        tag,
-                        count: trendingTagsByScore.find((t) => t.tag === tag)?.count ?? 0,
-                      }))
-                      .sort((a, b) => b.count - a.count)
-                      .map(({ tag, count }) => (
-                        <TagListRow
-                          key={tag}
-                          tag={tag}
-                          count={count}
-                          variant="favorite"
-                          onMenuClick={(t, variant) => setTagMenu({ tag: t, variant })}
-                        />
-                      ))
-                  )}
-                </div>
-              </section>
-            )}
+            <section
+              className={`border-b border-gray-200 pt-2.5${activeTab === "favorite" ? "" : " hidden"}`}
+              aria-hidden={activeTab !== "favorite"}
+            >
+              <div className="px-[5.333vw]">
+                {!isLoggedIn ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <p className="text-sm text-gray-700">
+                      LINEでログインするとお気に入りタグを保存できるよ
+                    </p>
+                    <Link
+                      href="/profile/login?returnTo=/search"
+                      className="mt-6 block w-full max-w-md rounded-[10px] bg-[#FFE100] py-4 text-center text-base font-bold text-gray-900 hover:opacity-90"
+                      aria-label="LINEでログインする"
+                    >
+                      LINEでログインする
+                    </Link>
+                  </div>
+                ) : favoriteTags.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-gray-500">お気に入りタグはまだありません。</p>
+                ) : (
+                  [...favoriteTags]
+                    .map((tag) => ({
+                      tag,
+                      count: trendingTagsByScore.find((t) => t.tag === tag)?.count ?? 0,
+                    }))
+                    .sort((a, b) => b.count - a.count)
+                    .map(({ tag, count }) => (
+                      <TagListRow
+                        key={tag}
+                        tag={tag}
+                        count={count}
+                        variant="favorite"
+                        onMenuClick={(t, variant) => setTagMenu({ tag: t, variant })}
+                      />
+                    ))
+                )}
+              </div>
+            </section>
           </>
         ) : (
           <>
