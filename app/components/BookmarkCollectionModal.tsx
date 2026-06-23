@@ -10,6 +10,7 @@ import {
   getCollectionsUpdatedEventName,
   type Collection,
 } from "../data/collections";
+import type { CollectionCategory } from "../data/collectionCategories";
 import { addBookmark, isCardBookmarked, getBookmarksUpdatedEventName } from "../data/bookmarks";
 import { removeBookmarkFully } from "../data/bookmarkRemove";
 import { showAppToast } from "../lib/appToast";
@@ -158,11 +159,13 @@ export default function BookmarkCollectionModal({
   const handleSaveNewCollection = async (
     name: string,
     gradient: CollectionGradient,
-    visibility: "public" | "private" | "member"
+    visibility: "public" | "private" | "member",
+    category: CollectionCategory
   ) => {
     await createOwnedCollectionFromSettings(name, {
       gradient,
       visibility,
+      category,
       cardId: cardId ?? undefined,
     });
     setCollections(getCollections());

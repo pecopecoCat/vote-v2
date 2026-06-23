@@ -12,6 +12,7 @@ type IndexRow = {
   gradient?: string;
   visibility: "public" | "private" | "member";
   cardIds: string[];
+  category?: string;
   createdByUserId?: string;
   createdByDisplayName?: string;
   createdByIconUrl?: string;
@@ -57,6 +58,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
         gradient?: string;
         visibility?: string;
         cardIds?: string[];
+        category?: string;
         createdByDisplayName?: string;
         createdByIconUrl?: string;
       };
@@ -93,6 +95,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       visibility,
       cardIds,
       createdByUserId: userId || undefined,
+      ...(typeof col.category === "string" && col.category.length > 0 ? { category: col.category } : {}),
       ...(createdByDisplayName ? { createdByDisplayName } : {}),
       ...(createdByIconUrl ? { createdByIconUrl } : {}),
     };

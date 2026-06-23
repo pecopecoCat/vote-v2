@@ -10,6 +10,7 @@ type IndexRow = {
   gradient?: string;
   visibility: "public" | "private" | "member";
   cardIds: string[];
+  category?: string;
   createdByUserId?: string;
   createdByDisplayName?: string;
   createdByIconUrl?: string;
@@ -37,6 +38,9 @@ function normalizeRow(raw: unknown): IndexRow | null {
   }
   if (typeof o.createdByIconUrl === "string" && o.createdByIconUrl.length > 0) {
     row.createdByIconUrl = o.createdByIconUrl;
+  }
+  if (typeof o.category === "string" && o.category.length > 0) {
+    row.category = o.category;
   }
   return row;
 }

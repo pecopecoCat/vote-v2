@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { Collection, CollectionVisibility } from "../data/collections";
+import {
+  COLLECTION_CATEGORY_OPTIONS,
+  resolveCollectionCategory,
+  type CollectionCategory,
+} from "../data/collectionCategories";
 import { COLLECTION_GRADIENT_OPTIONS, type CollectionGradient } from "../data/search";
 
 const VISIBILITY_OPTIONS: { value: CollectionVisibility; label: string }[] = [
@@ -14,7 +19,12 @@ const VISIBILITY_OPTIONS: { value: CollectionVisibility; label: string }[] = [
 export interface CollectionSettingsModalProps {
   onClose: () => void;
   /** 保存時は name, gradient, visibility を渡す（Bookmark/検索/MyPage/設定で共通グラデーション） */
-  onSave: (name: string, gradient: CollectionGradient, visibility: CollectionVisibility) => void | Promise<void>;
+  onSave: (
+    name: string,
+    gradient: CollectionGradient,
+    visibility: CollectionVisibility,
+    category: CollectionCategory
+  ) => void | Promise<void>;
   /** 編集時は既存コレクションを渡す（新規のときは undefined） */
   editingCollection?: Collection | null;
 }
@@ -29,6 +39,9 @@ export default function CollectionSettingsModal({
   const [name, setName] = useState(editingCollection?.name ?? "");
   const [gradient, setGradient] = useState<CollectionGradient>(editingCollection?.gradient ?? "blue-cyan");
   const [visibility, setVisibility] = useState<CollectionVisibility>(editingCollection?.visibility ?? "public");
+  const [category, setCategory] = useState<CollectionCategory>(
+    editingCollection ? resolveCollectionCategory(editingCollection) : "other"
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -39,10 +52,12 @@ export default function CollectionSettingsModal({
       setName(editingCollection.name);
       setGradient(editingCollection.gradient ?? "blue-cyan");
       setVisibility(editingCollection.visibility);
+      setCategory(resolveCollectionCategory(editingCollection));
     } else {
       setName("");
       setGradient("blue-cyan");
       setVisibility("public");
+      setCategory("other");
     }
   }, [editingCollection]);
 
@@ -51,7 +66,7 @@ export default function CollectionSettingsModal({
     const trimmed = name.trim() || (editingCollection ? editingCollection.name : "新しいコレクション");
     setSaving(true);
     try {
-      await onSave(trimmed, gradient, visibility);
+      await onSave(trimmed, gradient, visibility, category);
       onClose();
     } finally {
       setSaving(false);
@@ -125,6 +140,29 @@ export default function CollectionSettingsModal({
                         </svg>
                       </span>
                     )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-900">カテゴリ</label>
+            <div className="flex flex-wrap gap-2">
+              {COLLECTION_CATEGORY_OPTIONS.map((opt) => {
+                const selected = category === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setCategory(opt.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                      selected
+                        ? "bg-[#FFE100] text-[#191919]"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {opt.label}
                   </button>
                 );
               })}

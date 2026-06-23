@@ -414,6 +414,46 @@ select {
   max-width: min(100%, 1680px);
 }
 
+.collections-category-section {
+  min-width: 0;
+}
+
+.collections-category-title {
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #191919;
+}
+
+.collections-category-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.collections-category-row::-webkit-scrollbar {
+  display: none;
+}
+
+.collection-list-tile {
+  flex: 0 0 min(42vw, 156px);
+  width: min(42vw, 156px);
+  scroll-snap-align: start;
+}
+
+@media (min-width: 640px) {
+  .collection-list-tile {
+    flex-basis: 156px;
+    width: 156px;
+  }
+}
+
 /* 回答欄ドロップシャドウ：Y1 #000000 25%（既存のシャドウと併用） */
 .vote-card-answer-shadow {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.08);

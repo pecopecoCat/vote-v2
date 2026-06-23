@@ -1173,11 +1173,11 @@ function ProfileContent() {
             setShowCollectionSettings(false);
             setEditingCollectionForSettings(null);
           }}
-          onSave={async (name, gradient, visibility) => {
+          onSave={async (name, gradient, visibility, category) => {
             if (editingCollectionForSettings) {
-              updateCollection(editingCollectionForSettings.id, { name, gradient, visibility });
+              updateCollection(editingCollectionForSettings.id, { name, gradient, visibility, category });
             } else {
-              await createOwnedCollectionFromSettings(name, { gradient, visibility });
+              await createOwnedCollectionFromSettings(name, { gradient, visibility, category });
             }
             setCollections(getCollections());
             setShowCollectionSettings(false);

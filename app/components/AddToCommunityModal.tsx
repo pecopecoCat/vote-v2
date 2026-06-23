@@ -9,6 +9,7 @@ import {
   getCollectionsUpdatedEventName,
   type Collection,
 } from "../data/collections";
+import type { CollectionCategory } from "../data/collectionCategories";
 import { type CollectionGradient } from "../data/search";
 import { useSharedData } from "../context/SharedDataContext";
 import { showAppToast } from "../lib/appToast";
@@ -89,11 +90,13 @@ export default function AddToCommunityModal({
   const handleSaveNewCollection = async (
     name: string,
     gradient: CollectionGradient,
-    visibility: "public" | "private" | "member"
+    visibility: "public" | "private" | "member",
+    category: CollectionCategory
   ) => {
     await createOwnedCollectionFromSettings(name, {
       gradient,
       visibility,
+      category,
       cardId: cardId ?? undefined,
     });
     setCollections(getCollections());

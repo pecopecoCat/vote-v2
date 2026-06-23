@@ -7,6 +7,7 @@
  */
 
 import type { CollectionGradient } from "./search";
+import type { CollectionCategory } from "./collectionCategories";
 import { getAuth, getCurrentActivityUserId } from "./auth";
 import {
   clearCollectionScopedLocalData,
@@ -45,6 +46,8 @@ export interface Collection {
   createdByDisplayName?: string;
   /** 作成者アイコンURL */
   createdByIconUrl?: string;
+  /** コレクション一覧のカテゴリ */
+  category?: CollectionCategory;
 }
 
 function normalizeCollection(c: Record<string, unknown>): Collection {
@@ -62,6 +65,7 @@ function normalizeCollection(c: Record<string, unknown>): Collection {
         ? c.createdByDisplayName.trim()
         : undefined,
     createdByIconUrl: typeof c.createdByIconUrl === "string" && c.createdByIconUrl.length > 0 ? c.createdByIconUrl : undefined,
+    category: typeof c.category === "string" ? (c.category as CollectionCategory) : undefined,
   };
 }
 
@@ -229,6 +233,7 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     gradient: "blue-cyan",
     visibility: "public",
     cardIds: getSeedCardIdsByTag("仕事"),
+    category: "work",
     createdByUserId: "user5",
     createdByDisplayName: "ryo",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -240,6 +245,7 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     gradient: "orange-yellow",
     visibility: "public",
     cardIds: getSeedCardIdsByTag("ワーママ"),
+    category: "life",
     createdByUserId: "user5",
     createdByDisplayName: "miki",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -251,6 +257,7 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     gradient: "pink-purple",
     visibility: "public",
     cardIds: getSeedCardIdsByTag("アニメ"),
+    category: "anime-manga",
     createdByUserId: "user5",
     createdByDisplayName: "kouta",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -262,6 +269,7 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     gradient: "green-yellow",
     visibility: "public",
     cardIds: getSeedCardIdsByTag("今日の献立"),
+    category: "gourmet",
     createdByUserId: "user5",
     createdByDisplayName: "yui",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -273,6 +281,7 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     gradient: "cyan-aqua",
     visibility: "public",
     cardIds: getSeedCardIdsByTag("ゴルゴ31"),
+    category: "anime-manga",
     createdByUserId: "user5",
     createdByDisplayName: "ryo",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -284,6 +293,7 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     gradient: "purple-pink",
     visibility: "public",
     cardIds: getSeedCardIdsByTag("ドラマ"),
+    category: "drama",
     createdByUserId: "user5",
     createdByDisplayName: "あい",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -603,6 +613,7 @@ function buildCollectionSyncPayload(col: Collection, userId: string) {
       gradient: col.gradient,
       visibility: col.visibility,
       cardIds: col.cardIds,
+      ...(col.category ? { category: col.category } : {}),
       ...(ownerName ? { createdByDisplayName: ownerName } : {}),
       ...(ownerIcon ? { createdByIconUrl: ownerIcon } : {}),
     },
@@ -757,6 +768,7 @@ export function createCollection(
     color?: string;
     gradient?: CollectionGradient;
     visibility?: CollectionVisibility;
+    category?: CollectionCategory;
     skipApiSync?: boolean;
     skipRemotePush?: boolean;
   }
@@ -771,6 +783,7 @@ export function createCollection(
     color: options?.color ?? "#87CEEB",
     gradient: options?.gradient,
     visibility: options?.visibility ?? "public",
+    category: options?.category ?? "other",
     cardIds: [],
     createdByUserId: userId,
     createdByDisplayName:
@@ -805,6 +818,7 @@ export async function createOwnedCollectionFromSettings(
   options: {
     gradient?: CollectionGradient;
     visibility?: CollectionVisibility;
+    category?: CollectionCategory;
     cardId?: string;
   }
 ): Promise<Collection> {
@@ -813,6 +827,7 @@ export async function createOwnedCollectionFromSettings(
     const created = createCollection(name, {
       gradient: options.gradient,
       visibility: options.visibility,
+      category: options.category,
       skipApiSync: true,
       skipRemotePush: true,
     });
@@ -834,7 +849,13 @@ export async function createOwnedCollectionFromSettings(
 /** コレクションを更新（名前・色・グラデーション・公開設定） */
 export function updateCollection(
   id: string,
-  updates: { name?: string; color?: string; gradient?: CollectionGradient; visibility?: CollectionVisibility }
+  updates: {
+    name?: string;
+    color?: string;
+    gradient?: CollectionGradient;
+    visibility?: CollectionVisibility;
+    category?: CollectionCategory;
+  }
 ): void {
   const userId = getCurrentActivityUserId();
   const cols = load(userId);
@@ -844,6 +865,7 @@ export function updateCollection(
     if (updates.name !== undefined) col.name = updates.name.trim() || col.name;
     if (updates.color !== undefined) col.color = updates.color;
     if (updates.gradient !== undefined) col.gradient = updates.gradient;
+    if (updates.category !== undefined) col.category = updates.category;
     save(userId, cols);
     return;
   }
@@ -851,6 +873,7 @@ export function updateCollection(
   if (updates.color !== undefined) col.color = updates.color;
   if (updates.gradient !== undefined) col.gradient = updates.gradient;
   if (updates.visibility !== undefined) col.visibility = updates.visibility;
+  if (updates.category !== undefined) col.category = updates.category;
   save(userId, cols);
   if (!isCollectionPinnable(col.visibility)) {
     const pinned = loadPinnedIds(userId).filter((pid) => pid !== id);
