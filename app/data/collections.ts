@@ -16,7 +16,7 @@ import {
 import { removeLocalCommentsForCollection } from "./voteCardActivity";
 import { addBookmark, removeBookmark } from "./bookmarks";
 import { showAppToast } from "../lib/appToast";
-import { getSeedClassicCardIds } from "./voteCards";
+import { getSeedCardIdsByTag } from "./voteCards";
 import { DEFAULT_RYO_AVATAR_URL } from "./avatarUrls";
 
 const STORAGE_KEY_PREFIX = "vote_collections_";
@@ -207,18 +207,83 @@ export function waitForCollectionsRemoteQueue(): Promise<void> {
   return collectionsWriteChain;
 }
 
-/** 入門の2択（デモ用の固定コレクション。作成者: ryo） */
+/** 旧デモコレ ID（後方互換。col-seed-anime へリダイレクト相当） */
 export const SEED_CLASSIC_COLLECTION_ID = "col-seed-classic";
+
+/** テーマ別コミュニティ（デモ用の固定分） */
+export const SEED_COMMUNITY_IDS = {
+  seikatsu: "col-seed-seikatsu",
+  shigoto: "col-seed-shigoto",
+  ikuji: "col-seed-ikuji",
+  anime: "col-seed-anime",
+  drama: "col-seed-drama",
+  idol: "col-seed-idol",
+} as const;
 
 /** 他ユーザー作成のコレクション（デモ用の固定分をここで差し込む） */
 export const OTHER_USERS_COLLECTIONS: Collection[] = [
   {
-    id: SEED_CLASSIC_COLLECTION_ID,
-    name: "POPカルチャー入門",
+    id: SEED_COMMUNITY_IDS.seikatsu,
+    name: "私生活モヤモヤ",
+    color: "#86EFAC",
+    gradient: "green-yellow",
+    visibility: "public",
+    cardIds: getSeedCardIdsByTag("私生活"),
+    createdByUserId: "user5",
+    createdByDisplayName: "yui",
+    createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
+  },
+  {
+    id: SEED_COMMUNITY_IDS.shigoto,
+    name: "仕事モヤモヤ",
+    color: "#93C5FD",
+    gradient: "blue-cyan",
+    visibility: "public",
+    cardIds: getSeedCardIdsByTag("仕事"),
+    createdByUserId: "user5",
+    createdByDisplayName: "ryo",
+    createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
+  },
+  {
+    id: SEED_COMMUNITY_IDS.ikuji,
+    name: "育児モヤモヤ",
+    color: "#FDBA74",
+    gradient: "orange-yellow",
+    visibility: "public",
+    cardIds: getSeedCardIdsByTag("育児"),
+    createdByUserId: "user5",
+    createdByDisplayName: "miki",
+    createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
+  },
+  {
+    id: SEED_COMMUNITY_IDS.anime,
+    name: "アニメモヤモヤ",
+    color: "#F9A8D4",
+    gradient: "pink-purple",
+    visibility: "public",
+    cardIds: getSeedCardIdsByTag("アニメ"),
+    createdByUserId: "user5",
+    createdByDisplayName: "kouta",
+    createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
+  },
+  {
+    id: SEED_COMMUNITY_IDS.drama,
+    name: "ドラマモヤモヤ",
     color: "#C4B5FD",
     gradient: "purple-pink",
     visibility: "public",
-    cardIds: getSeedClassicCardIds(),
+    cardIds: getSeedCardIdsByTag("ドラマ"),
+    createdByUserId: "user5",
+    createdByDisplayName: "あい",
+    createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
+  },
+  {
+    id: SEED_COMMUNITY_IDS.idol,
+    name: "アイドルモヤモヤ",
+    color: "#67E8F9",
+    gradient: "cyan-aqua",
+    visibility: "public",
+    cardIds: getSeedCardIdsByTag("アイドル"),
     createdByUserId: "user5",
     createdByDisplayName: "ryo",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,

@@ -327,8 +327,8 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
           const cardId = resolveStableVoteCardId(card);
           const act = activity[cardId];
           return (
+            <div key={`vote-${cardId}`} className="home-feed-masonry__tile">
               <VoteCard
-                key={`vote-${cardId}`}
                 {...buildVoteCardProps({
                   card,
                   cardId,
@@ -343,41 +343,52 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
                   onMoreClick,
                 })}
               />
+            </div>
           );
         }
         if (item.type === "collection") {
           const { id, title, gradient } = item.collection;
           return (
-            <CollectionCard
-              key={`col-${id}-${idx}`}
-              id={id}
-              title={title}
-              gradient={gradient}
-              titleVariant="blackBlock"
-              href={`/collection/${id}`}
-              timelineBanner
-              label="コレクション"
-            />
+            <div key={`col-${id}-${idx}`} className="home-feed-masonry__tile home-feed-masonry__tile--full">
+              <CollectionCard
+                id={id}
+                title={title}
+                gradient={gradient}
+                titleVariant="blackBlock"
+                href={`/collection/${id}`}
+                timelineBanner
+                label="コレクション"
+              />
+            </div>
           );
         }
         if (item.type === "tags") {
-          return <RecommendedTags key={`tags-${idx}`} tags={timelineTagList} />;
+          return (
+            <div key={`tags-${idx}`} className="home-feed-masonry__tile home-feed-masonry__tile--full">
+              <RecommendedTags tags={timelineTagList} className="!mx-0" />
+            </div>
+          );
         }
         if (item.type === "pr") {
           return (
-            <AdCard
-              key={`pr-${idx}`}
-              brandName={item.banner.brandName}
-              caption={item.banner.caption}
-              imageUrl={item.banner.imageUrl}
-              fallbackGradientClassName={item.banner.fallbackGradientClassName}
-            />
+            <div key={`pr-${idx}`} className="home-feed-masonry__tile home-feed-masonry__tile--full">
+              <AdCard
+                brandName={item.banner.brandName}
+                caption={item.banner.caption}
+                imageUrl={item.banner.imageUrl}
+                fallbackGradientClassName={item.banner.fallbackGradientClassName}
+              />
+            </div>
           );
         }
         return null;
       })}
       {visibleCount < timelineItems.length ? (
-        <div ref={loadSentinelRef} className="h-1 w-full shrink-0" aria-hidden />
+        <div
+          ref={loadSentinelRef}
+          className="home-feed-masonry__tile home-feed-masonry__tile--full h-1 w-full shrink-0"
+          aria-hidden
+        />
       ) : null}
     </>
   );
@@ -773,7 +784,13 @@ function HomeContent() {
       <FeedTabs activeId={activeTab} onSelect={selectFeedTab} />
 
       {/* メインコンテンツ（下ナビ分の余白を確保） */}
-      <main className="mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4">
+      <main
+        className={
+          activeTab === "community"
+            ? "mx-auto max-w-lg px-[5.333vw] pb-[50px] pt-4"
+            : "home-feed-main mx-auto px-[5.333vw] pb-[50px] pt-4 sm:px-6"
+        }
+      >
         {activeTab === "community" ? (
           <section className="flex flex-col gap-3">
             {collectionsIndexLoading && remotePopularCollections.length === 0 ? (
@@ -822,12 +839,14 @@ function HomeContent() {
                 最新を取得中…
               </p>
             )}
-            <VoteCardList>
+            <VoteCardList className="home-feed-masonry">
               {(activeTab === "trending" || activeTab === "new") && cardsForTab.length === 0 ? (
-                <div className="vote-card-outer px-6 py-12 text-center">
-                  <p className="text-sm text-gray-600">
-                    まだ投票できる投稿がありません。
-                  </p>
+                <div className="home-feed-masonry__tile home-feed-masonry__tile--full">
+                  <div className="vote-card-outer px-6 py-12 text-center">
+                    <p className="text-sm text-gray-600">
+                      まだ投票できる投稿がありません。
+                    </p>
+                  </div>
                 </div>
               ) : null}
 

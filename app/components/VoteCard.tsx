@@ -286,7 +286,7 @@ function VoteCard({
       )}
       {/* 背景付きエリア（カード左右内側 20px） */}
       <div
-        className={`relative min-h-[100px] rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat px-5 pb-[5.333vw] pt-[13.333vw] ${!useImage ? patternClass : ""}`}
+        className={`vote-card-hero relative min-h-[100px] rounded-t-[18px] bg-gray-200 bg-cover bg-center bg-no-repeat px-5 ${!useImage ? patternClass : ""}`}
         style={
           useImage
             ? { backgroundImage: `url(${backgroundImageUrl})` }
@@ -302,8 +302,8 @@ function VoteCard({
           </div>
         </div>
 
-        {/* 選択肢（質問〜A 30px=8vw, A〜B の縦余白80%=3.2vw） */}
-        <div className="mt-[8vw] flex flex-col gap-[3.2vw]">
+        {/* 選択肢（質問〜A 30px, A〜B 12px @375） */}
+        <div className="vote-card-options flex flex-col">
           {!showResult ? (
             <>
               <button
@@ -317,7 +317,7 @@ function VoteCard({
                 <span className="flex w-[14.25%] min-w-[41px] shrink-0 flex-col justify-center self-stretch rounded-l-xl bg-[#E63E48] py-3.5 text-center text-base font-bold text-white">
                   A
                 </span>
-                <span className="vote-card-option-text flex min-w-0 flex-1 items-start rounded-r-xl bg-white px-4 py-3.5 text-left text-[clamp(12px,4.8vw,16px)] font-semibold leading-snug text-[#212121]">
+                <span className="vote-card-option-text flex min-w-0 flex-1 items-start rounded-r-xl bg-white px-4 py-3.5 text-left font-semibold leading-snug text-[#212121]">
                   <span className="min-w-0 whitespace-normal break-words">{optionA}</span>
                 </span>
               </button>
@@ -332,7 +332,7 @@ function VoteCard({
                 <span className="flex w-[14.25%] min-w-[41px] shrink-0 flex-col justify-center self-stretch rounded-l-xl bg-[#3273E3] py-3.5 text-center text-base font-bold text-white">
                   B
                 </span>
-                <span className="vote-card-option-text flex min-w-0 flex-1 items-start rounded-r-xl bg-white px-4 py-3.5 text-left text-[clamp(12px,4.8vw,16px)] font-semibold leading-snug text-[#212121]">
+                <span className="vote-card-option-text flex min-w-0 flex-1 items-start rounded-r-xl bg-white px-4 py-3.5 text-left font-semibold leading-snug text-[#212121]">
                   <span className="min-w-0 whitespace-normal break-words">{optionB}</span>
                 </span>
               </button>
@@ -349,7 +349,7 @@ function VoteCard({
                       className={`absolute inset-y-0 left-0 overflow-hidden bg-[#fce4ec] transition-[width] duration-300 ease-out ${displayPercentA >= 100 ? "rounded-r-xl" : ""}`}
                       style={{ width: `${displayPercentA}%` }}
                     />
-                    <span className="relative z-10 min-w-0 whitespace-normal break-words font-semibold text-[#CF0606] leading-snug text-[clamp(12px,4.8vw,16px)]">
+                    <span className="vote-card-option-text relative z-10 min-w-0 whitespace-normal break-words font-semibold text-[#CF0606] leading-snug">
                       {optionA}
                     </span>
                     <span className="relative z-10 ml-auto flex min-w-[3rem] shrink-0 items-baseline justify-end">
@@ -374,7 +374,7 @@ function VoteCard({
                       className={`absolute inset-y-0 left-0 overflow-hidden bg-[#e3f2fd] transition-[width] duration-300 ease-out ${displayPercentB >= 100 ? "rounded-r-xl" : ""}`}
                       style={{ width: `${displayPercentB}%` }}
                     />
-                    <span className="relative z-10 min-w-0 whitespace-normal break-words font-semibold text-[#1F77D4] leading-snug text-[clamp(12px,4.8vw,16px)]">
+                    <span className="vote-card-option-text relative z-10 min-w-0 whitespace-normal break-words font-semibold text-[#1F77D4] leading-snug">
                       {optionB}
                     </span>
                     <span className="relative z-10 ml-auto flex min-w-[3rem] shrink-0 items-baseline justify-end">
@@ -396,7 +396,7 @@ function VoteCard({
 
       {/* フッター（タグあり時は下0.36em、タグなし時は下2倍の0.72em） */}
       <div
-        className={`flex items-center gap-4 border-t border-gray-100 px-5 pt-[2.73vw] ${tags.length > 0 ? "pb-[0.36em]" : "pb-[0.72em]"}`}
+        className={`vote-card-footer-row flex items-center gap-4 border-t border-gray-100 px-5 ${tags.length > 0 ? "pb-[0.36em]" : "pb-[0.72em]"}`}
       >
         <span className="flex items-center gap-1" aria-label="2択回答数">
           <img
