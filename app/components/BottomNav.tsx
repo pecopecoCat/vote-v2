@@ -61,13 +61,13 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 flex w-full items-stretch justify-around border-t border-gray-200 bg-white px-1 pt-1.5 safe-area-pb"
+      className="fixed bottom-0 left-0 right-0 z-30 flex w-full items-stretch justify-around border-t border-gray-200 bg-white px-1 safe-area-pb"
       aria-label="メインナビゲーション"
     >
       {navItems.map(({ id, label, href, src, srcOn }) => {
         const isActive = activeId === id;
         const className =
-          "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1 transition-colors active:opacity-80";
+          "flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 py-2 transition-colors active:opacity-80";
         const showUserIcon = id === "profile" && userIconUrl;
         /** プロフィールは円形クリップで実寸より小さく見えるため、他タブより一回り大きくして視覚的に揃える */
         const profilePx = 26;
@@ -131,7 +131,7 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
           );
         })();
         const labelEl = (
-          <span className="max-w-full truncate text-[10px] leading-none text-[#191919]">{label}</span>
+          <span className="max-w-full truncate text-[9px] leading-none text-[#191919]">{label}</span>
         );
         if (href) {
           const wrapIcon =
