@@ -890,7 +890,7 @@ function ProfileContent() {
                 >
                   <span className="text-sm font-bold text-gray-900">ALL</span>
                 </button>
-                <p className="mb-2 mt-3 text-sm font-bold text-gray-900">コレクション</p>
+                <p className="mb-2 mt-3 text-sm font-bold text-gray-900">コミュニティ</p>
                 <div className="flex flex-col gap-2">
                   {collections.map((col) => (
                     <div
@@ -916,7 +916,7 @@ function ProfileContent() {
                       <button
                         type="button"
                         className="flex h-9 w-9 shrink-0 items-center justify-center text-[#666666]"
-                        aria-label="コレクションの設定"
+                        aria-label="コミュニティの設定"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -936,7 +936,7 @@ function ProfileContent() {
                     setShowCollectionSettings(true);
                   }}
                 >
-                  新しいコレクションを追加
+                  新しいコミュニティを追加
                 </Button>
               </div>
             ) : (
@@ -954,7 +954,7 @@ function ProfileContent() {
                     </svg>
                   </button>
                   <span className="text-sm font-bold text-gray-900">
-                    {selectedBookmarkId === "all" ? "ALL" : collections.find((c) => c.id === selectedBookmarkId)?.name ?? "コレクション"}
+                    {selectedBookmarkId === "all" ? "ALL" : collections.find((c) => c.id === selectedBookmarkId)?.name ?? "コミュニティ"}
                   </span>
                 </div>
                 {(() => {
@@ -962,7 +962,7 @@ function ProfileContent() {
                     return (
                       <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
                         <p className="text-sm text-gray-500">
-                          {selectedBookmarkId === "all" ? "ブックマークした投稿がここに表示されます。" : "このコレクションにはまだ投稿がありません。"}
+                          {selectedBookmarkId === "all" ? "ブックマークした投稿がここに表示されます。" : "このコミュニティにはまだ投稿がありません。"}
                         </p>
                       </div>
                     );
@@ -1137,7 +1137,7 @@ function ProfileContent() {
           showShare={menuCol?.visibility === "member"}
           onShare={() => void handleCollectionMenuShare(collectionMenuOpenId)}
           hideEdit={Boolean(menuCol?.joinedParticipation)}
-          deleteLabel={menuCol?.joinedParticipation ? "マイリストから削除" : "コレクションを削除"}
+          deleteLabel={menuCol?.joinedParticipation ? "マイリストから削除" : "コミュニティを削除"}
           onClose={() => setCollectionMenuOpenId(null)}
           onEdit={() => {
             const col = collections.find((c) => c.id === collectionMenuOpenId);

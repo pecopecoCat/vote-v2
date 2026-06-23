@@ -183,7 +183,7 @@ export default function BookmarkCollectionModal({
       <BookmarkModalShell onComplete={onClose}>
         <div className="flex flex-col items-center justify-center gap-4 px-5 py-10 text-center">
           <p className="text-sm font-bold text-[#191919]">
-            ブックマーク・コレクションを使うには
+            ブックマーク・コミュニティを使うには
             <br />
             ログインしてください。
           </p>
@@ -237,7 +237,7 @@ export default function BookmarkCollectionModal({
         footer={
           <>
             <Button variant="outline" className="w-full" onClick={() => setShowSettingsModal(true)}>
-              新しいコレクションを追加
+              新しいコミュニティを追加
             </Button>
             {bookmarked ? (
               <button
@@ -270,7 +270,7 @@ export default function BookmarkCollectionModal({
         <BookmarkModalDivider />
 
         <div className="bg-[#F5F5F5] px-5 py-2">
-          <span className="text-xs font-bold text-[#787878]">コレクション</span>
+          <span className="text-xs font-bold text-[#787878]">コミュニティ</span>
         </div>
 
         <ul className="divide-y divide-[#DADADA]">

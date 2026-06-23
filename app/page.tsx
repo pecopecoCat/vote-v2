@@ -357,7 +357,7 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
                 titleVariant="blackBlock"
                 href={`/collection/${id}`}
                 timelineBanner
-                label="コレクション"
+                label="コミュニティ"
               />
             </div>
           );

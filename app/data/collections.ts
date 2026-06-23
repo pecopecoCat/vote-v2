@@ -767,7 +767,7 @@ export function createCollection(
   const id = `col-${Date.now()}`;
   const newCol: Collection = {
     id,
-    name: name.trim() || "新しいコレクション",
+    name: name.trim() || "新しいコミュニティ",
     color: options?.color ?? "#87CEEB",
     gradient: options?.gradient,
     visibility: options?.visibility ?? "public",
@@ -826,7 +826,7 @@ export async function createOwnedCollectionFromSettings(
     await pushUserOwnedCollectionsToRemoteIfLoggedIn(userId, cols);
     syncOwnedCollectionToApiIfPublic(created.id);
     const saved = cols.find((c) => c.id === created.id) ?? load(userId).find((c) => c.id === created.id) ?? created;
-    showAppToast("コレクションを作成しました");
+    showAppToast("コミュニティを作成しました");
     return saved;
   });
 }

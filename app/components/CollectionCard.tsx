@@ -20,7 +20,7 @@ export interface CollectionCardProps {
   titleVariant?: "default" | "blackBlock";
   /** 人気コレクション枠：タイムラインのコレバナーに寄せた黒地＋白字（21px 基準の 81% = 0.9×0.9） */
   popularBanner?: boolean;
-  /** 右上のラベル（例: コレクション）。角丸・薄い背景付き */
+  /** 右上のラベル（例: コミュニティ）。角丸・薄い背景付き */
   label?: string;
   /** タイムライン用バナー：W335px相当・H260px・タイトルは黒地＋白字・26px */
   timelineBanner?: boolean;
