@@ -529,9 +529,61 @@ select {
 }
 
 .home-feed-main,
-.collections-list-main {
+.collections-list-main,
+.comments-page {
   width: 100%;
   max-width: min(100%, 1680px);
+}
+
+/* みんなのコメント（PC）：カードはタイル幅・コメント帯は横いっぱい・下部VOTEはマasonry */
+@media (min-width: 768px) {
+  .comments-page__hero-tile {
+    display: inline-block;
+    width: min(375px, 100%);
+    min-width: 0;
+    container-type: inline-size;
+    container-name: home-vote-card;
+    vertical-align: top;
+  }
+
+  .comments-page__hero-tile .vote-card-outer {
+    --vote-u: min(100cqw, 375px);
+  }
+
+  .comments-page__comments {
+    margin-left: -24px;
+    margin-right: -24px;
+    width: auto;
+  }
+
+  .comments-page__comments .comment-thread-row {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .comments-page__vote-feed {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-top-color: #d1d5db;
+  }
+
+  .comments-page__post-bar {
+    right: 24px;
+    bottom: 24px;
+    left: auto;
+    width: auto;
+    max-width: min(320px, calc(100vw - var(--app-side-nav-width) - 48px));
+    padding: 0;
+  }
+
+  .comments-page__post-bar .btn-yellow-3d {
+    width: auto;
+    min-width: 200px;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
 }
 
 .collections-category-section {

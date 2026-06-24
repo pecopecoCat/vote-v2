@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, getDisplayUserForDemo, fetchUserProfileFromApi, resolveStoredDemoUserId, releaseActiveUserOnServer, claimActiveUserOnServer, DEMO_USER_IDS, DEMO_USERS, type DemoUserId } from "../../data/auth";
+import { getAuth, loginAsDemoUser, getLastLoggedInUserId, clearLastLoggedInUserId, getDisplayUserForDemo, fetchUserProfileFromApi, resolveStoredDemoUserId, releaseActiveUserOnServerWithRetry, claimActiveUserOnServer, DEMO_USER_IDS, DEMO_USERS, type DemoUserId } from "../../data/auth";
 
 const USER_MEMOS: Record<DemoUserId, string> = {
   user1: "35歳",
@@ -53,7 +53,7 @@ function ProfileLoginContent() {
         // 解除が間に合わないと、直後の再ログインが 409 になることがあるため await で直列化する。
         const lastId = getLastLoggedInUserId();
         if (lastId && DEMO_USER_IDS.includes(lastId as DemoUserId)) {
-          const released = await releaseActiveUserOnServer(lastId as DemoUserId);
+          const released = await releaseActiveUserOnServerWithRetry(lastId as DemoUserId);
           if (released) {
             clearLastLoggedInUserId();
           }
@@ -92,6 +92,9 @@ function ProfileLoginContent() {
     if (typeof window === "undefined") return;
     if (getAuth().isLoggedIn) return;
     openUserChoice();
+    return () => {
+      openChoiceInFlightRef.current = false;
+    };
   }, [openUserChoice]);
 
   const handleLoginAs = useCallback(
@@ -105,11 +108,11 @@ function ProfileLoginContent() {
           (getAuth().isLoggedIn ? resolveStoredDemoUserId(getAuth()) : undefined);
 
         if (previousId && previousId !== userId) {
-          await releaseActiveUserOnServer(previousId);
+          await releaseActiveUserOnServerWithRetry(previousId);
         }
-        if (activeUserIds.includes(userId)) {
-          await releaseActiveUserOnServer(userId);
-        }
+
+        // GET の一覧が空でも KV に「ログイン中」が残っていると 409 になるため、常に先に解除する
+        await releaseActiveUserOnServerWithRetry(userId);
 
         const claim = await claimActiveUserOnServer(userId);
         if (!claim.ok) {
@@ -119,6 +122,14 @@ function ProfileLoginContent() {
                 ? "このアカウントは別の端末でログイン中です。"
                 : "ログインに失敗しました。しばらくしてからお試しください。")
           );
+          try {
+            const activeRes = (await fetch("/api/active-user").then((r) => r.json())) as {
+              userIds?: string[];
+            };
+            setActiveUserIds(Array.isArray(activeRes.userIds) ? activeRes.userIds : []);
+          } catch {
+            // ignore
+          }
           return;
         }
 
@@ -130,7 +141,7 @@ function ProfileLoginContent() {
         setLoading(false);
       }
     },
-    [returnTo, router, activeUserIds]
+    [returnTo, router]
   );
 
   return (

@@ -301,7 +301,7 @@ export default function CommentThreadGroup({
     <div className="w-full border-b border-[#DADADA]">
       <div
         ref={threadFlexRef}
-        className={`flex items-stretch gap-3 ${threadInnerFlush ? "px-0" : "px-[5.333vw]"} ${showConnector ? "pt-4 pb-4" : "py-4"}`}
+        className={`comment-thread-row flex items-stretch gap-3 ${threadInnerFlush ? "px-0" : "px-[5.333vw]"} ${showConnector ? "pt-4 pb-4" : "py-4"}`}
       >
         <div
           className={`flex shrink-0 flex-col items-center ${showConnector ? "min-h-0" : "w-10"}`}

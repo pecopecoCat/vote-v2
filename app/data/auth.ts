@@ -205,6 +205,23 @@ export async function releaseActiveUserOnServer(userId: DemoUserId): Promise<boo
   }
 }
 
+/** 解除が KV 反映遅延で失敗することがあるため、ログアウト・再ログイン前に数回試す */
+export async function releaseActiveUserOnServerWithRetry(
+  userId: DemoUserId,
+  opts?: { maxAttempts?: number; delayMs?: number }
+): Promise<boolean> {
+  const maxAttempts = opts?.maxAttempts ?? 3;
+  const delayMs = opts?.delayMs ?? 150;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+    }
+    const ok = await releaseActiveUserOnServer(userId);
+    if (ok) return true;
+  }
+  return false;
+}
+
 export type ClaimActiveUserResult =
   | { ok: true }
   | { ok: false; error?: string; code?: string };
@@ -216,8 +233,8 @@ export async function claimActiveUserOnServer(
   userId: DemoUserId,
   opts?: { maxAttempts?: number; delayMs?: number }
 ): Promise<ClaimActiveUserResult> {
-  const maxAttempts = opts?.maxAttempts ?? 3;
-  const delayMs = opts?.delayMs ?? 180;
+  const maxAttempts = opts?.maxAttempts ?? 5;
+  const delayMs = opts?.delayMs ?? 200;
   let lastError: string | undefined;
   let lastCode: string | undefined;
 
@@ -426,9 +443,15 @@ export function resolveStoredDemoUserId(state: AuthState): DemoUserId | undefine
  */
 export async function logout(): Promise<void> {
   if (typeof window !== "undefined") {
-    const demoId = resolveStoredDemoUserId(load());
+    const state = load();
+    const demoId =
+      resolveStoredDemoUserId(state) ??
+      (() => {
+        const last = getLastLoggedInUserId();
+        return last && DEMO_USER_IDS.includes(last as DemoUserId) ? (last as DemoUserId) : undefined;
+      })();
     if (demoId) {
-      await releaseActiveUserOnServer(demoId);
+      await releaseActiveUserOnServerWithRetry(demoId);
       // ログイン画面でサーバー解除を再試行できるよう、成功・失敗にかかわらず保持する
       rememberLastLoggedInUserId(demoId);
     }

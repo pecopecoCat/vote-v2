@@ -105,8 +105,8 @@ function sortByNewest(cards: VoteCardData[]): VoteCardData[] {
 }
 
 
-/** タイムライン差し込みルール：5個に1つコレクション、10個につき1setおすすめタグ、15個につき1つPR */
-const COLLECTION_EVERY = 5;
+/** タイムライン差し込みルール：3個に1つコレクション、10個につき1setおすすめタグ、15個につき1つPR */
+const COLLECTION_EVERY = 3;
 const TAGS_EVERY = 10;
 const PR_BANNER_EVERY = 15;
 
@@ -197,7 +197,7 @@ function getTimelineCollectionPool(
   return [...popularCollections, ...other, ...mine];
 }
 
-/** タイムライン配列を組み立て（5/10/15ルール・コレクションは位置で安定選択） */
+/** タイムライン配列を組み立て（3/10/15ルール・コレクションは位置で安定選択） */
 function buildTimelineItems(
   cards: VoteCardData[],
   collectionPool: { id: string; title: string; gradient: CollectionGradient }[]

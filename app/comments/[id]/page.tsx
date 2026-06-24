@@ -6,7 +6,7 @@ import { useMemo, useState, useEffect } from "react";
 import AppHeader from "../../components/AppHeader";
 import VoteCard from "../../components/VoteCard";
 import VoteCardMini from "../../components/VoteCardMini";
-import { VoteCardList } from "../../components/VoteCardList";
+import { VoteCardList, VoteCardMasonryTile } from "../../components/VoteCardList";
 import CollectionCard from "../../components/CollectionCard";
 import CardModerationModals from "../../components/CardModerationModals";
 import ReportViolationModal from "../../components/ReportViolationModal";
@@ -298,8 +298,8 @@ export default function CommentsPage() {
       const relatedId = related.id ?? related.question;
       const relActivity = sharedActivity[relatedId] ?? emptyActivity;
       return (
+        <VoteCardMasonryTile key={relatedId}>
         <VoteCard
-          key={relatedId}
           {...buildVoteCardProps({
             card: related,
             cardId: relatedId,
@@ -322,6 +322,7 @@ export default function CommentsPage() {
             onAddToCollectionClick: moderation.openAddToCommunity,
           })}
         />
+        </VoteCardMasonryTile>
       );
     });
 
@@ -356,12 +357,12 @@ export default function CommentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-[120px]">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[120px] md:pb-24">
       <AppHeader type="title" title="みんなのコメント" />
 
-      <main className="mx-auto max-w-lg px-[5.333vw] py-4">
-        {/* ページ上部：VOTE CARD mini（登録された投票数・コメント数を反映） */}
-        <div className="mb-4">
+      <main className="comments-page mx-auto max-w-lg px-[5.333vw] py-4 md:max-w-none md:px-6 md:py-6">
+        {/* ページ上部：VOTE CARD mini（PCはタイル幅） */}
+        <div className="comments-page__hero-tile mb-4 md:mb-6">
           <VoteCardMini
             backgroundImageUrl={backgroundUrl}
             patternType={card.patternType}
@@ -388,15 +389,15 @@ export default function CommentsPage() {
           />
         </div>
 
-        {/* コメント：グレー帯の見出し + 白背景の一覧（デザイン参照） */}
-        <div className="-mx-[5.333vw] overflow-hidden border-t border-[#DADADA]">
-          <div className="flex items-center justify-between bg-[var(--color-bg)] px-[5.333vw] py-3">
+        {/* コメント：グレー帯の見出し + 白背景の一覧（PCは横いっぱい） */}
+        <div className="comments-page__comments -mx-[5.333vw] overflow-hidden border-t border-[#DADADA]">
+          <div className="flex items-center justify-between bg-[var(--color-bg)] px-[5.333vw] py-3 md:px-6">
             <h2 className="text-base font-bold text-[#191919]">コメント</h2>
             <CommentSortSegment value={commentSortOrder} onChange={setCommentSortOrder} />
           </div>
           <div className="bg-white">
           {activity.comments.length === 0 ? (
-            <div className="px-[5.333vw] py-10 text-center">
+            <div className="px-[5.333vw] py-10 text-center md:px-6">
               <p className="text-sm text-[#787878]">
                 {commentsDisabled ? "このVOTEはコメントを受け付けていません。" : "まだコメントはありません。"}
               </p>
@@ -456,15 +457,15 @@ export default function CommentsPage() {
 
         {/* 一番下：関連VOTE（最大10件）。1〜9件のときは下に新着VOTE 10件。関連0件のときは新着のみ — HOMEと同じNORMALサイズ */}
         {relatedBottomCards.length > 0 && (
-          <section className="-mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6">
+          <section className="comments-page__vote-feed -mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6 md:mx-0 md:px-0">
             <h2 className="mb-3 text-base font-bold text-gray-900">関連VOTE</h2>
-            <VoteCardList>{mapBottomVoteList(relatedBottomCards)}</VoteCardList>
+            <VoteCardList masonry>{mapBottomVoteList(relatedBottomCards)}</VoteCardList>
           </section>
         )}
         {newestBottomCards.length > 0 && (
-          <section className="-mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6">
+          <section className="comments-page__vote-feed -mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6 md:mx-0 md:px-0">
             <h2 className="mb-3 text-base font-bold text-gray-900">新着VOTE</h2>
-            <VoteCardList>{mapBottomVoteList(newestBottomCards)}</VoteCardList>
+            <VoteCardList masonry>{mapBottomVoteList(newestBottomCards)}</VoteCardList>
           </section>
         )}
       </main>
@@ -493,8 +494,8 @@ export default function CommentsPage() {
       />
 
       {/* 画面下固定：入力を開くボタン（コメント受け付けないVOTEは非表示に近いグレー文言のみ） */}
-      <div className="fixed inset-x-0 bottom-14 z-30 bg-transparent px-4 pb-4">
-        <div className="mx-auto max-w-lg">
+      <div className="comments-page__post-bar fixed inset-x-0 bottom-14 z-30 bg-transparent px-4 pb-4">
+        <div className="mx-auto max-w-lg md:mx-0 md:max-w-none">
           <Button
             type="button"
             variant="yellowPill"

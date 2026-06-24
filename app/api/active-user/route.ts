@@ -112,6 +112,14 @@ export async function POST(
         { status: 409 }
       );
     }
+    const expire = (kv as unknown as { expire?: (key: string, seconds: number) => Promise<unknown> }).expire;
+    if (typeof expire === "function") {
+      try {
+        await expire.call(kv, activeKey(userId), ACTIVE_USER_TTL_SEC);
+      } catch {
+        // TTL 付与失敗時もログイン自体は成功扱い
+      }
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/active-user] POST error:", e);

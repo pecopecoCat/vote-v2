@@ -64,7 +64,7 @@ function CollectionCard({
             : `overflow-hidden rounded-[18px]`
       } ${
         feedTile
-          ? "min-h-[88px] px-4 py-4 sm:min-h-[72px]"
+          ? "min-h-[88px] px-4 py-4 md:min-h-[118px] md:py-[31px]"
           : timelineBanner
             ? "h-[260px] min-h-[260px] px-5 py-5"
             : popularGradientRow || listPage
@@ -105,7 +105,7 @@ function CollectionCard({
         <div className="w-full rounded-none bg-black px-4 py-3 text-left">
           <p
             className={`whitespace-pre-line font-bold leading-snug text-[#ffffff] ${
-              feedTile ? "text-base sm:text-lg" : timelineBanner ? "text-[26px]" : "text-[28px]"
+              feedTile ? "text-base md:text-lg" : timelineBanner ? "text-[26px]" : "text-[28px]"
             }`}
           >
             {title}
