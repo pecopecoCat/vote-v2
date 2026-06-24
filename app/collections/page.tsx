@@ -75,6 +75,7 @@ function CollectionsContent() {
         visibility: "public" as const,
         cardIds: c.cardIds,
         category: c.category,
+        coverImageUrl: c.coverImageUrl,
         createdByUserId: c.createdByUserId,
         createdByDisplayName: c.createdByDisplayName,
         createdByIconUrl: c.createdByIconUrl,
@@ -189,9 +190,9 @@ function CollectionsContent() {
             setShowSettings(false);
             setEditingCollection(null);
           }}
-          onSave={async (name, gradient, visibility, category) => {
+          onSave={async (name, gradient, visibility, category, coverImageUrl) => {
             if (editingCollection) {
-              updateCollection(editingCollection.id, { name, gradient, visibility, category });
+              updateCollection(editingCollection.id, { name, gradient, visibility, category, coverImageUrl });
               refreshCollections();
             }
             setShowSettings(false);

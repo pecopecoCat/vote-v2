@@ -13,6 +13,7 @@ type IndexRow = {
   visibility: "public" | "private" | "member";
   cardIds: string[];
   category?: string;
+  coverImageUrl?: string;
   createdByUserId?: string;
   createdByDisplayName?: string;
   createdByIconUrl?: string;
@@ -59,6 +60,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
         visibility?: string;
         cardIds?: string[];
         category?: string;
+        coverImageUrl?: string;
         createdByDisplayName?: string;
         createdByIconUrl?: string;
       };
@@ -96,6 +98,9 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       cardIds,
       createdByUserId: userId || undefined,
       ...(typeof col.category === "string" && col.category.length > 0 ? { category: col.category } : {}),
+      ...(typeof col.coverImageUrl === "string" && col.coverImageUrl.length > 0
+        ? { coverImageUrl: col.coverImageUrl }
+        : {}),
       ...(createdByDisplayName ? { createdByDisplayName } : {}),
       ...(createdByIconUrl ? { createdByIconUrl } : {}),
     };

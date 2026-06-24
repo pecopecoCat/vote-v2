@@ -11,6 +11,7 @@ type IndexRow = {
   visibility: "public" | "private" | "member";
   cardIds: string[];
   category?: string;
+  coverImageUrl?: string;
   createdByUserId?: string;
   createdByDisplayName?: string;
   createdByIconUrl?: string;
@@ -41,6 +42,9 @@ function normalizeRow(raw: unknown): IndexRow | null {
   }
   if (typeof o.category === "string" && o.category.length > 0) {
     row.category = o.category;
+  }
+  if (typeof o.coverImageUrl === "string" && o.coverImageUrl.length > 0) {
+    row.coverImageUrl = o.coverImageUrl;
   }
   return row;
 }

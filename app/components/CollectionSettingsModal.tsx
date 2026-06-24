@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Collection, CollectionVisibility } from "../data/collections";
 import {
@@ -9,23 +9,23 @@ import {
   type CollectionCategory,
 } from "../data/collectionCategories";
 import { COLLECTION_GRADIENT_OPTIONS, type CollectionGradient } from "../data/search";
+import { compressImageFile } from "../lib/compressImageFile";
+import { showAppToast } from "../lib/appToast";
 
 const VISIBILITY_OPTIONS: { value: CollectionVisibility; label: string }[] = [
   { value: "public", label: "公開" },
-  { value: "private", label: "非公開" },
   { value: "member", label: "メンバー限定" },
 ];
 
 export interface CollectionSettingsModalProps {
   onClose: () => void;
-  /** 保存時は name, gradient, visibility を渡す（Bookmark/検索/MyPage/設定で共通グラデーション） */
   onSave: (
     name: string,
     gradient: CollectionGradient,
     visibility: CollectionVisibility,
-    category: CollectionCategory
+    category: CollectionCategory,
+    coverImageUrl?: string
   ) => void | Promise<void>;
-  /** 編集時は既存コレクションを渡す（新規のときは undefined） */
   editingCollection?: Collection | null;
 }
 
@@ -36,12 +36,20 @@ export default function CollectionSettingsModal({
 }: CollectionSettingsModalProps) {
   const [mounted, setMounted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
   const [name, setName] = useState(editingCollection?.name ?? "");
   const [gradient, setGradient] = useState<CollectionGradient>(editingCollection?.gradient ?? "blue-cyan");
-  const [visibility, setVisibility] = useState<CollectionVisibility>(editingCollection?.visibility ?? "public");
+  const [visibility, setVisibility] = useState<CollectionVisibility>(() => {
+    const v = editingCollection?.visibility ?? "public";
+    return v === "private" ? "public" : v;
+  });
   const [category, setCategory] = useState<CollectionCategory>(
     editingCollection ? resolveCollectionCategory(editingCollection) : "other"
   );
+  const [coverImageUrl, setCoverImageUrl] = useState<string | undefined>(
+    editingCollection?.coverImageUrl
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -51,22 +59,40 @@ export default function CollectionSettingsModal({
     if (editingCollection) {
       setName(editingCollection.name);
       setGradient(editingCollection.gradient ?? "blue-cyan");
-      setVisibility(editingCollection.visibility);
+      const v = editingCollection.visibility;
+      setVisibility(v === "private" ? "public" : v);
       setCategory(resolveCollectionCategory(editingCollection));
+      setCoverImageUrl(editingCollection.coverImageUrl);
     } else {
       setName("");
       setGradient("blue-cyan");
       setVisibility("public");
       setCategory("other");
+      setCoverImageUrl(undefined);
     }
   }, [editingCollection]);
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImageBusy(true);
+    try {
+      const dataUrl = await compressImageFile(file);
+      setCoverImageUrl(dataUrl);
+    } catch (err) {
+      showAppToast(err instanceof Error ? err.message : "画像を設定できませんでした。", "error");
+    } finally {
+      setImageBusy(false);
+    }
+  };
 
   const handleSave = async () => {
     if (saving) return;
     const trimmed = name.trim() || (editingCollection ? editingCollection.name : "新しいコレクション");
     setSaving(true);
     try {
-      await onSave(trimmed, gradient, visibility, category);
+      await onSave(trimmed, gradient, visibility, category, coverImageUrl ?? "");
       onClose();
     } finally {
       setSaving(false);
@@ -113,6 +139,61 @@ export default function CollectionSettingsModal({
               placeholder="コレクション名を入力"
               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400"
             />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-900">アイコン画像</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              aria-label="コレクションのアイコン画像を選択"
+              onChange={(e) => void handleImageSelect(e)}
+              disabled={imageBusy || saving}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative h-10 w-10 shrink-0">
+                <button
+                  type="button"
+                  disabled={imageBusy || saving}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full transition-transform active:scale-95 disabled:opacity-60 ${
+                    coverImageUrl ? "ring-2 ring-[#FFE100] ring-offset-2" : "bg-[#D9D9D9]"
+                  }`}
+                  aria-label={coverImageUrl ? "アイコン画像を変更" : "アイコン画像を設定"}
+                >
+                  {coverImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={coverImageUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span
+                      className="block h-[17.5px] w-5 shrink-0"
+                      style={{
+                        backgroundColor: "#787878",
+                        mask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+                        WebkitMask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+                      }}
+                      aria-hidden
+                    />
+                  )}
+                </button>
+                {coverImageUrl ? (
+                  <button
+                    type="button"
+                    disabled={imageBusy || saving}
+                    onClick={() => setCoverImageUrl(undefined)}
+                    className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-[#333333] text-[10px] font-bold leading-none text-white shadow-sm"
+                    aria-label="アイコン画像を削除"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+              <p className="min-w-0 flex-1 text-xs leading-relaxed text-[#787878]">
+                丸いアイコンに表示されます。未設定のときは下の背景カラーまたは登録VOTEの画像が使われます。
+              </p>
+            </div>
           </div>
 
           <div>
@@ -217,7 +298,7 @@ export default function CollectionSettingsModal({
           <button
             type="button"
             onClick={() => void handleSave()}
-            disabled={saving}
+            disabled={saving || imageBusy}
             className="btn-font flex-1 rounded-[10px] bg-[#FFE100] py-3 text-sm font-bold text-[#191919] hover:opacity-90 active:opacity-95 disabled:opacity-50"
           >
             {saving ? "保存中…" : "保存"}

@@ -1173,11 +1173,22 @@ function ProfileContent() {
             setShowCollectionSettings(false);
             setEditingCollectionForSettings(null);
           }}
-          onSave={async (name, gradient, visibility, category) => {
+          onSave={async (name, gradient, visibility, category, coverImageUrl) => {
             if (editingCollectionForSettings) {
-              updateCollection(editingCollectionForSettings.id, { name, gradient, visibility, category });
+              updateCollection(editingCollectionForSettings.id, {
+                name,
+                gradient,
+                visibility,
+                category,
+                coverImageUrl,
+              });
             } else {
-              await createOwnedCollectionFromSettings(name, { gradient, visibility, category });
+              await createOwnedCollectionFromSettings(name, {
+                gradient,
+                visibility,
+                category,
+                coverImageUrl,
+              });
             }
             setCollections(getCollections());
             setShowCollectionSettings(false);

@@ -160,12 +160,14 @@ export default function BookmarkCollectionModal({
     name: string,
     gradient: CollectionGradient,
     visibility: "public" | "private" | "member",
-    category: CollectionCategory
+    category: CollectionCategory,
+    coverImageUrl?: string
   ) => {
     await createOwnedCollectionFromSettings(name, {
       gradient,
       visibility,
       category,
+      coverImageUrl,
       cardId: cardId ?? undefined,
     });
     setCollections(getCollections());

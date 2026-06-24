@@ -18,6 +18,7 @@ type StoredCollection = {
   createdByUserId?: string;
   createdByDisplayName?: string;
   createdByIconUrl?: string;
+  coverImageUrl?: string;
 };
 
 function normalizeOne(raw: unknown): StoredCollection | null {
@@ -37,6 +38,8 @@ function normalizeOne(raw: unknown): StoredCollection | null {
       : undefined;
   const createdByIconUrl =
     typeof o.createdByIconUrl === "string" && o.createdByIconUrl.length > 0 ? o.createdByIconUrl : undefined;
+  const coverImageUrl =
+    typeof o.coverImageUrl === "string" && o.coverImageUrl.length > 0 ? o.coverImageUrl : undefined;
   return {
     id,
     name,
@@ -47,6 +50,7 @@ function normalizeOne(raw: unknown): StoredCollection | null {
     ...(createdByUserId ? { createdByUserId } : {}),
     ...(createdByDisplayName ? { createdByDisplayName } : {}),
     ...(createdByIconUrl ? { createdByIconUrl } : {}),
+    ...(coverImageUrl ? { coverImageUrl } : {}),
   };
 }
 

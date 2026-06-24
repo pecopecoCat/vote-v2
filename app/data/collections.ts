@@ -48,6 +48,8 @@ export interface Collection {
   createdByIconUrl?: string;
   /** コレクション一覧のカテゴリ */
   category?: CollectionCategory;
+  /** 一覧タイル等で表示するアイコン画像（data URL または URL） */
+  coverImageUrl?: string;
 }
 
 function normalizeCollection(c: Record<string, unknown>): Collection {
@@ -66,6 +68,8 @@ function normalizeCollection(c: Record<string, unknown>): Collection {
         : undefined,
     createdByIconUrl: typeof c.createdByIconUrl === "string" && c.createdByIconUrl.length > 0 ? c.createdByIconUrl : undefined,
     category: typeof c.category === "string" ? (c.category as CollectionCategory) : undefined,
+    coverImageUrl:
+      typeof c.coverImageUrl === "string" && c.coverImageUrl.length > 0 ? c.coverImageUrl : undefined,
   };
 }
 
@@ -614,6 +618,7 @@ function buildCollectionSyncPayload(col: Collection, userId: string) {
       visibility: col.visibility,
       cardIds: col.cardIds,
       ...(col.category ? { category: col.category } : {}),
+      ...(col.coverImageUrl ? { coverImageUrl: col.coverImageUrl } : {}),
       ...(ownerName ? { createdByDisplayName: ownerName } : {}),
       ...(ownerIcon ? { createdByIconUrl: ownerIcon } : {}),
     },
@@ -769,6 +774,7 @@ export function createCollection(
     gradient?: CollectionGradient;
     visibility?: CollectionVisibility;
     category?: CollectionCategory;
+    coverImageUrl?: string;
     skipApiSync?: boolean;
     skipRemotePush?: boolean;
   }
@@ -784,6 +790,7 @@ export function createCollection(
     gradient: options?.gradient,
     visibility: options?.visibility ?? "public",
     category: options?.category ?? "other",
+    coverImageUrl: options?.coverImageUrl?.length ? options.coverImageUrl : undefined,
     cardIds: [],
     createdByUserId: userId,
     createdByDisplayName:
@@ -819,6 +826,7 @@ export async function createOwnedCollectionFromSettings(
     gradient?: CollectionGradient;
     visibility?: CollectionVisibility;
     category?: CollectionCategory;
+    coverImageUrl?: string;
     cardId?: string;
   }
 ): Promise<Collection> {
@@ -828,6 +836,7 @@ export async function createOwnedCollectionFromSettings(
       gradient: options.gradient,
       visibility: options.visibility,
       category: options.category,
+      coverImageUrl: options.coverImageUrl,
       skipApiSync: true,
       skipRemotePush: true,
     });
@@ -855,6 +864,7 @@ export function updateCollection(
     gradient?: CollectionGradient;
     visibility?: CollectionVisibility;
     category?: CollectionCategory;
+    coverImageUrl?: string;
   }
 ): void {
   const userId = getCurrentActivityUserId();
@@ -866,6 +876,9 @@ export function updateCollection(
     if (updates.color !== undefined) col.color = updates.color;
     if (updates.gradient !== undefined) col.gradient = updates.gradient;
     if (updates.category !== undefined) col.category = updates.category;
+    if (updates.coverImageUrl !== undefined) {
+      col.coverImageUrl = updates.coverImageUrl.length > 0 ? updates.coverImageUrl : undefined;
+    }
     save(userId, cols);
     return;
   }
@@ -874,6 +887,9 @@ export function updateCollection(
   if (updates.gradient !== undefined) col.gradient = updates.gradient;
   if (updates.visibility !== undefined) col.visibility = updates.visibility;
   if (updates.category !== undefined) col.category = updates.category;
+  if (updates.coverImageUrl !== undefined) {
+    col.coverImageUrl = updates.coverImageUrl.length > 0 ? updates.coverImageUrl : undefined;
+  }
   save(userId, cols);
   if (!isCollectionPinnable(col.visibility)) {
     const pinned = loadPinnedIds(userId).filter((pid) => pid !== id);

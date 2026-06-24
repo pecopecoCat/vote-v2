@@ -10,6 +10,7 @@ export type CollectionsIndexRow = {
   visibility: string;
   cardIds: string[];
   category?: CollectionCategory;
+  coverImageUrl?: string;
   createdByUserId?: string;
   createdByDisplayName?: string;
   createdByIconUrl?: string;
@@ -37,6 +38,7 @@ function normalizeRow(raw: unknown): CollectionsIndexRow | null {
         ? o.createdByDisplayName.trim()
         : undefined,
     createdByIconUrl: typeof o.createdByIconUrl === "string" && o.createdByIconUrl.length > 0 ? o.createdByIconUrl : undefined,
+    coverImageUrl: typeof o.coverImageUrl === "string" && o.coverImageUrl.length > 0 ? o.coverImageUrl : undefined,
   };
 }
 
