@@ -7,8 +7,6 @@ export interface CardOptionsModalProps {
   onClose: () => void;
   /** 自分で作ったカードのとき true。このとき「非表示する」「報告する」は表示しない */
   isOwnCard?: boolean;
-  /** 指定時は「コミュニティに追加」を表示 */
-  onAddToCommunity?: (cardId: string) => void;
   onHide?: (cardId: string) => void;
   onReport?: (cardId: string) => void;
 }
@@ -17,7 +15,6 @@ export default function CardOptionsModal({
   cardId,
   onClose,
   isOwnCard = false,
-  onAddToCommunity,
   onHide,
   onReport,
 }: CardOptionsModalProps) {
@@ -28,21 +25,6 @@ export default function CardOptionsModal({
       icon: ReactNode;
       onClick: () => void;
     }> = [];
-
-    if (onAddToCommunity) {
-      list.push({
-        label: "コレクションに追加",
-        icon: (
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
-            <img src="/icons/icon_plus.svg" alt="" className="h-2.5 w-2.5" width={10} height={10} />
-          </span>
-        ),
-        onClick: () => {
-          onAddToCommunity(cardId);
-          onClose();
-        },
-      });
-    }
 
     if (!isOwnCard) {
       list.push(
@@ -82,7 +64,7 @@ export default function CardOptionsModal({
     }
 
     return list;
-  }, [isOwnCard, cardId, onAddToCommunity, onHide, onReport, onClose]);
+  }, [isOwnCard, cardId, onHide, onReport, onClose]);
 
   useEffect(() => {
     if (cardId != null && items.length === 0) {

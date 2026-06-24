@@ -1,16 +1,11 @@
 "use client";
 
-import { Suspense, useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo } from "react";
 import AppHeader from "../components/AppHeader";
-import CollectionListTile from "../components/CollectionListTile";
-import CollectionOptionsModal from "../components/CollectionOptionsModal";
-import CollectionSettingsModal from "../components/CollectionSettingsModal";
+import CollectionTilesRow from "../components/CollectionTilesRow";
 import { groupCollectionsForListPage } from "../data/collectionCategories";
 import {
-  deleteCollection,
   getOtherUsersCollections,
-  isCollectionPinnable,
-  togglePinnedCollection,
   updateCollection,
   type Collection,
 } from "../data/collections";
@@ -37,16 +32,6 @@ function CollectionsLoading() {
   );
 }
 
-function isOwnedCollection(
-  collection: Collection,
-  activityUserId: string,
-  localCollections: Collection[]
-): boolean {
-  const local = localCollections.find((c) => c.id === collection.id);
-  if (local && !local.joinedParticipation) return true;
-  return Boolean(collection.createdByUserId === activityUserId && !collection.joinedParticipation);
-}
-
 function CollectionsContent() {
   const auth = useAuthState();
   const isLoggedIn = auth.isLoggedIn;
@@ -59,10 +44,6 @@ function CollectionsContent() {
     "community",
     refreshCollections
   );
-
-  const [menuCollectionId, setMenuCollectionId] = useState<string | null>(null);
-  const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
 
   const collectionsForList = useMemo(() => {
     const remotePublic = remotePopularCollections
@@ -82,8 +63,13 @@ function CollectionsContent() {
       }));
     const other = getOtherUsersCollections();
     const mine = collections.filter((c) => c.visibility !== "member");
+    const ownedIds = new Set(
+      collections.filter((c) => !c.joinedParticipation).map((c) => c.id)
+    );
+    const remoteFiltered = remotePublic.filter((c) => !ownedIds.has(c.id));
+    const otherFiltered = other.filter((c) => !ownedIds.has(c.id));
     const seen = new Set<string>();
-    const combined = [...remotePublic, ...other, ...mine].filter((c) => {
+    const combined = [...mine, ...remoteFiltered, ...otherFiltered].filter((c) => {
       if (!c?.id) return false;
       if (seen.has(c.id)) return false;
       seen.add(c.id);
@@ -105,31 +91,21 @@ function CollectionsContent() {
     return map;
   }, [collectionsForList, createdVotesForTimeline]);
 
-  const menuCollection = useMemo(
-    () => (menuCollectionId ? collectionsForList.find((c) => c.id === menuCollectionId) ?? null : null),
-    [collectionsForList, menuCollectionId]
-  );
-
-  const handlePinToggle = useCallback(
-    (collectionId: string) => {
-      togglePinnedCollection(collectionId);
+  const handleSettingsSave = useCallback(
+    async (
+      editing: Collection | null,
+      name: string,
+      gradient: CollectionGradient,
+      visibility: Collection["visibility"],
+      category: Collection["category"],
+      coverImageUrl?: string
+    ) => {
+      if (!editing) return;
+      updateCollection(editing.id, { name, gradient, visibility, category, coverImageUrl });
       refreshCollections();
     },
     [refreshCollections]
   );
-
-  const openSettings = useCallback((col: Collection) => {
-    setMenuCollectionId(null);
-    setEditingCollection(col);
-    setShowSettings(true);
-  }, []);
-
-  const handleDeleteCollection = useCallback(() => {
-    if (!menuCollection) return;
-    deleteCollection(menuCollection.id);
-    refreshCollections();
-    setMenuCollectionId(null);
-  }, [menuCollection, refreshCollections]);
 
   return (
     <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
@@ -150,56 +126,22 @@ function CollectionsContent() {
             {sections.map((section) => (
               <section key={section.id} className="collections-category-section">
                 <h2 className="collections-category-title">{section.title}</h2>
-                <div className="collections-category-row">
-                  {section.collections.map((col) => {
-                    const canPin = isCollectionPinnable(col.visibility);
-                    const owned = isOwnedCollection(col, activityUserId, collections);
-                    return (
-                      <CollectionListTile
-                        key={`${section.id}-${col.id}`}
-                        collection={col}
-                        thumbnailUrl={thumbnailById.get(col.id)}
-                        href={`/collection/${col.id}`}
-                        canPin={canPin}
-                        isPinned={canPin && pinnedCollectionIds.includes(col.id)}
-                        showMenu={owned}
-                        onPinToggle={() => handlePinToggle(col.id)}
-                        onMenuClick={() => setMenuCollectionId(col.id)}
-                      />
-                    );
-                  })}
-                </div>
+                <CollectionTilesRow
+                  collections={section.collections}
+                  thumbnailById={thumbnailById}
+                  localCollections={collections}
+                  activityUserId={activityUserId}
+                  pinnedCollectionIds={pinnedCollectionIds}
+                  menuFilter="owned"
+                  showPin
+                  onRefresh={refreshCollections}
+                  onSettingsSave={handleSettingsSave}
+                />
               </section>
             ))}
           </div>
         )}
       </main>
-
-      {menuCollection ? (
-        <CollectionOptionsModal
-          onClose={() => setMenuCollectionId(null)}
-          onEdit={() => openSettings(menuCollection)}
-          onDelete={handleDeleteCollection}
-        />
-      ) : null}
-
-      {showSettings ? (
-        <CollectionSettingsModal
-          editingCollection={editingCollection}
-          onClose={() => {
-            setShowSettings(false);
-            setEditingCollection(null);
-          }}
-          onSave={async (name, gradient, visibility, category, coverImageUrl) => {
-            if (editingCollection) {
-              updateCollection(editingCollection.id, { name, gradient, visibility, category, coverImageUrl });
-              refreshCollections();
-            }
-            setShowSettings(false);
-            setEditingCollection(null);
-          }}
-        />
-      ) : null}
     </div>
   );
 }

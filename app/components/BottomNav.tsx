@@ -1,78 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getAuth, getAuthUpdatedEventName } from "../data/auth";
-import { MOCK_ANNOUNCEMENTS } from "../data/notifications";
-import {
-  ANNOUNCEMENTS_READ_STATE_EVENT,
-  hasUnreadAnnouncements,
-} from "../data/announcementReadState";
+import { MAIN_NAV_ITEMS, type NavItemId } from "./mainNav";
+import { useMainNavState } from "../hooks/useMainNavState";
 
 const DEFAULT_AVATAR = "/default-avatar.png";
 
-/** スマホメイン用・下部固定ナビ。左から n_home, コレクション, n_vote, n_news, n_mypage */
-export type NavItemId = "home" | "collection" | "add" | "notifications" | "profile";
+export type { NavItemId };
 
 export interface BottomNavProps {
   activeId?: NavItemId;
 }
 
-const navItems: { id: NavItemId; label: string; href?: string; src: string; srcOn: string }[] = [
-  { id: "home", label: "ホーム", href: "/", src: "/icons/n_home.svg", srcOn: "/icons/n_home_on.svg" },
-  {
-    id: "collection",
-    label: "コレクション",
-    href: "/collections",
-    src: "/icons/icon_collection.svg",
-    srcOn: "/icons/n_collection_on.svg",
-  },
-  { id: "add", label: "作成", href: "/create/form", src: "/icons/n_vote.svg", srcOn: "/icons/n_vote_on.svg" },
-  { id: "notifications", label: "お知らせ", href: "/notifications", src: "/icons/n_news.svg", srcOn: "/icons/n_news_on.svg" },
-  { id: "profile", label: "マイページ", href: "/profile", src: "/icons/n_mypage.svg", srcOn: "/icons/n_mypage_on.svg" },
-];
-
 export default function BottomNav({ activeId = "home" }: BottomNavProps) {
-  const [userIconUrl, setUserIconUrl] = useState<string | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [announcementUnread, setAnnouncementUnread] = useState(false);
-
-  useEffect(() => {
-    const update = () => {
-      const auth = getAuth();
-      setIsLoggedIn(auth.isLoggedIn);
-      setUserIconUrl(auth.isLoggedIn && auth.user?.iconUrl ? auth.user.iconUrl : null);
-    };
-    update();
-    window.addEventListener(getAuthUpdatedEventName(), update);
-    return () => window.removeEventListener(getAuthUpdatedEventName(), update);
-  }, []);
-
-  useEffect(() => {
-    const sync = () => setAnnouncementUnread(hasUnreadAnnouncements(MOCK_ANNOUNCEMENTS));
-    sync();
-    window.addEventListener(ANNOUNCEMENTS_READ_STATE_EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(ANNOUNCEMENTS_READ_STATE_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
+  const { userIconUrl, isLoggedIn, announcementUnread } = useMainNavState();
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 flex w-full items-stretch justify-around border-t border-gray-200 bg-white px-1 safe-area-pb"
+      className="fixed bottom-0 left-0 right-0 z-30 flex w-full items-stretch justify-around border-t border-gray-200 bg-white px-1 safe-area-pb md:hidden"
       aria-label="メインナビゲーション"
     >
-      {navItems.map(({ id, label, href, src, srcOn }) => {
+      {MAIN_NAV_ITEMS.map(({ id, label, href, src, srcOn }) => {
         const isActive = activeId === id;
         const className =
           "flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 py-2 transition-colors active:opacity-80";
         const showUserIcon = id === "profile" && userIconUrl;
-        /** プロフィールは円形クリップで実寸より小さく見えるため、他タブより一回り大きくして視覚的に揃える */
         const profilePx = 26;
         const iconPx = id === "profile" ? profilePx : 22;
-        /** マイページ選択時: #191919 の 2px 縁（ring は内側クリップと分離して描画） */
         const profileActiveRing = "ring-2 ring-[#191919] ring-offset-0";
 
         const icon = (() => {
@@ -95,7 +49,6 @@ export default function BottomNav({ activeId = "home" }: BottomNavProps) {
                 />
               </span>
             );
-            /** ログイン時のみ選択中に黒リング（未ログインのデフォルトアイコンはリングなし） */
             return isActive && isLoggedIn ? (
               <span className={`inline-flex shrink-0 rounded-full ${profileActiveRing}`}>{avatar}</span>
             ) : (

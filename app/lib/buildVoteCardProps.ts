@@ -22,6 +22,7 @@ export type BuildVoteCardPropsArgs = {
   onVote?: (cardId: string, option: "A" | "B") => void;
   onBookmarkClick?: (cardId: string) => void;
   onMoreClick?: (cardId: string) => void;
+  onAddToCollectionClick?: (cardId: string) => void;
   optimisticVoteResult?: boolean;
   hideShare?: boolean;
   hideBookmark?: boolean;
@@ -80,6 +81,7 @@ export function buildVoteCardProps(args: BuildVoteCardPropsArgs): VoteCardProps 
       ...base,
       onBookmarkClick: args.onBookmarkClick,
       onMoreClick: args.onMoreClick,
+      onAddToCollectionClick: args.onAddToCollectionClick,
       optimisticVoteResult: true,
     };
   } else {
@@ -88,6 +90,7 @@ export function buildVoteCardProps(args: BuildVoteCardPropsArgs): VoteCardProps 
       onVote: args.onVote,
       onBookmarkClick: args.onBookmarkClick,
       onMoreClick: args.onMoreClick,
+      onAddToCollectionClick: args.onAddToCollectionClick,
       optimisticVoteResult: args.optimisticVoteResult ?? true,
     };
   }

@@ -319,6 +319,7 @@ export default function CommentsPage() {
             },
             onMoreClick: () =>
               moderation.openCardOptions(relatedId, related.createdByUserId === activityUserId),
+            onAddToCollectionClick: moderation.openAddToCommunity,
           })}
         />
       );
@@ -379,6 +380,7 @@ export default function CommentsPage() {
             onMoreClick={() =>
               moderation.openCardOptions(id, (card?.createdByUserId ?? "") === activityUserId)
             }
+            onAddToCollectionClick={() => moderation.openAddToCommunity(id)}
             periodStart={card?.periodStart}
             periodEnd={card?.periodEnd}
             expandMiniForCommentsPage

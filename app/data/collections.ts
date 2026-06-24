@@ -7,7 +7,7 @@
  */
 
 import type { CollectionGradient } from "./search";
-import type { CollectionCategory } from "./collectionCategories";
+import { normalizeCollectionCategory, type CollectionCategory } from "./collectionCategories";
 import { getAuth, getCurrentActivityUserId } from "./auth";
 import {
   clearCollectionScopedLocalData,
@@ -67,7 +67,7 @@ function normalizeCollection(c: Record<string, unknown>): Collection {
         ? c.createdByDisplayName.trim()
         : undefined,
     createdByIconUrl: typeof c.createdByIconUrl === "string" && c.createdByIconUrl.length > 0 ? c.createdByIconUrl : undefined,
-    category: typeof c.category === "string" ? (c.category as CollectionCategory) : undefined,
+    category: normalizeCollectionCategory(typeof c.category === "string" ? c.category : undefined),
     coverImageUrl:
       typeof c.coverImageUrl === "string" && c.coverImageUrl.length > 0 ? c.coverImageUrl : undefined,
   };
@@ -228,6 +228,20 @@ export const SEED_COMMUNITY_IDS = {
   golgo31: "col-seed-golgo31",
 } as const;
 
+const SEED_COLLECTION_COVER_URLS: Record<string, string> = {
+  [SEED_COMMUNITY_IDS.anime]: "/collections/anime.png",
+  [SEED_COMMUNITY_IDS.dramaEnd]: "/collections/drama-end.png",
+  [SEED_COMMUNITY_IDS.golgo31]: "/collections/golgo31.png",
+  [SEED_COMMUNITY_IDS.kondate]: "/collections/kondate.png",
+  [SEED_COMMUNITY_IDS.shigoto]: "/collections/shigoto.png",
+  [SEED_COMMUNITY_IDS.warmama]: "/collections/warmama.png",
+};
+
+/** デモ用シードコレクションの代表画像（coverImageUrl 未設定時のフォールバック） */
+export function getSeedCollectionCoverImageUrl(collectionId: string): string | undefined {
+  return SEED_COLLECTION_COVER_URLS[collectionId];
+}
+
 /** 他ユーザー作成のコレクション（デモ用の固定分をここで差し込む） */
 export const OTHER_USERS_COLLECTIONS: Collection[] = [
   {
@@ -238,6 +252,7 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     visibility: "public",
     cardIds: getSeedCardIdsByTag("仕事"),
     category: "work",
+    coverImageUrl: SEED_COLLECTION_COVER_URLS[SEED_COMMUNITY_IDS.shigoto],
     createdByUserId: "user5",
     createdByDisplayName: "ryo",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -249,7 +264,8 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     gradient: "orange-yellow",
     visibility: "public",
     cardIds: getSeedCardIdsByTag("ワーママ"),
-    category: "life",
+    category: "parenting",
+    coverImageUrl: SEED_COLLECTION_COVER_URLS[SEED_COMMUNITY_IDS.warmama],
     createdByUserId: "user5",
     createdByDisplayName: "miki",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -262,6 +278,7 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     visibility: "public",
     cardIds: getSeedCardIdsByTag("アニメ"),
     category: "anime-manga",
+    coverImageUrl: SEED_COLLECTION_COVER_URLS[SEED_COMMUNITY_IDS.anime],
     createdByUserId: "user5",
     createdByDisplayName: "kouta",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -273,7 +290,8 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     gradient: "green-yellow",
     visibility: "public",
     cardIds: getSeedCardIdsByTag("今日の献立"),
-    category: "gourmet",
+    category: "gourmet-alcohol",
+    coverImageUrl: SEED_COLLECTION_COVER_URLS[SEED_COMMUNITY_IDS.kondate],
     createdByUserId: "user5",
     createdByDisplayName: "yui",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -286,6 +304,7 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     visibility: "public",
     cardIds: getSeedCardIdsByTag("ゴルゴ31"),
     category: "anime-manga",
+    coverImageUrl: SEED_COLLECTION_COVER_URLS[SEED_COMMUNITY_IDS.golgo31],
     createdByUserId: "user5",
     createdByDisplayName: "ryo",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
@@ -298,6 +317,7 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     visibility: "public",
     cardIds: getSeedCardIdsByTag("ドラマ"),
     category: "drama",
+    coverImageUrl: SEED_COLLECTION_COVER_URLS[SEED_COMMUNITY_IDS.dramaEnd],
     createdByUserId: "user5",
     createdByDisplayName: "あい",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,

@@ -8,7 +8,7 @@ import {
   resolveCollectionCategory,
   type CollectionCategory,
 } from "../data/collectionCategories";
-import { COLLECTION_GRADIENT_OPTIONS, type CollectionGradient } from "../data/search";
+import { type CollectionGradient } from "../data/search";
 import { compressImageFile } from "../lib/compressImageFile";
 import { showAppToast } from "../lib/appToast";
 
@@ -38,7 +38,6 @@ export default function CollectionSettingsModal({
   const [saving, setSaving] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [name, setName] = useState(editingCollection?.name ?? "");
-  const [gradient, setGradient] = useState<CollectionGradient>(editingCollection?.gradient ?? "blue-cyan");
   const [visibility, setVisibility] = useState<CollectionVisibility>(() => {
     const v = editingCollection?.visibility ?? "public";
     return v === "private" ? "public" : v;
@@ -58,14 +57,12 @@ export default function CollectionSettingsModal({
   useEffect(() => {
     if (editingCollection) {
       setName(editingCollection.name);
-      setGradient(editingCollection.gradient ?? "blue-cyan");
       const v = editingCollection.visibility;
       setVisibility(v === "private" ? "public" : v);
       setCategory(resolveCollectionCategory(editingCollection));
       setCoverImageUrl(editingCollection.coverImageUrl);
     } else {
       setName("");
-      setGradient("blue-cyan");
       setVisibility("public");
       setCategory("other");
       setCoverImageUrl(undefined);
@@ -90,6 +87,7 @@ export default function CollectionSettingsModal({
   const handleSave = async () => {
     if (saving) return;
     const trimmed = name.trim() || (editingCollection ? editingCollection.name : "新しいコレクション");
+    const gradient: CollectionGradient = editingCollection?.gradient ?? "blue-cyan";
     setSaving(true);
     try {
       await onSave(trimmed, gradient, visibility, category, coverImageUrl ?? "");
@@ -115,16 +113,16 @@ export default function CollectionSettingsModal({
           </h2>
           <button
             type="button"
-            className="flex h-10 w-10 items-center justify-center"
+            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center"
             aria-label="閉じる"
             onClick={onClose}
           >
             <img
               src="/icons/icon_close.svg"
               alt=""
-              className="icon-close-responsive"
-              width={14}
-              height={14}
+              className="icon-close-collection-settings"
+              width={22}
+              height={22}
             />
           </button>
         </div>
@@ -152,78 +150,42 @@ export default function CollectionSettingsModal({
               onChange={(e) => void handleImageSelect(e)}
               disabled={imageBusy || saving}
             />
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative h-10 w-10 shrink-0">
+            <div className="relative inline-block h-10 w-10">
+              <button
+                type="button"
+                disabled={imageBusy || saving}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full transition-transform active:scale-95 disabled:opacity-60 ${
+                  coverImageUrl ? "ring-2 ring-[#FFE100] ring-offset-2" : "bg-[#D9D9D9]"
+                }`}
+                aria-label={coverImageUrl ? "アイコン画像を変更" : "アイコン画像を設定"}
+              >
+                {coverImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={coverImageUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span
+                    className="block h-[17.5px] w-5 shrink-0"
+                    style={{
+                      backgroundColor: "#787878",
+                      mask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+                      WebkitMask: "url(/icons/icon_photo.svg) no-repeat center/contain",
+                    }}
+                    aria-hidden
+                  />
+                )}
+              </button>
+              {coverImageUrl ? (
                 <button
                   type="button"
                   disabled={imageBusy || saving}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full transition-transform active:scale-95 disabled:opacity-60 ${
-                    coverImageUrl ? "ring-2 ring-[#FFE100] ring-offset-2" : "bg-[#D9D9D9]"
-                  }`}
-                  aria-label={coverImageUrl ? "アイコン画像を変更" : "アイコン画像を設定"}
+                  onClick={() => setCoverImageUrl(undefined)}
+                  className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-[#333333] text-[10px] font-bold leading-none text-white shadow-sm"
+                  aria-label="アイコン画像を削除"
                 >
-                  {coverImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={coverImageUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span
-                      className="block h-[17.5px] w-5 shrink-0"
-                      style={{
-                        backgroundColor: "#787878",
-                        mask: "url(/icons/icon_photo.svg) no-repeat center/contain",
-                        WebkitMask: "url(/icons/icon_photo.svg) no-repeat center/contain",
-                      }}
-                      aria-hidden
-                    />
-                  )}
+                  ×
                 </button>
-                {coverImageUrl ? (
-                  <button
-                    type="button"
-                    disabled={imageBusy || saving}
-                    onClick={() => setCoverImageUrl(undefined)}
-                    className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-[#333333] text-[10px] font-bold leading-none text-white shadow-sm"
-                    aria-label="アイコン画像を削除"
-                  >
-                    ×
-                  </button>
-                ) : null}
-              </div>
-              <p className="min-w-0 flex-1 text-xs leading-relaxed text-[#787878]">
-                丸いアイコンに表示されます。未設定のときは下の背景カラーまたは登録VOTEの画像が使われます。
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-900">背景カラー</label>
-            <div className="flex flex-wrap gap-3">
-              {COLLECTION_GRADIENT_OPTIONS.map((c) => {
-                const isSelected = gradient === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setGradient(c.id)}
-                    className={`relative h-10 w-10 shrink-0 rounded-full transition-transform active:scale-95 ${
-                      isSelected ? "ring-2 ring-[#FFE100] ring-offset-2" : ""
-                    }`}
-                    style={{
-                      background: `linear-gradient(to bottom, ${c.start}, ${c.end})`,
-                    }}
-                    aria-label={`グラデーション ${c.id}`}
-                  >
-                    {isSelected && (
-                      <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#FFE100]">
-                        <svg className="h-3 w-3" fill="#191919" viewBox="0 0 24 24">
-                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                        </svg>
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+              ) : null}
             </div>
           </div>
 

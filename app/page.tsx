@@ -267,6 +267,7 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
   currentUser,
   handleVote,
   onMoreClick,
+  onAddToCollectionClick,
 }: {
   timelineItems: TimelineItem[];
   timelineTagList: string[];
@@ -276,6 +277,7 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
   currentUser: CurrentUser;
   handleVote: (id: string, option: "A" | "B") => void;
   onMoreClick: (cardId: string) => void;
+  onAddToCollectionClick: (cardId: string) => void;
 }) {
   const [loadMoreSteps, setLoadMoreSteps] = useState(0);
   const visibleCount = Math.min(
@@ -324,6 +326,7 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
                   hasCommented: commentedCardIdSet.has(cardId),
                   onVote: handleVote,
                   onMoreClick,
+                  onAddToCollectionClick,
                 })}
               />
             </div>
@@ -733,6 +736,7 @@ function HomeContent() {
                 currentUser={currentUser}
                 handleVote={handleVote}
                 onMoreClick={handleCardMoreClick}
+                onAddToCollectionClick={moderation.openAddToCommunity}
               />
             </VoteCardList>
           </>

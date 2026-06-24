@@ -689,6 +689,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
                         hasCommented: commentedCardIdSet.has(cardId),
                         onVote: handleVote,
                         onMoreClick: handleTagFilterCardMoreClick,
+                        onAddToCollectionClick: moderation.openAddToCommunity,
                       })}
                     />
                     </VoteCardMasonryTile>
@@ -883,6 +884,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
                                 hasCommented: commentedCardIdSet.has(cardId),
                                 onVote: handleVote,
                                 onMoreClick: handleTagFilterCardMoreClick,
+                        onAddToCollectionClick: moderation.openAddToCommunity,
                               })}
                             />
                           </VoteCardMasonryTile>

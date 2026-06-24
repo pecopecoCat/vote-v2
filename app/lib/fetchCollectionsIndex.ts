@@ -1,4 +1,4 @@
-import type { CollectionCategory } from "../data/collectionCategories";
+import { normalizeCollectionCategory, type CollectionCategory } from "../data/collectionCategories";
 
 /** 検索の人気コレ・参加コレ掃除で共有する /api/collections 結果キャッシュ */
 
@@ -31,7 +31,7 @@ function normalizeRow(raw: unknown): CollectionsIndexRow | null {
     gradient: typeof o.gradient === "string" ? o.gradient : undefined,
     visibility: typeof o.visibility === "string" ? o.visibility : "public",
     cardIds: Array.isArray(o.cardIds) ? o.cardIds.filter((x): x is string => typeof x === "string") : [],
-    category: typeof o.category === "string" ? (o.category as CollectionCategory) : undefined,
+    category: normalizeCollectionCategory(typeof o.category === "string" ? o.category : undefined),
     createdByUserId: typeof o.createdByUserId === "string" ? o.createdByUserId : undefined,
     createdByDisplayName:
       typeof o.createdByDisplayName === "string" && o.createdByDisplayName.trim()

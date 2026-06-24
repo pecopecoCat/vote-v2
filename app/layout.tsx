@@ -3,7 +3,7 @@ import { Lato, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 import { SharedDataProvider } from "./context/SharedDataContext";
 import AppToastHost from "./components/AppToastHost";
-import AppBottomNav from "./components/AppBottomNav";
+import AppMainNav from "./components/AppMainNav";
 import ServerStorageBanner from "./components/ServerStorageBanner";
 
 const notoSansJP = Noto_Sans_JP({
@@ -38,9 +38,11 @@ export default function RootLayout({
         <div className="min-h-dvh w-full bg-[var(--color-bg)]">
           <SharedDataProvider>
             <ServerStorageBanner />
-            {children}
-            {modal}
-            <AppBottomNav />
+            <div className="app-shell__main min-w-0">
+              {children}
+              {modal}
+            </div>
+            <AppMainNav />
             <AppToastHost />
           </SharedDataProvider>
         </div>

@@ -41,7 +41,6 @@ export default function CardModerationModals({
           cardId={cardOptionsCardId}
           isOwnCard={cardOptionsIsOwnCard}
           onClose={onCloseOptions}
-          onAddToCommunity={onAddToCommunity}
           onHide={onHideCard}
           onReport={onReportCard}
         />

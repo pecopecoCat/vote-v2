@@ -25,13 +25,13 @@ import {
   getCollections,
   createOwnedCollectionFromSettings,
   updateCollection,
-  deleteCollection,
-  syncCollectionToApiAndWait,
   type Collection,
-  type CollectionVisibility,
 } from "../data/collections";
 import { getBookmarkIds, isCardBookmarked, getBookmarksUpdatedEventName } from "../data/bookmarks";
-import { getCollectionGradientStyle } from "../data/search";
+import CollectionTilesRow, {
+  type CollectionTilesRowHandle,
+} from "../components/CollectionTilesRow";
+import { getCollectionThumbnailUrl } from "../lib/getCollectionThumbnailUrl";
 import { perfMeasure } from "../lib/perf";
 import { buildVoteCardProps } from "../lib/buildVoteCardProps";
 import { resolveCardBackgroundUrl } from "../lib/resolveCardBackgroundUrl";
@@ -54,18 +54,9 @@ import type { VoteCardData } from "../data/voteCards";
 import type { CurrentUser } from "../components/VoteCard";
 import VoteCardMini from "../components/VoteCardMini";
 import Button from "../components/Button";
-import CollectionSettingsModal from "../components/CollectionSettingsModal";
-import CollectionOptionsModal from "../components/CollectionOptionsModal";
-import MemberCollectionShareSheet from "../components/MemberCollectionShareSheet";
 import NewestOldestSortDropdown from "../components/NewestOldestSortDropdown";
 import CommentThreadGroup from "../components/CommentThreadGroup";
 import UnderlineTabBar, { type UnderlineTabItem } from "../components/UnderlineTabBar";
-
-const VISIBILITY_LABEL: Record<CollectionVisibility, string> = {
-  public: "公開",
-  private: "非公開",
-  member: "メンバー限定",
-};
 
 const MOCK_USER = {
   name: "love_nitaku",
@@ -276,17 +267,6 @@ function ProfileContent() {
     [replaceProfileQuery]
   );
 
-  const openCommunityView = useCallback(
-    (communityId: string) => {
-      setSelectedCommunityId(communityId);
-      replaceProfileQuery((params) => {
-        params.set("tab", "myCommunity");
-        params.set("community", communityId);
-      });
-    },
-    [replaceProfileQuery]
-  );
-
   const closeCommunityView = useCallback(() => {
     setSelectedCommunityId(null);
     replaceProfileQuery((params) => {
@@ -295,24 +275,7 @@ function ProfileContent() {
     });
   }, [replaceProfileQuery]);
 
-  /** マイコミュニティタブ3点リーダー「シェアする」→ コレ画面の飛行機アイコンと同じ半モーダル */
-  const handleCollectionMenuShare = useCallback(
-    async (collectionId: string) => {
-      const col = collections.find((c) => c.id === collectionId);
-      if (!col || col.visibility !== "member") return;
-      const ok = await syncCollectionToApiAndWait(col);
-      if (ok) setShareSheetCollectionId(collectionId);
-    },
-    [collections]
-  );
-  /** コレクション設定モーダル（新規追加 or 編集） */
-  const [showCollectionSettings, setShowCollectionSettings] = useState(false);
-  /** 編集中のコレクション（null = 新規追加） */
-  const [editingCollectionForSettings, setEditingCollectionForSettings] = useState<Collection | null>(null);
-  /** 3点リーダーメニューを開いているコレクションID */
-  const [collectionMenuOpenId, setCollectionMenuOpenId] = useState<string | null>(null);
-  /** メンバー限定コレのシェア半モーダル（マイコミュニティタブの3点リーダーから） */
-  const [shareSheetCollectionId, setShareSheetCollectionId] = useState<string | null>(null);
+  const collectionTilesRef = useRef<CollectionTilesRowHandle>(null);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
   const [hiddenCardIds, setHiddenCardIds] = useState<string[]>(() => getHiddenCardIds());
   /** myVOTE 編集モード（カード削除用） */
@@ -527,6 +490,14 @@ function ProfileContent() {
     }
     return out;
   }, [selectedCommunityId, collections, allCardsFiltered]);
+
+  const communityThumbnailById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const col of collections) {
+      map.set(col.id, getCollectionThumbnailUrl(col, createdVotesForTimeline));
+    }
+    return map;
+  }, [collections, createdVotesForTimeline]);
 
   const commentedCardIds = useMemo(
     () =>
@@ -894,6 +865,7 @@ function ProfileContent() {
                         hasCommented: commentedCardIdSet.has(cardId),
                         onVote: handleProfileParticipateVote,
                         onMoreClick: handleProfileCardMoreClick,
+                        onAddToCollectionClick: moderation.openAddToCommunity,
                       })}
                     />
                     </VoteCardMasonryTile>
@@ -907,49 +879,50 @@ function ProfileContent() {
         {activeTab === "myCommunity" && (
           <>
             {selectedCommunityId == null ? (
-              <div className="flex flex-col gap-2">
-                {collections.map((col) => (
-                  <div
-                    key={col.id}
-                    className="flex w-full items-center gap-3 rounded-xl bg-white pl-4 pr-[10px] py-3"
-                  >
-                    <button
-                      type="button"
-                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                      onClick={() => openCommunityView(col.id)}
-                    >
-                      <span
-                        className="h-10 w-10 shrink-0 rounded-full"
-                        style={getCollectionGradientStyle(col.gradient, col.color)}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-[#191919]">{col.name}</p>
-                        <p className="text-xs text-gray-500">
-                          登録数 {col.cardIds.length}件 · {VISIBILITY_LABEL[col.visibility]}
-                          {col.joinedParticipation ? " · 参加中" : ""}
-                        </p>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center text-[#666666]"
-                        aria-label="コレクションの設定"
-                      onClick={() => setCollectionMenuOpenId(col.id)}
-                    >
-                      <img src="/icons/icon_3ten.svg" alt="" className="h-6 w-6" width={24} height={24} />
-                    </button>
-                  </div>
-                ))}
+              <div className="flex flex-col gap-4">
                 <Button
                   variant="outline"
-                  className="mt-4 w-full"
-                  onClick={() => {
-                    setEditingCollectionForSettings(null);
-                    setShowCollectionSettings(true);
-                  }}
+                  className="w-full"
+                  onClick={() => collectionTilesRef.current?.openCreateSettings()}
                 >
-                  新しいコレクションを追加
+                  コレクションを作成
                 </Button>
+                {collections.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-gray-500">コレクションがまだありません。</p>
+                ) : null}
+                <CollectionTilesRow
+                  ref={collectionTilesRef}
+                  collections={collections}
+                  thumbnailById={communityThumbnailById}
+                  localCollections={collections}
+                  activityUserId={getCurrentActivityUserId()}
+                  menuFilter="library"
+                  onRefresh={() => setCollections(getCollections())}
+                  onSettingsSave={async (editing, name, gradient, visibility, category, coverImageUrl) => {
+                    if (editing) {
+                      updateCollection(editing.id, {
+                        name,
+                        gradient,
+                        visibility,
+                        category,
+                        coverImageUrl,
+                      });
+                    } else {
+                      await createOwnedCollectionFromSettings(name, {
+                        gradient,
+                        visibility,
+                        category,
+                        coverImageUrl,
+                      });
+                    }
+                    setCollections(getCollections());
+                  }}
+                  onDeleted={(collectionId) => {
+                    if (selectedCommunityId === collectionId) {
+                      closeCommunityView();
+                    }
+                  }}
+                />
               </div>
             ) : (
               <>
@@ -990,6 +963,7 @@ function ProfileContent() {
                             hasCommented: commentedCardIdSet.has(cardId),
                             onVote: handleProfileParticipateVote,
                             onMoreClick: handleProfileCardMoreClick,
+                        onAddToCollectionClick: moderation.openAddToCommunity,
                           })}
                         />
                       );
@@ -1129,73 +1103,6 @@ function ProfileContent() {
         onCloseReport={moderation.closeReport}
       />
 
-      {collectionMenuOpenId != null && (() => {
-        const menuCol = collections.find((c) => c.id === collectionMenuOpenId);
-        return (
-        <CollectionOptionsModal
-          showShare={menuCol?.visibility === "member"}
-          onShare={() => void handleCollectionMenuShare(collectionMenuOpenId)}
-          hideEdit={Boolean(menuCol?.joinedParticipation)}
-          deleteLabel={menuCol?.joinedParticipation ? "マイリストから削除" : "コレクションを削除"}
-          onClose={() => setCollectionMenuOpenId(null)}
-          onEdit={() => {
-            const col = collections.find((c) => c.id === collectionMenuOpenId);
-            if (col) {
-              setEditingCollectionForSettings(col);
-              setShowCollectionSettings(true);
-            }
-            setCollectionMenuOpenId(null);
-          }}
-          onDelete={() => {
-            deleteCollection(collectionMenuOpenId);
-            setCollections(getCollections());
-            if (selectedCommunityId === collectionMenuOpenId) {
-              closeCommunityView();
-            }
-            setCollectionMenuOpenId(null);
-          }}
-        />
-        );
-      })()}
-
-      {shareSheetCollectionId != null && (
-        <MemberCollectionShareSheet
-          open
-          onClose={() => setShareSheetCollectionId(null)}
-          collectionId={shareSheetCollectionId}
-        />
-      )}
-
-      {showCollectionSettings && (
-        <CollectionSettingsModal
-          editingCollection={editingCollectionForSettings}
-          onClose={() => {
-            setShowCollectionSettings(false);
-            setEditingCollectionForSettings(null);
-          }}
-          onSave={async (name, gradient, visibility, category, coverImageUrl) => {
-            if (editingCollectionForSettings) {
-              updateCollection(editingCollectionForSettings.id, {
-                name,
-                gradient,
-                visibility,
-                category,
-                coverImageUrl,
-              });
-            } else {
-              await createOwnedCollectionFromSettings(name, {
-                gradient,
-                visibility,
-                category,
-                coverImageUrl,
-              });
-            }
-            setCollections(getCollections());
-            setShowCollectionSettings(false);
-            setEditingCollectionForSettings(null);
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -900,6 +900,9 @@ export default function CollectionPage() {
                     hasCommented: false,
                     onVote: handleCollectionVote,
                     onMoreClick: isMemberCollection ? undefined : handleCollectionCardMoreClick,
+                    onAddToCollectionClick: isMemberCollection
+                      ? undefined
+                      : moderation.openAddToCommunity,
                     commentsDisabled: isMemberCollection || card.commentsDisabled === true,
                     hideShare: isMemberCollection,
                     hideBookmark: isMemberCollectionParticipant,

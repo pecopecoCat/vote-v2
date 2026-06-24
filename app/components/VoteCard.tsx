@@ -75,6 +75,8 @@ export interface VoteCardProps {
   hasCommented?: boolean;
   /** 3点リーダー（その他）タップ時（cardId を渡してモーダル表示用） */
   onMoreClick?: (cardId: string) => void;
+  /** コレクションに追加アイコンタップ時 */
+  onAddToCollectionClick?: (cardId: string) => void;
   /** true のときコメント導線を出さず受け付けない旨を表示 */
   commentsDisabled?: boolean;
   /** true のときフッターのシェアアイコンを出さない（メンバー限定コレクション内など） */
@@ -124,6 +126,7 @@ function VoteCard({
   visibility,
   hasCommented = false,
   onMoreClick,
+  onAddToCollectionClick,
   commentsDisabled = false,
   hideShare = false,
   hideBookmark = false,
@@ -472,6 +475,25 @@ function VoteCard({
                 className="vote-card-footer-icon-bookmark opacity-40"
               />
             )}
+          </button>
+        )}
+        {cardId != null && onAddToCollectionClick && (
+          <button
+            type="button"
+            className="flex items-center justify-center text-[#191919] hover:opacity-80"
+            aria-label="コレクションに追加"
+            onClick={(e) => {
+              e.preventDefault();
+              onAddToCollectionClick(cardId);
+            }}
+          >
+            <img
+              src="/icons/icon_addCollection.svg"
+              alt=""
+              className="h-[18px] w-auto shrink-0"
+              width={24}
+              height={19}
+            />
           </button>
         )}
         <div className="ml-auto flex items-center gap-1">
