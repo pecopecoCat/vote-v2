@@ -91,12 +91,11 @@ function CollectionListTile({
           </div>
         ) : null}
 
-        <Link href={href} prefetch={false} className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-3">
-          <div className="mb-3 flex h-8 shrink-0 items-start justify-between gap-1" aria-hidden>
-            <span className="h-8 w-8 shrink-0" />
-            <span className="h-8 w-8 shrink-0" />
-          </div>
-
+        <Link
+          href={href}
+          prefetch={false}
+          className={`flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3 ${showTopActions ? "pt-11" : "pt-4"}`}
+        >
           <div className="flex shrink-0 justify-center">
             <span className="relative h-[88px] w-[88px] overflow-hidden rounded-full ring-1 ring-black/[0.06]">
               {thumbnailUrl ? (
@@ -114,7 +113,7 @@ function CollectionListTile({
             </span>
           </div>
 
-          <div className="mt-auto min-h-0 w-full pt-3">
+          <div className="min-h-0 w-full">
             <h3
               className="w-full min-w-0 truncate text-center text-sm font-bold leading-snug text-[#191919]"
               title={collection.name}
