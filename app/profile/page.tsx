@@ -658,10 +658,8 @@ function ProfileContent() {
           </Link>
         </div>
 
-        {/* 横棒：横幅100%（ビューポート幅）・お気に入りタグの上 */}
-        <div className="mt-4 w-screen relative left-1/2 -translate-x-1/2">
-          <div className="h-px w-full bg-[#EDC229]" aria-hidden />
-        </div>
+        {/* 横棒：SP は画面端まで／PC はメイン幅内 */}
+        <div className="profile-yellow-header-divider mt-4" aria-hidden />
         <div className="mt-4">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1 text-sm font-bold text-[#191919]">

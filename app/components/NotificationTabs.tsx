@@ -36,7 +36,7 @@ export default function NotificationTabs({
   const effectiveTab = isLoggedIn ? activeTab : "announcements";
 
   return (
-    <div className="bg-[#F1F1F1]">
+    <div className="min-w-0 overflow-visible bg-[#F1F1F1]">
       <AppHeader type="logo" />
 
       {isLoggedIn ? (
@@ -45,16 +45,16 @@ export default function NotificationTabs({
           activeId={effectiveTab}
           onSelect={onTabChange}
           ariaLabel="お知らせタブ"
-          layout="equal"
+          layout="equalScroll"
         />
       ) : null}
 
-      {/* アクティビティは区切り線フル幅のため横パディングなし。お知らせは 335/375 相当のコンテンツ幅 */}
-      <main className="mx-auto max-w-lg pb-6 pt-4">
+      {/* アクティビティは区切り線フル幅・本文は notification-content-width。お知らせも同幅 */}
+      <main className="mx-auto min-w-0 max-w-lg overflow-visible pb-6 pt-4">
         {effectiveTab === "activity" ? (
           activityContent
         ) : (
-          <div className="mx-auto w-[min(100%,calc(100vw*335/375))]">{announcementsContent}</div>
+          <div className="notification-content-width">{announcementsContent}</div>
         )}
       </main>
     </div>

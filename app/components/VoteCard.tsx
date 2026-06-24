@@ -8,6 +8,7 @@ import { toggleBookmark } from "../lib/toggleBookmark";
 import { useSharedData } from "../context/SharedDataContext";
 import TagSearchLink from "./TagSearchLink";
 import VoteCardShareSheet from "./VoteCardShareSheet";
+import { VoteCardFooterIconBox } from "./VoteCardFooterIconBox";
 import { getVotePeriodStatusText, isVotingAllowedNow } from "../data/votePeriod";
 import { getAvatarProxySrc } from "../lib/avatarProxy";
 import { isRemoteHttpUrl, resolveAvatarSrc } from "../lib/normalize";
@@ -405,11 +406,13 @@ function VoteCard({
         className={`vote-card-footer-row flex items-center gap-4 border-t border-gray-100 px-5 ${tags.length > 0 ? "pb-[0.36em]" : "pb-[0.72em]"}`}
       >
         <span className="flex items-center gap-1" aria-label="2択回答数">
-          <img
-            src={showResult ? "/icons/votemark.svg" : "/icons/votemark-black.svg"}
-            alt=""
-            className="vote-card-footer-icon-square"
-          />
+          <VoteCardFooterIconBox>
+            <img
+              src={showResult ? "/icons/votemark.svg" : "/icons/votemark-black.svg"}
+              alt=""
+              className="vote-card-footer-icon-graphic"
+            />
+          </VoteCardFooterIconBox>
           <span className="vote-card-footer-count">{displayTotal}</span>
         </span>
         {commentsDisabled ? (
@@ -422,18 +425,26 @@ function VoteCard({
             onClick={handleNavigateToComments}
           >
             {hasCommented ? (
-              <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
+              <VoteCardFooterIconBox>
+                <span className="comment-icon-commented vote-card-footer-icon-graphic" aria-hidden />
+              </VoteCardFooterIconBox>
             ) : (
-              <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
+              <VoteCardFooterIconBox>
+                <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-graphic" />
+              </VoteCardFooterIconBox>
             )}
             <span className="vote-card-footer-count">{commentCount}</span>
           </Link>
         ) : (
           <span className="flex items-center gap-1" aria-label="コメント数">
             {hasCommented ? (
-              <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
+              <VoteCardFooterIconBox>
+                <span className="comment-icon-commented vote-card-footer-icon-graphic" aria-hidden />
+              </VoteCardFooterIconBox>
             ) : (
-              <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
+              <VoteCardFooterIconBox>
+                <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-graphic" />
+              </VoteCardFooterIconBox>
             )}
             <span className="vote-card-footer-count">{commentCount}</span>
           </span>
@@ -467,13 +478,17 @@ function VoteCard({
             }}
           >
             {isBookmarked ? (
-              <span className="bookmark-icon-bookmarked vote-card-footer-icon-bookmark" aria-hidden />
+              <VoteCardFooterIconBox>
+                <span className="bookmark-icon-bookmarked vote-card-footer-icon-graphic" aria-hidden />
+              </VoteCardFooterIconBox>
             ) : (
-              <img
-                src="/icons/bookmark.svg"
-                alt=""
-                className="vote-card-footer-icon-bookmark opacity-40"
-              />
+              <VoteCardFooterIconBox>
+                <img
+                  src="/icons/bookmark.svg"
+                  alt=""
+                  className="vote-card-footer-icon-graphic opacity-40"
+                />
+              </VoteCardFooterIconBox>
             )}
           </button>
         )}
@@ -487,13 +502,13 @@ function VoteCard({
               onAddToCollectionClick(cardId);
             }}
           >
-            <img
-              src="/icons/icon_addCollection.svg"
-              alt=""
-              className="h-[18px] w-auto shrink-0"
-              width={24}
-              height={19}
-            />
+            <VoteCardFooterIconBox>
+              <img
+                src="/icons/icon_addCollection.svg"
+                alt=""
+                className="vote-card-footer-icon-graphic"
+              />
+            </VoteCardFooterIconBox>
           </button>
         )}
         <div className="ml-auto flex items-center gap-1">
@@ -507,7 +522,9 @@ function VoteCard({
                 setShareSheetOpen(true);
               }}
             >
-              <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />
+              <VoteCardFooterIconBox>
+                <img src="/icons/icon_share.svg" alt="" className="vote-card-footer-icon-graphic" />
+              </VoteCardFooterIconBox>
             </button>
           )}
           {cardId != null && onMoreClick && (
@@ -520,7 +537,9 @@ function VoteCard({
                 onMoreClick(cardId);
               }}
             >
-              <MoreIcon className="h-5 w-5" />
+              <VoteCardFooterIconBox>
+                <MoreIcon className="vote-card-footer-icon-graphic" />
+              </VoteCardFooterIconBox>
             </button>
           )}
         </div>

@@ -41,7 +41,7 @@ function CollectionListTile({
                 <button
                   type="button"
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
-                    isPinned ? "bg-[#FFE100]" : "bg-[#EBEBEB]"
+                    isPinned ? "bg-[#191919]" : "bg-[#EBEBEB]"
                   }`}
                   aria-label={isPinned ? "ピン留めを解除" : "ピン留めする"}
                   onClick={(e) => {
@@ -51,9 +51,9 @@ function CollectionListTile({
                   }}
                 >
                   <img
-                    src="/icons/icon_pin.svg"
+                    src={isPinned ? "/icons/icon_pin_yellow.svg" : "/icons/icon_pin.svg"}
                     alt=""
-                    className={`h-[18px] w-[18px] ${isPinned ? "" : "opacity-35"}`}
+                    className={`h-[18px] w-[18px] ${isPinned ? "scale-90" : "opacity-35"}`}
                     width={18}
                     height={18}
                     aria-hidden

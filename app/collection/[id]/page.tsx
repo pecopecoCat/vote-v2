@@ -30,6 +30,7 @@ import {
 } from "../../data/collections";
 import { isCardBookmarked } from "../../data/bookmarks";
 import { getCollectionGradientClass } from "../../data/search";
+import { getCollectionThumbnailUrl } from "../../lib/getCollectionThumbnailUrl";
 import { voteCardsData, resolveStableVoteCardId } from "../../data/voteCards";
 import { getCurrentActivityUserId } from "../../data/auth";
 import {
@@ -563,6 +564,10 @@ export default function CollectionPage() {
 
   const canPin = isCollectionPinnable(collection?.visibility ?? "private");
   const isPinned = canPin && pinnedIds.includes(id);
+  const collectionHeaderCoverUrl = useMemo(() => {
+    if (!collection) return null;
+    return getCollectionThumbnailUrl(collection, createdVotesForTimeline);
+  }, [collection, createdVotesForTimeline]);
 
   const cardsInCollection = useMemo(() => {
     if (!collection) return [];
@@ -755,15 +760,30 @@ export default function CollectionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-[50px]">
-      {/* ヘッダー：設定グラデーション/カラー背景・コレクション名・戻る・ピン（全画面共通） */}
-      <header
-        className={`flex items-center justify-between px-4 py-3 ${collection.gradient ? `bg-gradient-to-r ${getCollectionGradientClass(collection.gradient)}` : ""}`}
-        style={collection.gradient ? undefined : { backgroundColor: collection.color }}
-      >
+    <div className="min-h-screen min-w-0 bg-[#F1F1F1] pb-[50px]">
+      {/* ヘッダー：設定画像 or グラデーション/カラー・コレクション名・戻る・ピン */}
+      <header className="relative flex min-h-[56px] w-full max-w-full items-center justify-between overflow-hidden border-b-2 border-[#FFE100] px-4 py-3">
+        {collectionHeaderCoverUrl ? (
+          <>
+            <img
+              src={collectionHeaderCoverUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+              decoding="async"
+              aria-hidden
+            />
+            <div className="absolute inset-0 bg-black/50" aria-hidden />
+          </>
+        ) : (
+          <div
+            className={`absolute inset-0 ${collection.gradient ? `bg-gradient-to-r ${getCollectionGradientClass(collection.gradient)}` : ""}`}
+            style={collection.gradient ? undefined : { backgroundColor: collection.color }}
+            aria-hidden
+          />
+        )}
         <button
           type="button"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/90 text-gray-900"
+          className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/90 text-gray-900"
           aria-label="1つ前のページに戻る"
           onClick={() =>
             navigateBack(router, {
@@ -775,20 +795,20 @@ export default function CollectionPage() {
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
           </svg>
         </button>
-        <h1 className="min-w-0 flex-1 truncate text-center text-base font-bold text-white drop-shadow-sm">
+        <h1 className="relative z-10 min-w-0 flex-1 truncate text-center text-base font-bold text-white drop-shadow-sm">
           {collection.name}
         </h1>
         {canPin ? (
           <button
             type="button"
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isPinned ? "bg-[#FFE100]" : "bg-white/90"}`}
+            className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isPinned ? "bg-[#191919]" : "bg-white/90"}`}
             aria-label={isPinned ? "ピン留めを外す" : "検索画面にピン留め"}
             onClick={handleTogglePin}
           >
             <img
-              src="/icons/icon_pin.svg"
+              src={isPinned ? "/icons/icon_pin_yellow.svg" : "/icons/icon_pin.svg"}
               alt=""
-              className="h-5 w-5"
+              className={`h-5 w-5 ${isPinned ? "scale-90" : ""}`}
               width={22}
               height={22}
             />

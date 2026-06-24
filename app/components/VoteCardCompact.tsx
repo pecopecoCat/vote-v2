@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { VoteCardPattern } from "./VoteCard";
 import VoteCardShareSheet from "./VoteCardShareSheet";
+import { VoteCardFooterIconBox } from "./VoteCardFooterIconBox";
 import { toggleBookmark } from "../lib/toggleBookmark";
 import { useSharedData } from "../context/SharedDataContext";
 import { getVotePeriodStatusText, isVotingAllowedNow } from "../data/votePeriod";
@@ -279,14 +280,16 @@ export default function VoteCardCompact({
 
       {!hideFooterIconRow && (
         <div
-          className={`flex items-center gap-4 border-t border-gray-100 px-5 ${isMini ? "pt-2 pb-[14.4px]" : "py-2"}`}
+          className={`vote-card-footer-row flex items-center gap-4 border-t border-gray-100 px-5 ${isMini ? "pt-2 pb-[14.4px]" : "py-2"}`}
         >
           <span className="flex items-center gap-1" aria-label="2択回答数">
-            <img
-              src={selectedSide ? "/icons/votemark.svg" : "/icons/votemark-black.svg"}
-              alt=""
-              className="vote-card-footer-icon-square"
-            />
+            <VoteCardFooterIconBox>
+              <img
+                src={selectedSide ? "/icons/votemark.svg" : "/icons/votemark-black.svg"}
+                alt=""
+                className="vote-card-footer-icon-graphic"
+              />
+            </VoteCardFooterIconBox>
             <span className="vote-card-footer-count">{displayTotal}</span>
           </span>
           {commentsDisabled ? (
@@ -294,9 +297,13 @@ export default function VoteCardCompact({
           ) : (
             <span className="flex items-center gap-1" aria-label="コメント数">
               {hasCommented ? (
-                <span className="comment-icon-commented vote-card-footer-icon-commented" aria-hidden />
+                <VoteCardFooterIconBox>
+                  <span className="comment-icon-commented vote-card-footer-icon-graphic" aria-hidden />
+                </VoteCardFooterIconBox>
               ) : (
-                <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-square" />
+                <VoteCardFooterIconBox>
+                  <img src="/icons/comment.svg" alt="" className="vote-card-footer-icon-graphic" />
+                </VoteCardFooterIconBox>
               )}
               <span className="vote-card-footer-count">{commentCount}</span>
             </span>
@@ -326,9 +333,13 @@ export default function VoteCardCompact({
             }}
           >
             {bookmarked ? (
-              <span className="bookmark-icon-bookmarked vote-card-footer-icon-bookmark" aria-hidden />
+              <VoteCardFooterIconBox>
+                <span className="bookmark-icon-bookmarked vote-card-footer-icon-graphic" aria-hidden />
+              </VoteCardFooterIconBox>
             ) : (
-              <img src="/icons/bookmark.svg" alt="" className="vote-card-footer-icon-bookmark opacity-40" />
+              <VoteCardFooterIconBox>
+                <img src="/icons/bookmark.svg" alt="" className="vote-card-footer-icon-graphic opacity-40" />
+              </VoteCardFooterIconBox>
             )}
           </button>
           {cardId != null && onAddToCollectionClick && (
@@ -338,13 +349,13 @@ export default function VoteCardCompact({
               aria-label="コレクションに追加"
               onClick={() => onAddToCollectionClick(cardId)}
             >
-              <img
-                src="/icons/icon_addCollection.svg"
-                alt=""
-                className="h-[18px] w-auto shrink-0"
-                width={24}
-                height={19}
-              />
+              <VoteCardFooterIconBox>
+                <img
+                  src="/icons/icon_addCollection.svg"
+                  alt=""
+                  className="vote-card-footer-icon-graphic"
+                />
+              </VoteCardFooterIconBox>
             </button>
           )}
           <div className="ml-auto flex items-center gap-1">
@@ -355,7 +366,9 @@ export default function VoteCardCompact({
                 aria-label="シェア"
                 onClick={() => setShareSheetOpen(true)}
               >
-                <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />
+                <VoteCardFooterIconBox>
+                  <img src="/icons/icon_share.svg" alt="" className="vote-card-footer-icon-graphic" />
+                </VoteCardFooterIconBox>
               </button>
             )}
             {cardId != null && onMoreClick && (
@@ -365,7 +378,9 @@ export default function VoteCardCompact({
                 aria-label="その他"
                 onClick={() => onMoreClick(cardId)}
               >
-                <MoreIcon className="h-5 w-5" />
+                <VoteCardFooterIconBox>
+                  <MoreIcon className="vote-card-footer-icon-graphic" />
+                </VoteCardFooterIconBox>
               </button>
             )}
           </div>

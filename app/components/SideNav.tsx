@@ -93,7 +93,7 @@ export default function SideNav({ activeId = "home" }: SideNavProps) {
               <li key={id}>
                 <Link
                   href={href}
-                  prefetch
+                  prefetch={id !== "add"}
                   className={itemClassName}
                   aria-label={
                     id === "notifications" && announcementUnread ? `${label}（未読のお知らせがあります）` : label

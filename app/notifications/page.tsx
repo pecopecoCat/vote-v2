@@ -25,13 +25,11 @@ import type { VoteCardData } from "../data/voteCards";
 
 const MY_COMMENT_USER_NAME = "自分";
 
-/** 375px 幅時にコンテンツ 335px 相当（335/375） */
-const NOTIFICATION_CONTENT_WIDTH_CLASS =
-  "mx-auto w-[min(100%,calc(100vw*335/375))]";
+/** 375px 幅時にコンテンツ 335px 相当（PC は固定幅） */
+const NOTIFICATION_CONTENT_WIDTH_CLASS = "notification-content-width";
 
-/** リスト枠：区切り線をビューポート横いっぱいに（max-w-lg 内からのフルブリード） */
-const ACTIVITY_LIST_FULL_BLEED_CLASS =
-  "w-screen max-w-[100vw] border-[#DADADA] border-t ml-[calc(50%-50vw)]";
+/** リスト枠：区切り線を横いっぱいに（PC はサイドナビ幅を考慮） */
+const ACTIVITY_LIST_FULL_BLEED_CLASS = "notification-activity-list-bleed";
 
 function getQuestion(cardId: string, created: { id?: string; question: string }[]): string {
   const fromCreated = created.find((c) => (c.id ?? c.question) === cardId);
@@ -267,7 +265,7 @@ export default function NotificationsPage() {
     return () => window.removeEventListener(getAuthUpdatedEventName(), handler);
   }, []);
 
-  /** アクティビティタブ表示時に KV の作成者向けイベント（コレ参加など）を取り直す（完了後は memberJoinEvents 依存の effect が再描画） */
+  /** アクティビティタブ表示時に KV の作成者向けイベント（コレ参加など）を取り直す */
   useEffect(() => {
     if (!shared.isRemote || !isLoggedIn || activeTab !== "activity") return;
     void shared.refetchActivity();
@@ -294,7 +292,7 @@ export default function NotificationsPage() {
   }, [isLoggedIn, activeTab]);
 
   return (
-    <div className="min-h-screen pb-[50px]">
+    <div className="min-h-screen min-w-0 pb-[50px]">
       <NotificationTabs
         isLoggedIn={isLoggedIn}
         activeTab={activeTab}
@@ -377,7 +375,7 @@ function ActivityIcon({ item }: { item: ActivityItem }) {
       );
     case "liked_my_comment":
       return (
-        <span className={iconClass} style={{ backgroundColor: "#F08B8B" }}>
+        <span className={`${iconClass} overflow-hidden`} style={{ backgroundColor: "#F08B8B" }}>
           <img src="/icons/good.svg" alt="" className="h-5 w-5" width={20} height={17} style={ICON_WHITE} />
         </span>
       );
@@ -419,7 +417,7 @@ function ActivityList({ items }: { items: ActivityItem[] }) {
         return (
           <li
             key={`${item.cardId}-${item.type}-${i}`}
-            className="w-full border-b border-[#DADADA] bg-[#F1F1F1] last:border-b-0"
+            className="w-full overflow-visible border-b border-[#DADADA] bg-[#F1F1F1] last:border-b-0"
           >
             <Link
               href={item.linkHref ?? `/comments/${item.cardId}`}

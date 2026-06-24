@@ -319,6 +319,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   /** fetchActivity のマージは同一 userId のときのみ（アカウント切替で前ユーザーの投票済みが残らないように） */
   const lastActivityFetchUserIdRef = useRef<string>("");
   const lastActivityFetchAtRef = useRef(0);
+  const activityFetchInFlightRef = useRef<Promise<boolean> | null>(null);
   const collectionsHydratePromiseRef = useRef<Promise<void> | null>(null);
   const [createdVotesForTimeline, setCreatedVotesForTimeline] = useState<VoteCardData[]>(() =>
     typeof window !== "undefined" ? mapDemoCreatorDisplayForTimeline(getCreatedVotesForTimeline()) : []
@@ -414,20 +415,32 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       if (!options?.force && now - lastActivityFetchAtRef.current < ACTIVITY_REFETCH_MIN_MS) {
         return true;
       }
-      const userId = getCurrentActivityUserId();
-      try {
-        const res = await fetch(`${ACTIVITY_API}?userId=${encodeURIComponent(userId)}`);
-        if (res.status !== 200) return false;
-        const data = (await res.json()) as ActivityApiPayload;
-        applyActivityResponseData(data, userId);
-        lastActivityFetchAtRef.current = Date.now();
-        return true;
-      } catch {
-        return false;
+      if (activityFetchInFlightRef.current) {
+        return activityFetchInFlightRef.current;
       }
+      const userId = getCurrentActivityUserId();
+      const request = (async () => {
+        try {
+          const res = await fetch(`${ACTIVITY_API}?userId=${encodeURIComponent(userId)}`);
+          if (res.status !== 200) return false;
+          const data = (await res.json()) as ActivityApiPayload;
+          applyActivityResponseData(data, userId);
+          lastActivityFetchAtRef.current = Date.now();
+          return true;
+        } catch {
+          return false;
+        } finally {
+          activityFetchInFlightRef.current = null;
+        }
+      })();
+      activityFetchInFlightRef.current = request;
+      return request;
     },
     [applyActivityResponseData]
   );
+
+  const refetchActivity = useCallback(() => fetchActivity({ force: true }), [fetchActivity]);
+  const refreshActivityIfStale = useCallback(() => fetchActivity({ force: false }), [fetchActivity]);
 
   const ensureCollectionsHydrated = useCallback(async (): Promise<void> => {
     if (collectionsHydratePromiseRef.current) {
@@ -976,8 +989,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       recordBookmarkEvent,
       removeCreatedVote,
       activityBootstrapDone,
-      refetchActivity: () => fetchActivity({ force: true }),
-      refreshActivityIfStale: () => fetchActivity({ force: false }),
+      refetchActivity,
+      refreshActivityIfStale,
       refetchCreatedVotes: fetchCreatedVotes,
       ensureCollectionsHydrated,
     }),
@@ -996,7 +1009,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       recordBookmarkEvent,
       removeCreatedVote,
       activityBootstrapDone,
-      fetchActivity,
+      refetchActivity,
+      refreshActivityIfStale,
       fetchCreatedVotes,
       ensureCollectionsHydrated,
     ]
