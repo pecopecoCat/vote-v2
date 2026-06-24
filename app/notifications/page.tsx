@@ -26,10 +26,7 @@ import type { VoteCardData } from "../data/voteCards";
 const MY_COMMENT_USER_NAME = "自分";
 
 /** 375px 幅時にコンテンツ 335px 相当（PC は固定幅） */
-const NOTIFICATION_CONTENT_WIDTH_CLASS = "notification-content-width";
-
-/** リスト枠：区切り線を横いっぱいに（PC はサイドナビ幅を考慮） */
-const ACTIVITY_LIST_FULL_BLEED_CLASS = "notification-activity-list-bleed";
+const ACTIVITY_LIST_CLASS = "notification-activity-list";
 
 function getQuestion(cardId: string, created: { id?: string; question: string }[]): string {
   const fromCreated = created.find((c) => (c.id ?? c.question) === cardId);
@@ -403,27 +400,25 @@ function ActivityIcon({ item }: { item: ActivityItem }) {
 function ActivityList({ items }: { items: ActivityItem[] }) {
   if (items.length === 0) {
     return (
-      <div className={NOTIFICATION_CONTENT_WIDTH_CLASS}>
-        <div className="rounded-[12px] bg-white px-6 py-12 text-center">
-          <p className="text-sm text-[#787878]">アクティビティはまだありません</p>
-        </div>
+      <div className="rounded-[12px] bg-white px-6 py-12 text-center">
+        <p className="text-sm text-[#787878]">アクティビティはまだありません</p>
       </div>
     );
   }
   return (
-    <ul className={ACTIVITY_LIST_FULL_BLEED_CLASS}>
+    <ul className={`${ACTIVITY_LIST_CLASS} -mx-[5.333vw] md:-mx-6`}>
       {items.map((item, i) => {
         const preview = item.commentPreview ?? item.questionPreview;
         return (
           <li
             key={`${item.cardId}-${item.type}-${i}`}
-            className="w-full overflow-visible border-b border-[#DADADA] bg-[#F1F1F1] last:border-b-0"
+            className="w-full border-b border-[#DADADA] bg-[#F1F1F1] last:border-b-0"
           >
             <Link
               href={item.linkHref ?? `/comments/${item.cardId}`}
-              className="block py-4 transition-colors active:bg-black/[0.03]"
+              className="block px-[5.333vw] py-4 transition-colors active:bg-black/[0.03] md:px-6"
             >
-              <div className={`flex gap-3 ${NOTIFICATION_CONTENT_WIDTH_CLASS}`}>
+              <div className="flex gap-3 pl-0.5">
                 <ActivityIcon item={item} />
                 <div className="min-w-0 flex-1 text-left">
                   <p className="text-sm font-bold leading-snug text-[#191919]">{getActivityLabel(item)}</p>

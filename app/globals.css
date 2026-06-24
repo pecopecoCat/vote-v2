@@ -286,18 +286,12 @@ select {
     background-color: #edc229;
   }
 
-  /* お知らせ：PC はメイン幅内（SP も同様に親幅に収める） */
-  .notification-activity-list-bleed {
+  /* お知らせ：PC はメイン幅内 */
+  .notification-announcements-width {
     width: 100%;
-    max-width: 100%;
-    margin-left: 0;
-  }
-
-  .notification-content-width {
-    width: 100%;
-    max-width: 100%;
-    padding-left: 24px;
-    padding-right: 24px;
+    max-width: 335px;
+    margin-left: auto;
+    margin-right: auto;
   }
 }
 
@@ -309,24 +303,25 @@ select {
   background-color: #edc229;
 }
 
-/* お知らせ・アクティビティ一覧（区切り線は親幅いっぱい・本文は中央寄せ） */
-.notification-activity-list-bleed {
+/* お知らせ・アクティビティ一覧 */
+.notification-activity-list {
   width: 100%;
   max-width: 100%;
   margin-left: 0;
   border-top: 1px solid #dadada;
-  overflow: visible;
 }
 
-.notification-content-width {
-  box-sizing: border-box;
+.notification-announcements-width {
   width: 100%;
-  max-width: 335px;
+  max-width: min(100%, calc(100vw * 335 / 375));
   margin-left: auto;
   margin-right: auto;
-  padding-left: max(20px, 5.333vw);
-  padding-right: max(20px, 5.333vw);
-  overflow: visible;
+}
+
+@media (min-width: 768px) {
+  .notification-announcements-width {
+    max-width: 335px;
+  }
 }
 
 /* マイページ等（UnderlineTabBar layout=equal）：Safari でもラベルをセル中央に */

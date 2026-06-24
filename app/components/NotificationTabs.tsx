@@ -49,12 +49,12 @@ export default function NotificationTabs({
         />
       ) : null}
 
-      {/* アクティビティは区切り線フル幅・本文は notification-content-width。お知らせも同幅 */}
-      <main className="mx-auto min-w-0 max-w-lg overflow-visible pb-6 pt-4">
+      {/* 横余白は main で統一（アイコンが左で見切れないよう） */}
+      <main className="mx-auto w-full min-w-0 max-w-lg px-[5.333vw] pb-6 pt-4 md:px-6">
         {effectiveTab === "activity" ? (
           activityContent
         ) : (
-          <div className="notification-content-width">{announcementsContent}</div>
+          <div className="notification-announcements-width">{announcementsContent}</div>
         )}
       </main>
     </div>
