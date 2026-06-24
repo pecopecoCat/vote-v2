@@ -4,14 +4,12 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useEffect } from "react";
 import AppHeader from "../../components/AppHeader";
-import VoteCard from "../../components/VoteCard";
 import VoteCardMini from "../../components/VoteCardMini";
-import { VoteCardList, VoteCardMasonryTile } from "../../components/VoteCardList";
-import CollectionCard from "../../components/CollectionCard";
+import { VoteCardList } from "../../components/VoteCardList";
+import { VoteTimelineMasonry } from "../../components/VoteTimelineMasonry";
 import CardModerationModals from "../../components/CardModerationModals";
 import ReportViolationModal from "../../components/ReportViolationModal";
 import { getCollectionById } from "../../data/collections";
-import RecommendedTags from "../../components/RecommendedTags";
 import CommentSortSegment from "../../components/CommentSortSegment";
 import { sortTopLevelComments, type CommentSortOrder } from "../../lib/commentSort";
 import CommentThreadGroup from "../../components/CommentThreadGroup";
@@ -28,10 +26,8 @@ import {
 import {
   getTagsSimilarTo,
   getTrendingTagsFromCards,
-  popularCollections,
-  type CollectionGradient,
 } from "../../data/search";
-import { getCollections, getOtherUsersCollections } from "../../data/collections";
+import { getCollections } from "../../data/collections";
 import {
   getMergedCounts,
   addCommentLike,
@@ -41,7 +37,7 @@ import {
   type VoteComment,
 } from "../../data/voteCardActivity";
 import { useSharedData } from "../../context/SharedDataContext";
-import { isCardBookmarked, getBookmarksUpdatedEventName } from "../../data/bookmarks";
+import { isCardBookmarked, getBookmarksUpdatedEventName, getBookmarkIds } from "../../data/bookmarks";
 import { getCurrentActivityUserId } from "../../data/auth";
 import { addHiddenUser } from "../../data/hiddenUsers";
 import { addHiddenCard } from "../../data/hiddenCards";
@@ -50,7 +46,7 @@ import { normalizeCardIdKey } from "../../lib/normalize";
 import { resolveActivityForCard } from "../../data/voteCardActivity";
 import { resolveVoteCardByStableId } from "../../lib/resolveVoteCardByStableId";
 import { resolveCardBackgroundUrl } from "../../lib/resolveCardBackgroundUrl";
-import { buildVoteCardProps } from "../../lib/buildVoteCardProps";
+import { buildTimelineItems, getTimelineCollectionPool } from "../../lib/voteTimeline";
 import { useAuthState } from "../../hooks/useAuthState";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { useCardModerationFlow } from "../../hooks/useCardModerationFlow";
@@ -122,6 +118,10 @@ export default function CommentsPage() {
     window.addEventListener(getBookmarksUpdatedEventName(), handler);
     return () => window.removeEventListener(getBookmarksUpdatedEventName(), handler);
   }, []);
+  const bookmarkedIds = useMemo(
+    () => new Set(getBookmarkIds()),
+    [bookmarkRefreshKey]
+  );
   const memberCollectionFromUrl = useMemo(() => {
     if (!collectionIdFromUrl) return null;
     return getCollectionById(collectionIdFromUrl);
@@ -178,7 +178,7 @@ export default function CommentsPage() {
   }, [createdVotesForTimeline]);
 
   /**
-   * 下部一覧: 関連を最大10件。関連が1〜9件のときはその下に新着を別見出しで10件（重複除外）。
+   * 下部一覧: 関連を最大10件。関連が1〜9件のときはその下に新着を10件（重複除外）。
    * 関連0件のときは新着のみ10件。
    */
   const { relatedBottomCards, newestBottomCards } = useMemo(() => {
@@ -225,26 +225,16 @@ export default function CommentsPage() {
     return getTagsSimilarTo(card.tags[0], allCards, 10);
   }, [card?.tags, allCards]);
 
-  /** みんなのコメントページ：実際にあるコレクションから1件表示（カードIDで安定選択） */
-  const randomCollectionForComments = useMemo(() => {
-    const other = getOtherUsersCollections().map((c) => ({
-      id: c.id,
-      title: c.name,
-      gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
-    }));
-    const mine = getCollections()
-      .filter((c) => c.visibility !== "member")
-      .map((c) => ({
-        id: c.id,
-        title: c.name,
-        gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
-      }));
-    const pool = [...popularCollections, ...other, ...mine];
-    if (pool.length === 0) return null;
-    let h = 0;
-    for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
-    return pool[Math.abs(h) % pool.length];
-  }, [id]);
+  /** みんなのコメントページ下部：関連＋新着を HOME と同じ差し込みルールで表示 */
+  const bottomVoteCards = useMemo(
+    () => [...relatedBottomCards, ...newestBottomCards],
+    [relatedBottomCards, newestBottomCards]
+  );
+
+  const bottomTimelineItems = useMemo(() => {
+    const pool = getTimelineCollectionPool(getCollections());
+    return buildTimelineItems(bottomVoteCards, pool);
+  }, [bottomVoteCards]);
 
   const commentedCardIds = useMemo(
     () =>
@@ -260,6 +250,8 @@ export default function CommentsPage() {
         .map(([cid]) => cid),
     [sharedActivity, isLoggedIn, auth.user?.name]
   );
+
+  const commentedCardIdSet = useMemo(() => new Set(commentedCardIds), [commentedCardIds]);
 
   const backgroundUrl = card ? resolveCardBackgroundUrl(card, id) : CARD_BACKGROUND_IMAGES[0];
   const merged = card ? getMergedCounts(card.countA ?? 0, card.countB ?? 0, card.commentCount ?? 0, activity) : { countA: 0, countB: 0, commentCount: 0 };
@@ -292,39 +284,6 @@ export default function CommentsPage() {
       setReplyingToCommentId(null)
     );
   };
-
-  const mapBottomVoteList = (cards: VoteCardData[]) =>
-    cards.map((related) => {
-      const relatedId = related.id ?? related.question;
-      const relActivity = sharedActivity[relatedId] ?? emptyActivity;
-      return (
-        <VoteCardMasonryTile key={relatedId}>
-        <VoteCard
-          {...buildVoteCardProps({
-            card: related,
-            cardId: relatedId,
-            activity: relActivity,
-            currentUser,
-            surface: "participate",
-            backgroundImageUrl: resolveCardBackgroundUrl(related, relatedId),
-            bookmarked: isCardBookmarked(relatedId),
-            hasCommented: commentedCardIds.includes(relatedId),
-            onVote: (cid, option) => {
-              setRelatedKeepVotedVisibleIds((prev) => {
-                const next = new Set(prev);
-                next.add(cid);
-                return next;
-              });
-              void sharedAddVote(cid, option);
-            },
-            onMoreClick: () =>
-              moderation.openCardOptions(relatedId, related.createdByUserId === activityUserId),
-            onAddToCollectionClick: moderation.openAddToCommunity,
-          })}
-        />
-        </VoteCardMasonryTile>
-      );
-    });
 
   const waitingForCreatedCard =
     id.startsWith("created-") && !card && !activityBootstrapDone;
@@ -362,7 +321,8 @@ export default function CommentsPage() {
 
       <main className="comments-page mx-auto max-w-lg px-[5.333vw] py-4 md:max-w-none md:px-6 md:py-6">
         {/* ページ上部：VOTE CARD mini（PCはタイル幅） */}
-        <div className="comments-page__hero-tile mb-4 md:mb-6">
+        <div className="comments-page__hero-wrap mb-4 md:mb-6">
+          <div className="comments-page__hero-tile">
           <VoteCardMini
             backgroundImageUrl={backgroundUrl}
             patternType={card.patternType}
@@ -387,6 +347,7 @@ export default function CommentsPage() {
             expandMiniForCommentsPage
             commentsDisabled={commentsDisabled}
           />
+          </div>
         </div>
 
         {/* コメント：グレー帯の見出し + 白背景の一覧（PCは横いっぱい） */}
@@ -438,34 +399,36 @@ export default function CommentsPage() {
           </div>
         </div>
 
-        <RecommendedTags className="mt-6" tags={commentsPageTagList} />
-
-        {randomCollectionForComments && (
-          <div className="mt-6">
-            <CollectionCard
-              key={randomCollectionForComments.id}
-              id={randomCollectionForComments.id}
-              title={randomCollectionForComments.title}
-              gradient={randomCollectionForComments.gradient}
-              titleVariant="blackBlock"
-              href={`/collection/${randomCollectionForComments.id}`}
-              timelineBanner
-              label="コレクション"
-            />
-          </div>
-        )}
-
-        {/* 一番下：関連VOTE（最大10件）。1〜9件のときは下に新着VOTE 10件。関連0件のときは新着のみ — HOMEと同じNORMALサイズ */}
-        {relatedBottomCards.length > 0 && (
+        {bottomVoteCards.length > 0 && (
           <section className="comments-page__vote-feed -mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6 md:mx-0 md:px-0">
-            <h2 className="mb-3 text-base font-bold text-gray-900">関連VOTE</h2>
-            <VoteCardList masonry>{mapBottomVoteList(relatedBottomCards)}</VoteCardList>
-          </section>
-        )}
-        {newestBottomCards.length > 0 && (
-          <section className="comments-page__vote-feed -mx-[5.333vw] mt-8 border-t border-gray-300 px-[5.333vw] pt-6 md:mx-0 md:px-0">
-            <h2 className="mb-3 text-base font-bold text-gray-900">新着VOTE</h2>
-            <VoteCardList masonry>{mapBottomVoteList(newestBottomCards)}</VoteCardList>
+            <VoteCardList masonry>
+              <VoteTimelineMasonry
+                items={bottomTimelineItems}
+                tagList={commentsPageTagList}
+                activity={sharedActivity}
+                commentedCardIdSet={commentedCardIdSet}
+                bookmarkedIds={bookmarkedIds}
+                currentUser={currentUser}
+                onVote={(cid, option) => {
+                  setRelatedKeepVotedVisibleIds((prev) => {
+                    const next = new Set(prev);
+                    next.add(cid);
+                    return next;
+                  });
+                  void sharedAddVote(cid, option);
+                }}
+                onMoreClick={(cardId) => {
+                  const related = bottomVoteCards.find(
+                    (c) => (c.id ?? c.question) === cardId
+                  );
+                  moderation.openCardOptions(
+                    cardId,
+                    related?.createdByUserId === activityUserId
+                  );
+                }}
+                onAddToCollectionClick={moderation.openAddToCommunity}
+              />
+            </VoteCardList>
           </section>
         )}
       </main>

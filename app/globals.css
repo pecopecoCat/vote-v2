@@ -537,6 +537,11 @@ select {
 
 /* みんなのコメント（PC）：カードはタイル幅・コメント帯は横いっぱい・下部VOTEはマasonry */
 @media (min-width: 768px) {
+  .comments-page__hero-wrap {
+    display: flex;
+    justify-content: center;
+  }
+
   .comments-page__hero-tile {
     display: inline-block;
     width: min(375px, 100%);
