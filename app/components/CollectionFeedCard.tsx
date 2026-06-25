@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { memo, useMemo } from "react";
-import { COLLECTION_VISIBILITY_LABEL } from "../data/collectionCategories";
-import type { CollectionVisibility } from "../data/collections";
 import type { VoteCardData } from "../data/voteCards";
 import { getCollectionThumbnailUrl } from "../lib/getCollectionThumbnailUrl";
 import type { TimelineCollection } from "../lib/voteTimeline";
@@ -16,7 +14,6 @@ export type CollectionFeedCardProps = {
   gradient?: CollectionGradient;
   color?: string;
   cardCount: number;
-  visibility: CollectionVisibility;
 };
 
 function CollectionFeedCard({
@@ -26,10 +23,9 @@ function CollectionFeedCard({
   gradient = "orange-yellow",
   color,
   cardCount,
-  visibility,
 }: CollectionFeedCardProps) {
   const gradientStyle = getCollectionGradientStyle(gradient, color);
-  const meta = `登録数 ${cardCount}件 · ${COLLECTION_VISIBILITY_LABEL[visibility]}`;
+  const meta = `登録数 ${cardCount}件`;
 
   return (
     <Link href={href} prefetch={false} className="block min-w-0">
@@ -84,7 +80,6 @@ export const TimelineCollectionFeedCard = memo(function TimelineCollectionFeedCa
       gradient={collection.gradient}
       color={collection.color}
       cardCount={collection.cardIds.length}
-      visibility={collection.visibility}
     />
   );
 });
