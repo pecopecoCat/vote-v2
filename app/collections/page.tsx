@@ -39,11 +39,7 @@ function CollectionsContent() {
   const { collections, pinnedCollectionIds, refreshCollections } = useLocalCollections();
   const { createdVotesForTimeline } = useSharedData();
   useEnsureCollectionsHydrated();
-  const { remotePopularCollections, collectionsIndexLoading } = useSearchCollectionsWarm(
-    isLoggedIn,
-    "community",
-    refreshCollections
-  );
+  const { remotePopularCollections, collectionsIndexLoading } = useSearchCollectionsWarm();
 
   const collectionsForList = useMemo(() => {
     const remotePublic = remotePopularCollections

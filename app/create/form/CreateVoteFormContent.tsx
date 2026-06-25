@@ -16,6 +16,7 @@ import VoteFormBackgroundPicker from "./VoteFormBackgroundPicker";
 import VoteFormOptionField from "./VoteFormOptionField";
 import VoteFormPeriodSection from "./VoteFormPeriodSection";
 import VoteFormTagsSection from "./VoteFormTagsSection";
+import { isCollectionVoteCardAddEnabled } from "../../lib/collectionVoteCardMutation";
 
 function CreateVoteFormContent({
   variant = "page",
@@ -169,45 +170,49 @@ function CreateVoteFormContent({
           onEndDayChange={form.setEndDay}
         />
 
-        <section>
-          <h2 className="mb-1 flex items-center gap-1 text-sm font-bold text-gray-900">
-            コレクション
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs text-gray-600">
-              ?
-            </span>
-          </h2>
-          <button
-            type="button"
-            onClick={() => form.setCollectionPickerOpen(true)}
-            className="flex w-full items-center rounded-[9999px] border border-gray-200 bg-white px-4 py-3 text-left"
-          >
-            <span
-              className={`min-w-0 flex-1 text-sm ${form.selectedCollectionLabel ? "text-gray-900" : "text-gray-400"}`}
+        {isCollectionVoteCardAddEnabled() ? (
+          <section>
+            <h2 className="mb-1 flex items-center gap-1 text-sm font-bold text-gray-900">
+              コレクション
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs text-gray-600">
+                ?
+              </span>
+            </h2>
+            <button
+              type="button"
+              onClick={() => form.setCollectionPickerOpen(true)}
+              className="flex w-full items-center rounded-[9999px] border border-gray-200 bg-white px-4 py-3 text-left"
             >
-              {form.selectedCollectionLabel ?? "追加したいコレクションを選択"}
-            </span>
-            <span className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
-              <img src="/icons/icon_b_arrow.svg" alt="" className="h-1.5 w-2" width={8} height={6} />
-            </span>
-          </button>
-        </section>
+              <span
+                className={`min-w-0 flex-1 text-sm ${form.selectedCollectionLabel ? "text-gray-900" : "text-gray-400"}`}
+              >
+                {form.selectedCollectionLabel ?? "追加したいコレクションを選択"}
+              </span>
+              <span className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
+                <img src="/icons/icon_b_arrow.svg" alt="" className="h-1.5 w-2" width={8} height={6} />
+              </span>
+            </button>
+          </section>
+        ) : null}
       </main>
 
-      <CollectionPickerSheet
-        open={form.collectionPickerOpen}
-        onClose={() => form.setCollectionPickerOpen(false)}
-        title="コレクションを選ぶ"
-        scope={isModal ? "contained" : "viewport"}
-        mode="select"
-        selectedIds={form.selectedCollectionIds}
-        onSelectedIdsChange={form.setSelectedCollectionIds}
-        onCreateNew={() => {
-          form.setCollectionPickerOpen(false);
-          form.setShowCollectionSettingsModal(true);
-        }}
-      />
+      {isCollectionVoteCardAddEnabled() ? (
+        <CollectionPickerSheet
+          open={form.collectionPickerOpen}
+          onClose={() => form.setCollectionPickerOpen(false)}
+          title="コレクションを選ぶ"
+          scope={isModal ? "contained" : "viewport"}
+          mode="select"
+          selectedIds={form.selectedCollectionIds}
+          onSelectedIdsChange={form.setSelectedCollectionIds}
+          onCreateNew={() => {
+            form.setCollectionPickerOpen(false);
+            form.setShowCollectionSettingsModal(true);
+          }}
+        />
+      ) : null}
 
-      {form.showCollectionSettingsModal ? (
+      {isCollectionVoteCardAddEnabled() && form.showCollectionSettingsModal ? (
         <CollectionSettingsModal
           onClose={() => form.setShowCollectionSettingsModal(false)}
           onSave={async (name, gradient, visibility, category, coverImageUrl) => {

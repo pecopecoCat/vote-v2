@@ -9,6 +9,7 @@ import { useSharedData } from "../../context/SharedDataContext";
 import { addDraft, getDraftById } from "../../data/drafts";
 import { useContributableCollections } from "../../hooks/useContributableCollections";
 import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "../../lib/appToast";
+import { isCollectionVoteCardAddEnabled } from "../../lib/collectionVoteCardMutation";
 import { compressImageFile } from "../../lib/compressImageFile";
 import { CURRENT_YEAR, QUESTION_MAX } from "./createVoteFormConstants";
 
@@ -156,8 +157,10 @@ export function useCreateVoteForm({ qFromUrl = "", draftIdFromUrl = "" }: UseCre
     };
     void sharedAddCreatedVote(card)
       .then(async () => {
-        for (const collectionId of selectedCollectionIds) {
-          await addCardToContributableCollection(collectionId, card.id);
+        if (isCollectionVoteCardAddEnabled()) {
+          for (const collectionId of selectedCollectionIds) {
+            await addCardToContributableCollection(collectionId, card.id);
+          }
         }
         try {
           sessionStorage.setItem(PENDING_VOTE_CREATED_TOAST_KEY, "1");

@@ -13,11 +13,7 @@ import {
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "./components/AppHeader";
-import VoteCard, { type CurrentUser } from "./components/VoteCard";
-import { VoteCardList } from "./components/VoteCardList";
-import AdCard from "./components/AdCard";
-import RecommendedTags from "./components/RecommendedTags";
-import CollectionCard from "./components/CollectionCard";
+import { VoteCardList, VoteCardMasonryTile } from "./components/VoteCardList";
 import FeedTabs from "./components/FeedTabs";
 import type { FeedTabId } from "./components/FeedTabs";
 import type { VoteCardData } from "./data/voteCards";
@@ -34,15 +30,14 @@ import {
 } from "./data/voteCardActivity";
 import { useSharedData } from "./context/SharedDataContext";
 import { useEnsureCollectionsHydrated } from "./hooks/useEnsureCollectionsHydrated";
+import { useLocalCollections } from "./hooks/useLocalCollections";
 import { useSearchCollectionsWarm } from "./hooks/useSearchCollectionsWarm";
 import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "./lib/appToast";
-import { buildVoteCardProps } from "./lib/buildVoteCardProps";
-import { resolveCardBackgroundUrl } from "./lib/resolveCardBackgroundUrl";
 import { useAuthState } from "./hooks/useAuthState";
 import { useCurrentUser } from "./hooks/useCurrentUser";
 import { useCardModerationFlow } from "./hooks/useCardModerationFlow";
 import CardModerationModals from "./components/CardModerationModals";
-import { getCollections, getCollectionsUpdatedEventName, getOtherUsersCollections, resetUser1AndUser2Collections } from "./data/collections";
+import { resetUser1AndUser2Collections } from "./data/collections";
 import { getBookmarkIds, getBookmarksUpdatedEventName, resetUser1AndUser2Bookmarks } from "./data/bookmarks";
 import { getCurrentActivityUserId } from "./data/auth";
 import {
@@ -55,8 +50,10 @@ import {
   addHiddenCard,
   getHiddenCardsUpdatedEventName,
 } from "./data/hiddenCards";
-import { popularCollections, getTrendingTagsFromCards } from "./data/search";
+import { getTrendingTagsFromCards } from "./data/search";
 import { buildTimelineItems, getTimelineCollectionPool, type TimelineItem } from "./lib/voteTimeline";
+import { VoteTimelineMasonry } from "./components/VoteTimelineMasonry";
+import type { CurrentUser } from "./components/VoteCard";
 
 /** 急上昇中：1週間のポイント制（投票+1, コメント+3, ブックマーク+3, 新規作成+5）でポイント多い順 */
 const TRENDING_POINTS = { vote: 1, comment: 3, bookmark: 3, newCreation: 5 } as const;
@@ -141,6 +138,9 @@ function ensureUser1User2CollectionsResetOnce(): void {
 const HomeTimelineFeed = memo(function HomeTimelineFeed({
   timelineItems,
   timelineTagList,
+  createdVotesForTimeline,
+  isRemote,
+  recordBookmarkEvent,
   activity,
   commentedCardIdSet,
   bookmarkedIds,
@@ -151,6 +151,9 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
 }: {
   timelineItems: TimelineItem[];
   timelineTagList: string[];
+  createdVotesForTimeline: VoteCardData[];
+  isRemote: boolean;
+  recordBookmarkEvent: (cardId: string) => void;
   activity: Record<string, CardActivity>;
   commentedCardIdSet: Set<string>;
   bookmarkedIds: Set<string>;
@@ -186,76 +189,27 @@ const HomeTimelineFeed = memo(function HomeTimelineFeed({
   }, [visibleCount, timelineItems.length]);
 
   return (
-    <>
-      {visibleTimelineItems.map((item, idx) => {
-        if (item.type === "vote") {
-          const card = item.card;
-          const cardId = resolveStableVoteCardId(card);
-          const act = activity[cardId];
-          return (
-            <div key={`vote-${cardId}`} className="home-feed-masonry__tile">
-              <VoteCard
-                {...buildVoteCardProps({
-                  card,
-                  cardId,
-                  activity: act,
-                  currentUser,
-                  surface: "participate",
-                  backgroundImageUrl: resolveCardBackgroundUrl(card),
-                  bookmarked: bookmarkedIds.has(cardId),
-                  hasCommented: commentedCardIdSet.has(cardId),
-                  onVote: handleVote,
-                  onMoreClick,
-                  onAddToCollectionClick,
-                })}
-              />
-            </div>
-          );
-        }
-        if (item.type === "collection") {
-          const { id, title, gradient } = item.collection;
-          return (
-            <div key={`col-${id}-${idx}`} className="home-feed-masonry__tile">
-              <CollectionCard
-                id={id}
-                title={title}
-                gradient={gradient}
-                titleVariant="blackBlock"
-                href={`/collection/${id}`}
-                feedTile
-              />
-            </div>
-          );
-        }
-        if (item.type === "tags") {
-          return (
-            <div key={`tags-${idx}`} className="home-feed-masonry__tile home-feed-masonry__tile--full">
-              <RecommendedTags tags={timelineTagList} className="!mx-0" />
-            </div>
-          );
-        }
-        if (item.type === "pr") {
-          return (
-            <div key={`pr-${idx}`} className="home-feed-masonry__tile home-feed-masonry__tile--full">
-              <AdCard
-                brandName={item.banner.brandName}
-                caption={item.banner.caption}
-                imageUrl={item.banner.imageUrl}
-                fallbackGradientClassName={item.banner.fallbackGradientClassName}
-              />
-            </div>
-          );
-        }
-        return null;
-      })}
-      {visibleCount < timelineItems.length ? (
-        <div
-          ref={loadSentinelRef}
-          className="home-feed-masonry__tile home-feed-masonry__tile--full h-1 w-full shrink-0"
-          aria-hidden
-        />
-      ) : null}
-    </>
+    <VoteTimelineMasonry
+      items={visibleTimelineItems}
+      tagList={timelineTagList}
+      createdVotesForTimeline={createdVotesForTimeline}
+      activity={activity}
+      commentedCardIdSet={commentedCardIdSet}
+      bookmarkedIds={bookmarkedIds}
+      currentUser={currentUser}
+      isRemote={isRemote}
+      recordBookmarkEvent={recordBookmarkEvent}
+      onVote={handleVote}
+      onMoreClick={onMoreClick}
+      onAddToCollectionClick={onAddToCollectionClick}
+      trailing={
+        visibleCount < timelineItems.length ? (
+          <VoteCardMasonryTile fullWidth className="h-1 w-full shrink-0">
+            <div ref={loadSentinelRef} className="h-1" aria-hidden />
+          </VoteCardMasonryTile>
+        ) : null
+      }
+    />
   );
 });
 
@@ -280,9 +234,16 @@ function HomeContent() {
     }
     showAppToast("VOTEを作成しました");
   }, [activeTab]);
-  const [collections, setCollections] = useState(() => getCollections());
+  const { collections, refreshCollections } = useLocalCollections();
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity, activityBootstrapDone, addVote: sharedAddVote } = shared;
+  const {
+    createdVotesForTimeline,
+    activity,
+    activityBootstrapDone,
+    addVote: sharedAddVote,
+    isRemote,
+    recordBookmarkEvent,
+  } = shared;
   useEnsureCollectionsHydrated();
   const moderation = useCardModerationFlow();
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>(() => getHiddenUserIds());
@@ -290,13 +251,8 @@ function HomeContent() {
   const hiddenCardIdSet = useMemo(() => new Set(hiddenCardIds), [hiddenCardIds]);
   const hiddenUserIdSet = useMemo(() => new Set(hiddenUserIds), [hiddenUserIds]);
   const auth = useAuthState();
-  const isLoggedIn = auth.isLoggedIn;
 
-  const refreshCollections = useCallback(() => {
-    setCollections(getCollections());
-  }, []);
-
-  useSearchCollectionsWarm(isLoggedIn, "trending", refreshCollections);
+  useSearchCollectionsWarm();
 
   useEffect(() => {
     const handler = () => setHiddenUserIds(getHiddenUserIds());
@@ -357,15 +313,6 @@ function HomeContent() {
     },
     [pathname, router, searchParamsKey]
   );
-
-  useEffect(() => {
-    const eventName = getCollectionsUpdatedEventName();
-    const handler = () => refreshCollections();
-    window.addEventListener(eventName, handler);
-    return () => {
-      window.removeEventListener(eventName, handler);
-    };
-  }, [refreshCollections]);
 
   const allCards = useMemo(() => {
     const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
@@ -610,6 +557,9 @@ function HomeContent() {
                 key={activeTab}
                 timelineItems={timelineItems}
                 timelineTagList={homeTagList}
+                createdVotesForTimeline={createdVotesForTimeline}
+                isRemote={isRemote}
+                recordBookmarkEvent={recordBookmarkEvent}
                 activity={activity}
                 commentedCardIdSet={commentedCardIdSet}
                 bookmarkedIds={bookmarkedIds}
@@ -639,7 +589,7 @@ function HomeContent() {
         cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
         reportCardId={moderation.reportCardId}
         addToCommunityCardId={moderation.addToCommunityCardId}
-        isLoggedIn={isLoggedIn}
+        isLoggedIn={auth.isLoggedIn}
         onCloseOptions={moderation.closeCardOptions}
         onAddToCommunity={moderation.openAddToCommunity}
         onCloseAddToCommunity={moderation.closeAddToCommunity}

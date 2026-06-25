@@ -210,6 +210,8 @@ function ProfileContent() {
     addVote: sharedAddVote,
     removeCreatedVote: sharedRemoveCreatedVote,
     refetchCreatedVotes,
+    isRemote,
+    recordBookmarkEvent,
   } = shared;
   /** マイコミュニティタブで一覧 or 個別を選択中。null = TOP */
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(() => {
@@ -731,7 +733,7 @@ function ProfileContent() {
         activeId={activeTab}
         onSelect={selectProfileTab}
         ariaLabel="マイページタブ"
-        layout="equalScroll"
+        layout="contentScroll"
       />
 
       <main className="home-feed-main mx-auto bg-[#F1F1F1] px-[5.333vw] pb-6 pt-[20px] sm:px-6">
@@ -788,6 +790,8 @@ function ProfileContent() {
                           bookmarked: isCardBookmarked(cardId),
                           hasCommented: commentedCardIdSet.has(cardId),
                           onVote: handleProfileParticipateVote,
+                          isRemote,
+                          recordBookmarkEvent,
                         })}
                       />
                     </div>
@@ -829,6 +833,8 @@ function ProfileContent() {
                         backgroundImageUrl: resolveCardBackgroundUrl(card, cardId),
                         bookmarked: isCardBookmarked(cardId),
                         hasCommented: commentedCardIdSet.has(cardId),
+                        isRemote,
+                        recordBookmarkEvent,
                       })}
                     />
                     </VoteCardMasonryTile>
@@ -864,6 +870,8 @@ function ProfileContent() {
                         onVote: handleProfileParticipateVote,
                         onMoreClick: handleProfileCardMoreClick,
                         onAddToCollectionClick: moderation.openAddToCommunity,
+                        isRemote,
+                        recordBookmarkEvent,
                       })}
                     />
                     </VoteCardMasonryTile>
@@ -961,7 +969,9 @@ function ProfileContent() {
                             hasCommented: commentedCardIdSet.has(cardId),
                             onVote: handleProfileParticipateVote,
                             onMoreClick: handleProfileCardMoreClick,
-                        onAddToCollectionClick: moderation.openAddToCommunity,
+                            onAddToCollectionClick: moderation.openAddToCommunity,
+                            isRemote,
+                            recordBookmarkEvent,
                           })}
                         />
                       );

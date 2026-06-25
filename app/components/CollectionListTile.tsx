@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { memo } from "react";
 import type { Collection } from "../data/collections";
-import { COLLECTION_VISIBILITY_LABEL } from "../data/collectionCategories";
 import { getCollectionGradientStyle } from "../data/search";
 
 export type CollectionListTileProps = {
@@ -28,7 +27,7 @@ function CollectionListTile({
   href,
 }: CollectionListTileProps) {
   const gradientStyle = getCollectionGradientStyle(collection.gradient, collection.color);
-  const meta = `登録数 ${collection.cardIds.length}件 · ${COLLECTION_VISIBILITY_LABEL[collection.visibility]}`;
+  const meta = `登録数 ${collection.cardIds.length}件`;
   const showTopActions = canPin || showMenu;
 
   return (
@@ -94,9 +93,9 @@ function CollectionListTile({
         <Link
           href={href}
           prefetch={false}
-          className={`flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3 ${showTopActions ? "pt-11" : "pt-4"}`}
+          className={`flex min-h-0 flex-1 flex-col gap-2 px-3 pb-[20px] ${showTopActions ? "pt-11" : "pt-4"}`}
         >
-          <div className="flex shrink-0 justify-center">
+          <div className="-mt-[10px] flex shrink-0 justify-center">
             <span className="relative h-[88px] w-[88px] overflow-hidden rounded-full ring-1 ring-black/[0.06]">
               {thumbnailUrl ? (
                 <img
@@ -113,14 +112,16 @@ function CollectionListTile({
             </span>
           </div>
 
-          <div className="min-h-0 w-full">
-            <h3
-              className="w-full min-w-0 truncate text-center text-sm font-bold leading-snug text-[#191919]"
-              title={collection.name}
-            >
-              {collection.name}
-            </h3>
-            <p className="mt-1 w-full min-w-0 truncate text-center text-[11px] leading-snug text-[#8A8A8A]">
+          <div className="mt-auto w-full shrink-0">
+            <div className="flex h-[2.75rem] w-full items-center justify-center">
+              <h3
+                className="line-clamp-2 w-full min-w-0 text-center text-sm font-bold leading-snug text-[#191919]"
+                title={collection.name}
+              >
+                {collection.name}
+              </h3>
+            </div>
+            <p className="mt-1 h-4 w-full min-w-0 truncate text-center text-[11px] leading-4 text-[#8A8A8A]">
               {meta}
             </p>
           </div>

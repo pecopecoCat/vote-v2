@@ -17,8 +17,9 @@ import {
 import { removeLocalCommentsForCollection } from "./voteCardActivity";
 import { removeBookmark } from "./bookmarks";
 import { showAppToast } from "../lib/appToast";
-import { invalidateCollectionsIndexCache } from "../lib/fetchCollectionsIndex";
-import { getSeedCardIdsByTag } from "./voteCards";
+import { fetchCollectionsIndex, invalidateCollectionsIndexCache, type CollectionsIndexRow } from "../lib/fetchCollectionsIndex";
+import { isCollectionVoteCardAddEnabled, isCollectionVoteCardRemoveEnabled } from "../lib/collectionVoteCardMutation";
+import { getSeedCardIdsByTag, SEED_TAG_DOG_WALK, SEED_TAG_OTSUBONE, SEED_TAG_SAD_PARENTING } from "./voteCards";
 import { DEFAULT_RYO_AVATAR_URL } from "./avatarUrls";
 
 const STORAGE_KEY_PREFIX = "vote_collections_";
@@ -197,8 +198,11 @@ export async function hydrateUserOwnedCollectionsFromRemote(): Promise<void> {
       }
 
       // PUT 完了前に GET が走るとサーバー側にまだ無い作成コレが消えるため、サーバー優先＋ローカルのみの id を残す
+      const localById = new Map(ownedLocal.map((c) => [c.id, c]));
       const serverIds = new Set(ownedServer.map((c) => c.id));
-      const mergedOwned = [...ownedServer];
+      const mergedOwned = ownedServer.map((c) =>
+        mergeOwnedCollectionFromRemote(c, localById.get(c.id))
+      );
       for (const c of ownedLocal) {
         if (serverIds.has(c.id)) continue;
         mergedOwned.push(c);
@@ -227,6 +231,9 @@ export const SEED_COMMUNITY_IDS = {
   anime: "col-seed-anime",
   dramaEnd: "col-seed-drama-end",
   golgo31: "col-seed-golgo31",
+  dogWalk: "col-seed-dog-walk",
+  sadParenting: "col-seed-sad-parenting",
+  otsubone: "col-seed-otsubone",
 } as const;
 
 const SEED_COLLECTION_COVER_URLS: Record<string, string> = {
@@ -323,6 +330,42 @@ export const OTHER_USERS_COLLECTIONS: Collection[] = [
     createdByDisplayName: "あい",
     createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
   },
+  {
+    id: SEED_COMMUNITY_IDS.dogWalk,
+    name: "犬の散歩中もやっとする2択",
+    color: "#86EFAC",
+    gradient: "green-yellow",
+    visibility: "public",
+    cardIds: getSeedCardIdsByTag(SEED_TAG_DOG_WALK),
+    category: "animals",
+    createdByUserId: "user5",
+    createdByDisplayName: "miki",
+    createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
+  },
+  {
+    id: SEED_COMMUNITY_IDS.sadParenting,
+    name: "悲しくなる育児の瞬間2択",
+    color: "#F9A8D4",
+    gradient: "pink-purple",
+    visibility: "public",
+    cardIds: getSeedCardIdsByTag(SEED_TAG_SAD_PARENTING),
+    category: "parenting",
+    createdByUserId: "user5",
+    createdByDisplayName: "mama",
+    createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
+  },
+  {
+    id: SEED_COMMUNITY_IDS.otsubone,
+    name: "オツボネが嫌い",
+    color: "#93C5FD",
+    gradient: "blue-cyan",
+    visibility: "public",
+    cardIds: getSeedCardIdsByTag(SEED_TAG_OTSUBONE),
+    category: "work",
+    createdByUserId: "user5",
+    createdByDisplayName: "ryo",
+    createdByIconUrl: DEFAULT_RYO_AVATAR_URL,
+  },
 ];
 
 /** 他ユーザーのコレクション一覧を取得 */
@@ -361,6 +404,16 @@ export function getCollections(): Collection[] {
 
 function cardIdsEqual(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
+/** hydrate 時：サーバー優先だが、カテゴリ等はローカルにだけある値を補完 */
+function mergeOwnedCollectionFromRemote(server: Collection, local?: Collection): Collection {
+  if (!local) return server;
+  return {
+    ...server,
+    category: server.category ?? local.category,
+    coverImageUrl: server.coverImageUrl ?? local.coverImageUrl,
+  };
 }
 
 function joinedParticipationRowEqual(a: Collection, b: Collection): boolean {
@@ -417,6 +470,8 @@ export function mergeMemberCollectionForDisplay(
     gradient: canonical.gradient ?? local.gradient,
     visibility: canonical.visibility ?? local.visibility,
     cardIds: useCanonicalCards ? [...canonical.cardIds] : [...local.cardIds],
+    category: canonical.category ?? local.category,
+    coverImageUrl: canonical.coverImageUrl ?? local.coverImageUrl,
     createdByUserId: canonical.createdByUserId ?? local.createdByUserId,
     createdByDisplayName: canonical.createdByDisplayName ?? local.createdByDisplayName,
     createdByIconUrl: canonical.createdByIconUrl ?? local.createdByIconUrl,
@@ -638,7 +693,8 @@ function buildCollectionSyncPayload(col: Collection, userId: string) {
       gradient: col.gradient,
       visibility: col.visibility,
       cardIds: col.cardIds,
-      ...(col.category ? { category: col.category } : {}),
+      ...(col.createdByUserId ? { createdByUserId: col.createdByUserId } : {}),
+    ...(col.category ? { category: col.category } : {}),
       ...(col.coverImageUrl ? { coverImageUrl: col.coverImageUrl } : {}),
       ...(ownerName ? { createdByDisplayName: ownerName } : {}),
       ...(ownerIcon ? { createdByIconUrl: ownerIcon } : {}),
@@ -717,6 +773,59 @@ function syncCollectionToApi(col: Collection): void {
   void syncCollectionToApiAndWait(col);
 }
 
+function collectionFromIndexRow(row: CollectionsIndexRow): Collection {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    gradient: row.gradient as CollectionGradient | undefined,
+    visibility:
+      row.visibility === "member" ? "member" : row.visibility === "private" ? "private" : "public",
+    cardIds: [...row.cardIds],
+    category: row.category,
+    coverImageUrl: row.coverImageUrl,
+    createdByUserId: row.createdByUserId,
+    createdByDisplayName: row.createdByDisplayName,
+    createdByIconUrl: row.createdByIconUrl,
+  };
+}
+
+async function resolveCollectionForKvSync(collectionId: string): Promise<Collection | null> {
+  const local = getCollectionById(collectionId);
+  if (local) return local;
+  const rows = await fetchCollectionsIndex(false);
+  const row = rows.find((r) => r.id === collectionId);
+  return row ? collectionFromIndexRow(row) : null;
+}
+
+async function remoteCollectionPayloadExists(collectionId: string, userId: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `/api/collection/${encodeURIComponent(collectionId)}?userId=${encodeURIComponent(userId)}`,
+      { cache: "no-store" }
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** 公開コレクションが KV に無いとき（シード等）先に同期してからカード追加できるようにする */
+async function ensurePublicCollectionInKv(collectionId: string): Promise<boolean> {
+  const userId = getCurrentActivityUserId();
+  if (await remoteCollectionPayloadExists(collectionId, userId)) return true;
+  const col = await resolveCollectionForKvSync(collectionId);
+  if (!col || col.visibility !== "public") return false;
+  return syncCollectionToApiAndWait(col, { quiet: true });
+}
+
+function remoteCollectionErrorMessage(status: number, errorCode?: string): string {
+  if (status === 403 || errorCode === "FORBIDDEN") return "このコレクションには追加できません。";
+  if (status === 404 || errorCode === "NOT_FOUND") return "コレクションが見つかりませんでした。";
+  if (errorCode === "KV_NOT_CONFIGURED") return "サーバーに接続できませんでした。";
+  return "コレクションへの追加に失敗しました。";
+}
+
 /** コレクションをAPIから削除（非公開化・削除時） */
 function deleteCollectionFromApi(id: string): void {
   fetch(`/api/collection/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
@@ -744,6 +853,7 @@ export function addCardToCollection(
   cardId: string,
   opts?: CollectionMutationOpts
 ): void {
+  if (!isCollectionVoteCardAddEnabled()) return;
   const userId = getCurrentActivityUserId();
   const cols = load(userId);
   const col = cols.find((c) => c.id === collectionId);
@@ -761,6 +871,7 @@ export function addCardToCollection(
 
 /** カードをコレクションから削除 */
 export function removeCardFromCollection(collectionId: string, cardId: string): void {
+  if (!isCollectionVoteCardRemoveEnabled()) return;
   const userId = getCurrentActivityUserId();
   const cols = load(userId);
   const col = cols.find((c) => c.id === collectionId);
@@ -777,8 +888,10 @@ export function toggleCardInCollection(collectionId: string, cardId: string): vo
   const col = cols.find((c) => c.id === collectionId);
   if (!col) return;
   if (col.cardIds.includes(cardId)) {
+    if (!isCollectionVoteCardRemoveEnabled()) return;
     col.cardIds = col.cardIds.filter((id) => id !== cardId);
   } else {
+    if (!isCollectionVoteCardAddEnabled()) return;
     col.cardIds.push(cardId);
   }
   save(userId, cols);
@@ -790,7 +903,13 @@ export async function addCardToRemotePublicCollection(
   collectionId: string,
   cardId: string
 ): Promise<boolean> {
+  if (!isCollectionVoteCardAddEnabled()) return false;
   const userId = getCurrentActivityUserId();
+  const ensured = await ensurePublicCollectionInKv(collectionId);
+  if (!ensured) {
+    showAppToast("コレクションが見つかりませんでした。", "error");
+    return false;
+  }
   try {
     const res = await fetch(`/api/collection/${encodeURIComponent(collectionId)}/cards`, {
       method: "POST",
@@ -798,17 +917,14 @@ export async function addCardToRemotePublicCollection(
       body: JSON.stringify({ userId, cardId, action: "add" }),
     });
     if (!res.ok) {
-      let message = "コレクションへの追加に失敗しました。";
-      if (res.status === 403) message = "このコレクションには追加できません。";
+      let errorCode: string | undefined;
       try {
         const data = (await res.json()) as { error?: string };
-        if (typeof data?.error === "string" && data.error.length > 0 && data.error !== "FORBIDDEN") {
-          message = data.error;
-        }
+        if (typeof data?.error === "string") errorCode = data.error;
       } catch {
         /* ignore */
       }
-      showAppToast(message, "error");
+      showAppToast(remoteCollectionErrorMessage(res.status, errorCode), "error");
       return false;
     }
     invalidateCollectionsIndexCache();
@@ -824,6 +940,7 @@ export async function addCardToContributableCollection(
   collectionId: string,
   cardId: string
 ): Promise<boolean> {
+  if (!isCollectionVoteCardAddEnabled()) return false;
   const userId = getCurrentActivityUserId();
   const cols = load(userId);
   const localCol = cols.find((c) => c.id === collectionId && !c.joinedParticipation);
@@ -841,7 +958,13 @@ export async function toggleCardInContributableCollection(
   meta: { isOwned: boolean; containsCard: boolean; canAdd: boolean; canRemove: boolean }
 ): Promise<boolean> {
   if (meta.isOwned) {
-    toggleCardInCollection(collectionId, cardId);
+    if (meta.containsCard) {
+      if (!isCollectionVoteCardRemoveEnabled()) return false;
+      removeCardFromCollection(collectionId, cardId);
+      return true;
+    }
+    if (!isCollectionVoteCardAddEnabled()) return false;
+    addCardToCollection(collectionId, cardId);
     return true;
   }
   if (meta.containsCard) {
@@ -925,7 +1048,7 @@ export async function createOwnedCollectionFromSettings(
       skipApiSync: true,
       skipRemotePush: true,
     });
-    if (options.cardId) {
+    if (options.cardId && isCollectionVoteCardAddEnabled()) {
       addCardToCollection(created.id, options.cardId, {
         skipApiSync: true,
         skipRemotePush: true,

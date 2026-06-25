@@ -17,6 +17,7 @@ export type CollectionsIndexRow = {
 };
 
 let cache: { at: number; rows: CollectionsIndexRow[] } | null = null;
+let inflight: Promise<CollectionsIndexRow[]> | null = null;
 const TTL_MS = 60_000;
 
 export function invalidateCollectionsIndexCache(): void {
@@ -46,11 +47,7 @@ function normalizeRow(raw: unknown): CollectionsIndexRow | null {
   };
 }
 
-/** KV のコレクション一覧 index（短時間キャッシュで同一セッションの二重 GET を防ぐ） */
-export async function fetchCollectionsIndex(force = false): Promise<CollectionsIndexRow[]> {
-  if (!force && cache && Date.now() - cache.at < TTL_MS) {
-    return cache.rows;
-  }
+async function loadCollectionsIndex(): Promise<CollectionsIndexRow[]> {
   try {
     const res = await fetch("/api/collections");
     if (!res.ok) return cache?.rows ?? [];
@@ -62,4 +59,22 @@ export async function fetchCollectionsIndex(force = false): Promise<CollectionsI
   } catch {
     return cache?.rows ?? [];
   }
+}
+
+/** KV のコレクション一覧 index（短時間キャッシュ・進行中リクエストの重複排除） */
+export async function fetchCollectionsIndex(force = false): Promise<CollectionsIndexRow[]> {
+  if (!force && cache && Date.now() - cache.at < TTL_MS) {
+    return cache.rows;
+  }
+  if (!force && inflight) {
+    return inflight;
+  }
+  const request = loadCollectionsIndex();
+  if (force) {
+    return request;
+  }
+  inflight = request.finally(() => {
+    inflight = null;
+  });
+  return inflight;
 }

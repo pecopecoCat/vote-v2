@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { isCollectionVoteCardAddEnabled } from "../lib/collectionVoteCardMutation";
 
 /** カードの「…」メニュー → 非表示 / 通報モーダル用の共通 state */
 export function useCardModerationFlow() {
@@ -18,6 +19,7 @@ export function useCardModerationFlow() {
   const closeCardOptions = useCallback(() => setCardOptionsCardId(null), []);
 
   const openAddToCommunity = useCallback((cardId: string) => {
+    if (!isCollectionVoteCardAddEnabled()) return;
     setAddToCommunityCardId(cardId);
     setCardOptionsCardId(null);
   }, []);

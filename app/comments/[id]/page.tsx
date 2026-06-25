@@ -68,6 +68,8 @@ export default function CommentsPage() {
     addVote: sharedAddVote,
     addComment: sharedAddComment,
     removeComment: sharedRemoveComment,
+    isRemote,
+    recordBookmarkEvent,
   } = shared;
   const activityRaw = useMemo(
     () => resolveActivityForCard(sharedActivity, stableId),
@@ -346,6 +348,8 @@ export default function CommentsPage() {
             periodEnd={card?.periodEnd}
             expandMiniForCommentsPage
             commentsDisabled={commentsDisabled}
+            isRemote={isRemote}
+            recordBookmarkEvent={recordBookmarkEvent}
           />
           </div>
         </div>
@@ -405,10 +409,13 @@ export default function CommentsPage() {
               <VoteTimelineMasonry
                 items={bottomTimelineItems}
                 tagList={commentsPageTagList}
+                createdVotesForTimeline={createdVotesForTimeline}
                 activity={sharedActivity}
                 commentedCardIdSet={commentedCardIdSet}
                 bookmarkedIds={bookmarkedIds}
                 currentUser={currentUser}
+                isRemote={isRemote}
+                recordBookmarkEvent={recordBookmarkEvent}
                 onVote={(cid, option) => {
                   setRelatedKeepVotedVisibleIds((prev) => {
                     const next = new Set(prev);

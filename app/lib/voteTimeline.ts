@@ -1,4 +1,4 @@
-import { getOtherUsersCollections } from "../data/collections";
+import { getOtherUsersCollections, type CollectionVisibility } from "../data/collections";
 import { popularCollections, type CollectionGradient } from "../data/search";
 import type { VoteCardData } from "../data/voteCards";
 
@@ -71,7 +71,15 @@ export const PR_BANNERS: PrBannerItem[] = [
   },
 ];
 
-export type TimelineCollection = { id: string; title: string; gradient: CollectionGradient };
+export type TimelineCollection = {
+  id: string;
+  title: string;
+  gradient: CollectionGradient;
+  cardIds: string[];
+  visibility: CollectionVisibility;
+  coverImageUrl?: string;
+  color?: string;
+};
 
 export type TimelineItem =
   | { type: "vote"; card: VoteCardData }
@@ -81,12 +89,24 @@ export type TimelineItem =
 
 /** 実際にあるコレクションのプール（人気＋他ユーザー＋自分のコレクション） */
 export function getTimelineCollectionPool(
-  collections: { id: string; name: string; gradient?: CollectionGradient; visibility?: string }[]
+  collections: {
+    id: string;
+    name: string;
+    gradient?: CollectionGradient;
+    visibility?: CollectionVisibility;
+    cardIds?: string[];
+    coverImageUrl?: string;
+    color?: string;
+  }[]
 ): TimelineCollection[] {
   const other = getOtherUsersCollections().map((c) => ({
     id: c.id,
     title: c.name,
     gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+    cardIds: c.cardIds,
+    visibility: c.visibility,
+    coverImageUrl: c.coverImageUrl,
+    color: c.color,
   }));
   const mine = collections
     .filter((c) => c.visibility !== "member")
@@ -94,8 +114,19 @@ export function getTimelineCollectionPool(
       id: c.id,
       title: c.name,
       gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
+      cardIds: c.cardIds ?? [],
+      visibility: (c.visibility ?? "public") as CollectionVisibility,
+      coverImageUrl: c.coverImageUrl,
+      color: c.color,
     }));
-  return [...popularCollections, ...other, ...mine];
+  const popular = popularCollections.map((c) => ({
+    id: c.id,
+    title: c.title,
+    gradient: c.gradient,
+    cardIds: [] as string[],
+    visibility: "public" as const,
+  }));
+  return [...popular, ...other, ...mine];
 }
 
 /** タイムライン配列を組み立て（3/10/15ルール・コレクションは位置で安定選択） */
@@ -112,7 +143,15 @@ export function buildTimelineItems(
       const col = collectionPool[colIndex];
       items.push({
         type: "collection",
-        collection: { id: col.id, title: col.title, gradient: col.gradient },
+        collection: {
+          id: col.id,
+          title: col.title,
+          gradient: col.gradient,
+          cardIds: col.cardIds,
+          visibility: col.visibility,
+          coverImageUrl: col.coverImageUrl,
+          color: col.color,
+        },
       });
     }
     if (oneBased % TAGS_EVERY === 0) {

@@ -1,3 +1,4 @@
+import { isCollectionVoteCardAddEnabled } from "./collectionVoteCardMutation";
 import type { VoteCardProps, CurrentUser } from "../components/VoteCard";
 import type { VoteCardData } from "../data/voteCards";
 import { getMergedCounts, type CardActivity } from "../data/voteCardActivity";
@@ -28,6 +29,9 @@ export type BuildVoteCardPropsArgs = {
   hideBookmark?: boolean;
   commentsDisabled?: boolean;
   commentsHref?: string;
+  /** リモート保存時のブックマークイベント記録（VoteCard が SharedData に依存しないため） */
+  isRemote?: boolean;
+  recordBookmarkEvent?: (cardId: string) => void;
   /** コレクション画面など、画面固有の上書き */
   overrides?: Partial<VoteCardProps>;
 };
@@ -73,7 +77,12 @@ export function buildVoteCardProps(args: BuildVoteCardPropsArgs): VoteCardProps 
     commentsHref: args.commentsHref,
     hideShare: args.hideShare,
     hideBookmark: args.hideBookmark,
+    isRemote: args.isRemote,
+    recordBookmarkEvent: args.recordBookmarkEvent,
   };
+
+  const collectionClick =
+    isCollectionVoteCardAddEnabled() ? args.onAddToCollectionClick : undefined;
 
   let props: VoteCardProps;
   if (args.surface === "votedHistory") {
@@ -81,7 +90,7 @@ export function buildVoteCardProps(args: BuildVoteCardPropsArgs): VoteCardProps 
       ...base,
       onBookmarkClick: args.onBookmarkClick,
       onMoreClick: args.onMoreClick,
-      onAddToCollectionClick: args.onAddToCollectionClick,
+      onAddToCollectionClick: collectionClick,
       optimisticVoteResult: true,
     };
   } else {
@@ -90,7 +99,7 @@ export function buildVoteCardProps(args: BuildVoteCardPropsArgs): VoteCardProps 
       onVote: args.onVote,
       onBookmarkClick: args.onBookmarkClick,
       onMoreClick: args.onMoreClick,
-      onAddToCollectionClick: args.onAddToCollectionClick,
+      onAddToCollectionClick: collectionClick,
       optimisticVoteResult: args.optimisticVoteResult ?? true,
     };
   }

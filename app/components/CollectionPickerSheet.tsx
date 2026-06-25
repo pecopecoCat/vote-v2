@@ -63,9 +63,6 @@ function CollectionPickerThumbnail({ row }: { row: ContributableCollection }) {
 function collectionMeta(row: ContributableCollection): string {
   if (row.disabledReason) return row.disabledReason;
   const parts: string[] = [];
-  if (!row.isOwned && row.createdByDisplayName) {
-    parts.push(row.createdByDisplayName);
-  }
   parts.push(COLLECTION_VISIBILITY_LABEL[row.visibility]);
   if (row.category) {
     const label = COLLECTION_CATEGORY_OPTIONS.find((c) => c.id === row.category)?.label;
@@ -193,7 +190,7 @@ export function CollectionPickerBody({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="名前・作成者・カテゴリで検索"
+          placeholder="名前・カテゴリで検索"
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}

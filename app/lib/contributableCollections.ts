@@ -6,6 +6,7 @@ import {
 import { COLLECTION_CATEGORY_OPTIONS, type CollectionCategory } from "../data/collectionCategories";
 import type { CollectionGradient } from "../data/search";
 import type { CollectionsIndexRow } from "./fetchCollectionsIndex";
+import { isCollectionVoteCardRemoveEnabled } from "./collectionVoteCardMutation";
 
 export type ContributableCollection = {
   id: string;
@@ -48,6 +49,9 @@ function collectionToContributable(
 ): ContributableCollection {
   const containsCard = opts.cardId ? col.cardIds.includes(opts.cardId) : false;
   const isOwner = opts.isOwned || col.createdByUserId === activityUserId;
+  let canRemove = opts.isOwned || isOwner;
+  if (containsCard && !isOwner && !opts.isOwned) canRemove = false;
+  if (!isCollectionVoteCardRemoveEnabled()) canRemove = false;
   return {
     id: col.id,
     name: col.name,
@@ -61,9 +65,8 @@ function collectionToContributable(
     category: col.category,
     isOwned: opts.isOwned,
     canAdd: col.visibility === "public" || opts.isOwned,
-    canRemove: opts.isOwned || isOwner,
+    canRemove,
     disabledReason: col.visibility === "member" && !opts.isOwned ? "作成者のみ追加できます" : undefined,
-    ...(containsCard && !isOwner && !opts.isOwned ? { canRemove: false } : {}),
   };
 }
 
@@ -74,6 +77,9 @@ function indexRowToContributable(
 ): ContributableCollection {
   const isOwner = Boolean(row.createdByUserId && row.createdByUserId === activityUserId);
   const containsCard = cardId ? row.cardIds.includes(cardId) : false;
+  let canRemove = isOwner;
+  if (containsCard && !isOwner) canRemove = false;
+  if (!isCollectionVoteCardRemoveEnabled()) canRemove = false;
   return {
     id: row.id,
     name: row.name,
@@ -87,9 +93,8 @@ function indexRowToContributable(
     category: row.category,
     isOwned: isOwner,
     canAdd: row.visibility === "public",
-    canRemove: isOwner,
+    canRemove,
     disabledReason: undefined,
-    ...(containsCard && !isOwner ? { canRemove: false } : {}),
   };
 }
 
@@ -134,12 +139,7 @@ export function matchesContributableQuery(row: ContributableCollection, rawQuery
   if (!q) return true;
   const categoryLabel =
     COLLECTION_CATEGORY_OPTIONS.find((c) => c.id === row.category)?.label ?? "";
-  const tokens = [
-    row.name,
-    row.createdByDisplayName ?? "",
-    categoryLabel,
-    row.category ?? "",
-  ].map(normalizeSearchText);
+  const tokens = [row.name, categoryLabel, row.category ?? ""].map(normalizeSearchText);
   return tokens.some((token) => token.length > 0 && token.includes(q));
 }
 

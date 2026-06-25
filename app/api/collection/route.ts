@@ -61,6 +61,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
         cardIds?: string[];
         category?: string;
         coverImageUrl?: string;
+        createdByUserId?: string;
         createdByDisplayName?: string;
         createdByIconUrl?: string;
       };
@@ -74,6 +75,10 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       ? col.visibility
       : "public";
     const cardIds = Array.isArray(col.cardIds) ? col.cardIds.filter((id): id is string => typeof id === "string") : [];
+    const createdByUserId =
+      typeof col.createdByUserId === "string" && col.createdByUserId.trim()
+        ? col.createdByUserId.trim()
+        : userId || undefined;
 
     if (visibility === "private") {
       await kv.del(KV_PREFIX + col.id);
@@ -96,7 +101,7 @@ export async function POST(request: Request): Promise<NextResponse<{ ok: boolean
       gradient: typeof col.gradient === "string" ? col.gradient : undefined,
       visibility,
       cardIds,
-      createdByUserId: userId || undefined,
+      createdByUserId,
       ...(typeof col.category === "string" && col.category.length > 0 ? { category: col.category } : {}),
       ...(typeof col.coverImageUrl === "string" && col.coverImageUrl.length > 0
         ? { coverImageUrl: col.coverImageUrl }

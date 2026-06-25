@@ -48,8 +48,12 @@ export interface VoteCardData {
 /**
  * アプリ初期表示・デモ用の固定VOTE（ローカル・KV有無どちらでもタイムラインに並ぶ）。
  * moyatto 想定：コミュニティ別の「もやっと」2択。
- * id は一覧側で seed-0 … seed-47 と付与（48件）。
+ * id は一覧側で seed-0 … seed-56 と付与（57件）。
  */
+export const SEED_TAG_DOG_WALK = "犬の散歩もやっと";
+export const SEED_TAG_SAD_PARENTING = "悲しい育児";
+export const SEED_TAG_OTSUBONE = "オツボネ";
+
 export const voteCardsData: VoteCardData[] = [
   /* --- 今日の献立 --- */
   {
@@ -690,6 +694,129 @@ export const voteCardsData: VoteCardData[] = [
     bookmarkCount: 5,
     createdAt: "2026-05-11T14:00:00.000Z",
     creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
+  },
+  /* --- 犬の散歩もやっと --- */
+  {
+    patternType: "yellow-loops",
+    question: "散歩の「もやっと」、いちばんつらいのはどっち？",
+    optionA: "家に帰りたがって逆方向に引っ張る🐕",
+    optionB: "あれこれ嗅ぎすぎて全然進まない👃",
+    countA: 22,
+    countB: 19,
+    commentCount: 6,
+    tags: [SEED_TAG_DOG_WALK],
+    bookmarkCount: 5,
+    createdAt: "2026-06-01T08:00:00.000Z",
+    creator: { name: "miki", iconUrl: DEFAULT_MAMA_AVATAR_URL },
+  },
+  {
+    patternType: "yellow-loops",
+    question: "犬が散歩を拒否し始めたら、あなたは？",
+    optionA: "その日は引き返してあげる",
+    optionB: "少しでも歩かせたい、粘る",
+    countA: 17,
+    countB: 24,
+    commentCount: 4,
+    tags: [SEED_TAG_DOG_WALK],
+    readMoreText: "飼い主さんの体力も限界あるよね。",
+    bookmarkCount: 4,
+    createdAt: "2026-06-01T09:30:00.000Z",
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
+  },
+  {
+    patternType: "blue-cyan",
+    question: "散歩中に他の犬とすれ違ったとき、近いのは？",
+    optionA: "近づきたがる／吠えるのでハラハラする",
+    optionB: "無視したいのに向こうから来るのがつらい",
+    countA: 20,
+    countB: 16,
+    commentCount: 3,
+    tags: [SEED_TAG_DOG_WALK],
+    bookmarkCount: 3,
+    createdAt: "2026-06-01T11:00:00.000Z",
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
+  },
+  /* --- 悲しい育児 --- */
+  {
+    patternType: "pink-blue",
+    question: "いちばん胸が締めつけられる育児の瞬間は？",
+    optionA: "「ママ／パパじゃない方がいい」と言われたとき",
+    optionB: "頑張っても「できない」と言われたとき",
+    countA: 28,
+    countB: 21,
+    commentCount: 7,
+    tags: [SEED_TAG_SAD_PARENTING],
+    bookmarkCount: 6,
+    createdAt: "2026-06-02T07:30:00.000Z",
+    creator: { name: "mama", iconUrl: DEFAULT_MAMA_AVATAR_URL },
+  },
+  {
+    patternType: "orange-purple",
+    question: "子どもの成長、嬉しいけど悲しくなるのは？",
+    optionA: "抱っこを求められなくなったとき",
+    optionB: "わからない言葉ばかり言われなくなったとき",
+    countA: 25,
+    countB: 18,
+    commentCount: 5,
+    tags: [SEED_TAG_SAD_PARENTING],
+    readMoreText: "成長の裏側にある切なさ、わかる人にはわかる。",
+    bookmarkCount: 5,
+    createdAt: "2026-06-02T09:00:00.000Z",
+    creator: { name: "papa", iconUrl: DEFAULT_PAPA_AVATAR_URL },
+  },
+  {
+    patternType: "geometric-stripes",
+    question: "育児で一人になった夜、しんどいのはどっち？",
+    optionA: "今日の失敗ばかり思い出す",
+    optionB: "明日も同じことの繰り返しだと感じる",
+    countA: 19,
+    countB: 23,
+    commentCount: 4,
+    tags: [SEED_TAG_SAD_PARENTING],
+    bookmarkCount: 4,
+    createdAt: "2026-06-02T10:30:00.000Z",
+    creator: { name: "あい", iconUrl: DEFAULT_AI_AVATAR_URL },
+  },
+  /* --- オツボネ --- */
+  {
+    patternType: "geometric-stripes",
+    question: "オツボネがいる職場、いちばんイヤなのは？",
+    optionA: "ミスしても上司に庇われる",
+    optionB: "いい案件だけ渡される",
+    countA: 31,
+    countB: 27,
+    commentCount: 8,
+    tags: [SEED_TAG_OTSUBONE],
+    bookmarkCount: 7,
+    createdAt: "2026-06-03T08:00:00.000Z",
+    creator: { name: "ryo", iconUrl: DEFAULT_RYO_AVATAR_URL },
+  },
+  {
+    patternType: "blue-cyan",
+    question: "自分がオツボネ扱いされたとき、つらいのは？",
+    optionA: "雑用ばかり回ってくる",
+    optionB: "他の人のフォローまで押し付けられる",
+    countA: 24,
+    countB: 29,
+    commentCount: 5,
+    tags: [SEED_TAG_OTSUBONE],
+    bookmarkCount: 5,
+    createdAt: "2026-06-03T09:45:00.000Z",
+    creator: { name: "kouta", iconUrl: DEFAULT_KOUTA_AVATAR_URL },
+  },
+  {
+    patternType: "pink-blue",
+    question: "オツボネへの対応、あなたに近いのは？",
+    optionA: "表面上は普通に付き合う",
+    optionB: "距離を置いて関わりたくない",
+    countA: 26,
+    countB: 22,
+    commentCount: 4,
+    tags: [SEED_TAG_OTSUBONE],
+    readMoreText: "職場の人間関係、ほんと疲れるよね。",
+    bookmarkCount: 4,
+    createdAt: "2026-06-03T11:15:00.000Z",
+    creator: { name: "yui", iconUrl: DEFAULT_YUI_AVATAR_URL },
   },
 ];
 

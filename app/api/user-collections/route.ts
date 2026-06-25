@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../lib/kv";
 import { httpResponseFromKvWriteError } from "../../lib/kvWriteErrors";
+import { normalizeCollectionCategory } from "../../data/collectionCategories";
 
 const KV_KEY_PREFIX = "vote_user_owned_collections:";
 
@@ -15,6 +16,7 @@ type StoredCollection = {
   gradient?: string;
   visibility: "public" | "private" | "member";
   cardIds: string[];
+  category?: string;
   createdByUserId?: string;
   createdByDisplayName?: string;
   createdByIconUrl?: string;
@@ -40,6 +42,7 @@ function normalizeOne(raw: unknown): StoredCollection | null {
     typeof o.createdByIconUrl === "string" && o.createdByIconUrl.length > 0 ? o.createdByIconUrl : undefined;
   const coverImageUrl =
     typeof o.coverImageUrl === "string" && o.coverImageUrl.length > 0 ? o.coverImageUrl : undefined;
+  const category = normalizeCollectionCategory(typeof o.category === "string" ? o.category : undefined);
   return {
     id,
     name,
@@ -47,6 +50,7 @@ function normalizeOne(raw: unknown): StoredCollection | null {
     gradient,
     visibility: vis,
     cardIds,
+    ...(category ? { category } : {}),
     ...(createdByUserId ? { createdByUserId } : {}),
     ...(createdByDisplayName ? { createdByDisplayName } : {}),
     ...(createdByIconUrl ? { createdByIconUrl } : {}),

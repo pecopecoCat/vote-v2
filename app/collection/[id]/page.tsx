@@ -197,7 +197,7 @@ export default function CollectionPage() {
   const router = useRouter();
   const id = typeof params.id === "string" ? params.id : "";
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity, addVote: sharedAddVote, isRemote } = shared;
+  const { createdVotesForTimeline, activity, addVote: sharedAddVote, isRemote, recordBookmarkEvent } = shared;
   useEnsureCollectionsHydrated();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
@@ -863,21 +863,27 @@ export default function CollectionPage() {
               <p className="text-[11px] leading-tight text-gray-500">まだ参加者はいません</p>
             ) : (
               <ul className="flex flex-wrap gap-x-2.5 gap-y-1.5">
-                {memberParticipantsForDisplay.map((p) => (
+                {memberParticipantsForDisplay.map((p) => {
+                  const isCreator =
+                    collection.createdByUserId === p.userId || p.userId === "__owner__";
+                  return (
                   <li key={p.userId} className="flex max-w-[10rem] min-w-0 items-center gap-1.5">
                     <MemberParticipantAvatar
                       userId={p.userId}
                       iconUrl={p.iconUrl}
                       lastVotedAt={p.lastVotedAt}
                     />
-                    <span className="min-w-0 truncate text-[11px] leading-tight text-gray-600">{p.name}</span>
-                    {(collection.createdByUserId === p.userId || p.userId === "__owner__") && (
+                    {!isCreator ? (
+                      <span className="min-w-0 truncate text-[11px] leading-tight text-gray-600">{p.name}</span>
+                    ) : null}
+                    {isCreator ? (
                       <span className="shrink-0 rounded bg-gray-200 px-1 py-px text-[9px] font-medium text-gray-600">
                         作成
                       </span>
-                    )}
+                    ) : null}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -930,6 +936,8 @@ export default function CollectionPage() {
                       initialSelectedOption,
                       optimisticVoteResult: isMemberCollection || showVoted,
                     },
+                    isRemote,
+                    recordBookmarkEvent,
                   })}
                 />
                 </VoteCardMasonryTile>

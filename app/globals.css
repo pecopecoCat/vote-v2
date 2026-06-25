@@ -138,14 +138,14 @@ select {
   color: #191919;
 }
 
-/* VOTEカードフッター：アイコン枠（375px時 18×18px・PCは固定18px） */
+/* VOTEカードフッター：アイコン枠（375px時 22×22px・PCは固定18px） */
 .vote-card-footer-icon-box {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: calc(var(--vote-u) * 18 / 375);
-  height: calc(var(--vote-u) * 18 / 375);
+  width: calc(var(--vote-u) * 22 / 375);
+  height: calc(var(--vote-u) * 22 / 375);
   vertical-align: middle;
 }
 
@@ -167,13 +167,15 @@ select {
 /* コレクション追加：bookmark と同じ高さ（幅はアスペクト比で自動） */
 .vote-card-footer-icon-box:has(.vote-card-footer-icon-collection) {
   width: auto;
-  min-width: calc(var(--vote-u) * 18 / 375);
+  min-width: calc(var(--vote-u) * 22 / 375);
+  align-items: flex-end;
 }
 
 .vote-card-footer-icon-box > .vote-card-footer-icon-collection {
   width: auto;
   height: 100%;
   max-width: none;
+  object-position: left bottom;
 }
 
 @media (min-width: 768px) {
@@ -197,8 +199,8 @@ select {
 .vote-card-footer-icon-square,
 .vote-card-footer-icon-bookmark,
 .vote-card-footer-icon-commented {
-  width: calc(var(--vote-u) * 18 / 375);
-  height: calc(var(--vote-u) * 18 / 375);
+  width: calc(var(--vote-u) * 22 / 375);
+  height: calc(var(--vote-u) * 22 / 375);
   flex-shrink: 0;
   object-fit: contain;
 }
@@ -653,6 +655,13 @@ select {
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   padding-bottom: 2px;
+  margin-right: -5.333vw;
+}
+
+@media (min-width: 640px) {
+  .collections-category-row {
+    margin-right: -1.5rem;
+  }
 }
 
 .collections-category-row::-webkit-scrollbar {

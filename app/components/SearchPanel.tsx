@@ -126,7 +126,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
   /** ハッシュタグ一覧の並び（マイページ等と同じプルダウン） */
   const [tagListSortOrder, setTagListSortOrder] = useState<"newest" | "oldest">("newest");
   const shared = useSharedData();
-  const { createdVotesForTimeline, activity, addVote: sharedAddVote } = shared;
+  const { createdVotesForTimeline, activity, addVote: sharedAddVote, isRemote, recordBookmarkEvent } = shared;
   const auth = useAuthState();
   const isLoggedIn = auth.isLoggedIn;
   const currentUser = useCurrentUser(auth);
@@ -146,11 +146,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
   const restoredUiStateRef = useRef(false);
   const trendingLoadSentinelRef = useRef<HTMLDivElement | null>(null);
   const voteSearchLoadSentinelRef = useRef<HTMLDivElement | null>(null);
-  const { remotePopularCollections } = useSearchCollectionsWarm(
-    isLoggedIn,
-    activeTab,
-    refreshCollections
-  );
+  const { remotePopularCollections } = useSearchCollectionsWarm();
 
   /** ハッシュタグタップで開いたとき（?tag=xxx）→ 従来のカード一覧。虫眼鏡タップ（/search）→ 新しい検索画面 */
   const isTagFilterView = tagFromUrl.length > 0;
@@ -690,6 +686,8 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
                         onVote: handleVote,
                         onMoreClick: handleTagFilterCardMoreClick,
                         onAddToCollectionClick: moderation.openAddToCommunity,
+                        isRemote,
+                        recordBookmarkEvent,
                       })}
                     />
                     </VoteCardMasonryTile>
@@ -884,7 +882,9 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
                                 hasCommented: commentedCardIdSet.has(cardId),
                                 onVote: handleVote,
                                 onMoreClick: handleTagFilterCardMoreClick,
-                        onAddToCollectionClick: moderation.openAddToCommunity,
+                                onAddToCollectionClick: moderation.openAddToCommunity,
+                                isRemote,
+                                recordBookmarkEvent,
                               })}
                             />
                           </VoteCardMasonryTile>

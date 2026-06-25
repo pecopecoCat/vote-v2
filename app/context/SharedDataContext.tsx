@@ -733,7 +733,6 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
             }
             throw new Error(message);
           }
-          void fetchCreatedVotes();
         } catch (e) {
           const id = cardWithMeta.id ?? "";
           setCreatedVotesForTimeline((prev) => prev.filter((c) => (c.id ?? "") !== id));
@@ -744,7 +743,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       addCreatedVoteLocal(card);
       setCreatedVotesForTimeline(mapDemoCreatorDisplayForTimeline(getCreatedVotesForTimeline()));
     },
-    [preferServerStorage, isRemote, fetchCreatedVotes]
+    [preferServerStorage, isRemote]
   );
 
   const addVote = useCallback(

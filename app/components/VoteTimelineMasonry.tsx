@@ -5,8 +5,9 @@ import VoteCard, { type CurrentUser } from "./VoteCard";
 import { VoteCardMasonryTile } from "./VoteCardList";
 import AdCard from "./AdCard";
 import RecommendedTags from "./RecommendedTags";
-import CollectionCard from "./CollectionCard";
+import { TimelineCollectionFeedCard } from "./CollectionFeedCard";
 import type { CardActivity } from "../data/voteCardActivity";
+import type { VoteCardData } from "../data/voteCards";
 import { resolveStableVoteCardId } from "../data/voteCards";
 import { buildVoteCardProps } from "../lib/buildVoteCardProps";
 import { resolveCardBackgroundUrl } from "../lib/resolveCardBackgroundUrl";
@@ -15,10 +16,13 @@ import type { TimelineItem } from "../lib/voteTimeline";
 type VoteTimelineMasonryProps = {
   items: TimelineItem[];
   tagList: string[];
+  createdVotesForTimeline: VoteCardData[];
   activity: Record<string, CardActivity>;
   commentedCardIdSet: Set<string>;
   bookmarkedIds: Set<string>;
   currentUser: CurrentUser;
+  isRemote?: boolean;
+  recordBookmarkEvent?: (cardId: string) => void;
   onVote: (id: string, option: "A" | "B") => void;
   onMoreClick: (cardId: string) => void;
   onAddToCollectionClick?: (cardId: string) => void;
@@ -29,10 +33,13 @@ type VoteTimelineMasonryProps = {
 export function VoteTimelineMasonry({
   items,
   tagList,
+  createdVotesForTimeline,
   activity,
   commentedCardIdSet,
   bookmarkedIds,
   currentUser,
+  isRemote = false,
+  recordBookmarkEvent,
   onVote,
   onMoreClick,
   onAddToCollectionClick,
@@ -60,22 +67,19 @@ export function VoteTimelineMasonry({
                   onVote,
                   onMoreClick,
                   onAddToCollectionClick,
+                  isRemote,
+                  recordBookmarkEvent,
                 })}
               />
             </VoteCardMasonryTile>
           );
         }
         if (item.type === "collection") {
-          const { id, title, gradient } = item.collection;
           return (
-            <VoteCardMasonryTile key={`col-${id}-${idx}`}>
-              <CollectionCard
-                id={id}
-                title={title}
-                gradient={gradient}
-                titleVariant="blackBlock"
-                href={`/collection/${id}`}
-                feedTile
+            <VoteCardMasonryTile key={`col-${item.collection.id}-${idx}`}>
+              <TimelineCollectionFeedCard
+                collection={item.collection}
+                createdVotesForTimeline={createdVotesForTimeline}
               />
             </VoteCardMasonryTile>
           );

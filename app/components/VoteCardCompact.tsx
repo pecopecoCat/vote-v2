@@ -6,7 +6,6 @@ import type { VoteCardPattern } from "./VoteCard";
 import VoteCardShareSheet from "./VoteCardShareSheet";
 import { VoteCardFooterIconBox } from "./VoteCardFooterIconBox";
 import { toggleBookmark } from "../lib/toggleBookmark";
-import { useSharedData } from "../context/SharedDataContext";
 import { getVotePeriodStatusText, isVotingAllowedNow } from "../data/votePeriod";
 
 const patternClasses: Record<VoteCardPattern, string> = {
@@ -59,6 +58,8 @@ export interface VoteCardCompactProps {
   flatOuterShadow?: boolean;
   /** true のときフッターの投票数・コメント・ブックマーク・その他（アイコン行）を出さない */
   hideFooterIconRow?: boolean;
+  isRemote?: boolean;
+  recordBookmarkEvent?: (cardId: string) => void;
 }
 
 export default function VoteCardCompact({
@@ -89,9 +90,10 @@ export default function VoteCardCompact({
   expandMiniForCommentsPage = false,
   flatOuterShadow = false,
   hideFooterIconRow = false,
+  isRemote = false,
+  recordBookmarkEvent,
 }: VoteCardCompactProps) {
   const router = useRouter();
-  const shared = useSharedData();
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const periodAllowsVote = useMemo(
     () => isVotingAllowedNow(periodStart, periodEnd),
@@ -320,7 +322,7 @@ export default function VoteCardCompact({
               }
               const result = toggleBookmark(cardId, {
                 onAdded: () => {
-                  if (shared.isRemote) void shared.recordBookmarkEvent(cardId);
+                  if (isRemote) void recordBookmarkEvent?.(cardId);
                 },
               });
               if (result === "login_required") {

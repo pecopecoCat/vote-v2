@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getKV } from "../../../../lib/kv";
 import { httpResponseFromKvWriteError } from "../../../../lib/kvWriteErrors";
+import {
+  COLLECTION_VOTE_CARD_ADD_ENABLED,
+  COLLECTION_VOTE_CARD_REMOVE_ENABLED,
+} from "../../../../lib/collectionVoteCardMutation";
 import type { CollectionPayload } from "../route";
 
 const KV_PREFIX = "vote_collection:";
@@ -61,6 +65,12 @@ export async function POST(
     const action = body.action === "remove" ? "remove" : "add";
     if (!userId || !cardId) {
       return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+    }
+    if (action === "add" && !COLLECTION_VOTE_CARD_ADD_ENABLED) {
+      return NextResponse.json({ error: "DISABLED" }, { status: 403 });
+    }
+    if (action === "remove" && !COLLECTION_VOTE_CARD_REMOVE_ENABLED) {
+      return NextResponse.json({ error: "DISABLED" }, { status: 403 });
     }
 
     const raw = await kv.get<CollectionPayload>(KV_PREFIX + collectionId);

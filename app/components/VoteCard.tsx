@@ -5,7 +5,6 @@ import { memo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toggleBookmark } from "../lib/toggleBookmark";
-import { useSharedData } from "../context/SharedDataContext";
 import TagSearchLink from "./TagSearchLink";
 import VoteCardShareSheet from "./VoteCardShareSheet";
 import { VoteCardFooterIconBox } from "./VoteCardFooterIconBox";
@@ -92,6 +91,9 @@ export interface VoteCardProps {
   periodStart?: string;
   /** 投票期間終了日時（ISO文字列）。設定時はタグ下に「投票終了までX日」または「投票期間終了」を表示 */
   periodEnd?: string;
+  /** リモート保存時にブックマークイベントを記録するか */
+  isRemote?: boolean;
+  recordBookmarkEvent?: (cardId: string) => void;
 }
 
 const patternClasses: Record<VoteCardPattern, string> = {
@@ -135,9 +137,10 @@ function VoteCard({
   optionBImageUrl,
   periodStart,
   periodEnd,
+  isRemote = false,
+  recordBookmarkEvent,
 }: VoteCardProps) {
   const router = useRouter();
-  const shared = useSharedData();
   const patternClass = patternClasses[patternType];
   const useImage = Boolean(backgroundImageUrl);
 
@@ -462,7 +465,7 @@ function VoteCard({
               }
               const result = toggleBookmark(cardId, {
                 onAdded: () => {
-                  if (shared.isRemote) void shared.recordBookmarkEvent(cardId);
+                  if (isRemote) void recordBookmarkEvent?.(cardId);
                 },
               });
               if (result === "login_required") {

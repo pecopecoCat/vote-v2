@@ -31,14 +31,14 @@ export type UnderlineTabItem<T extends string> = {
   icon?: UnderlineTabIcon;
 };
 
-export type UnderlineTabBarLayout = "scroll" | "equal" | "equalScroll" | "center";
+export type UnderlineTabBarLayout = "scroll" | "equal" | "equalScroll" | "contentScroll" | "center";
 
 export type UnderlineTabBarProps<T extends string> = {
   items: UnderlineTabItem<T>[];
   activeId: T;
   onSelect: (id: T) => void;
   ariaLabel: string;
-  /** scroll: 検索（横スクロール可） / equal: 等分（狭いと省略） / equalScroll: 等幅＋横スクロール / center: HOME フィード */
+  /** scroll: 検索（横スクロール可） / equal: 等分（狭いと省略） / equalScroll: 等幅＋横スクロール / contentScroll: 文字幅+左右余白・等間隔＋横スクロール / center: HOME フィード */
   layout?: UnderlineTabBarLayout;
   className?: string;
   /** タブ行の背景（デフォルト: layout により white または #F1F1F1） */
@@ -138,7 +138,11 @@ export default function UnderlineTabBar<T extends string>({
   navStyle,
   transition = true,
 }: UnderlineTabBarProps<T>) {
-  const indicator = indicatorClassName ?? (layout === "equal" || layout === "equalScroll" ? PROFILE_INDICATOR : DEFAULT_INDICATOR);
+  const indicator =
+    indicatorClassName ??
+    (layout === "equal" || layout === "equalScroll" || layout === "contentScroll"
+      ? PROFILE_INDICATOR
+      : DEFAULT_INDICATOR);
   const bg = backgroundClassName ?? (layout === "center" ? "bg-[#F1F1F1]" : "bg-white");
 
   const renderButton = (item: UnderlineTabItem<T>) => {
@@ -150,7 +154,9 @@ export default function UnderlineTabBar<T extends string>({
         ? `relative flex min-w-0 flex-1 items-center justify-center gap-1.5 pt-[14.4px] pb-[11.4px] font-bold w-full text-center ${labelClassName}`
         : layout === "equalScroll"
           ? `relative flex shrink-0 items-center justify-center gap-1.5 pt-[14.4px] pb-[11.4px] font-bold whitespace-nowrap text-center ${labelClassName}`
-          : layout === "center"
+          : layout === "contentScroll"
+            ? `relative inline-flex shrink-0 items-center justify-center gap-1.5 px-5 pt-[14.4px] pb-[11.4px] font-bold whitespace-nowrap text-center ${labelClassName}`
+            : layout === "center"
             ? `relative inline-flex items-center justify-center gap-1.5 pb-[8px] leading-snug text-[15px] ${active ? "font-bold" : "font-normal"}`
             : `relative inline-flex min-h-[3.25rem] flex-none items-center gap-1.5 whitespace-nowrap font-bold ${labelClassName}`;
 
@@ -174,7 +180,7 @@ export default function UnderlineTabBar<T extends string>({
         {item.icon ? <TabIcon icon={item.icon} active={active} /> : null}
         <span
           className={
-            layout === "scroll" || layout === "equalScroll"
+            layout === "scroll" || layout === "equalScroll" || layout === "contentScroll"
               ? "whitespace-nowrap"
               : "min-w-0 truncate"
           }
@@ -193,6 +199,21 @@ export default function UnderlineTabBar<T extends string>({
       >
         <nav
           className="flex w-max min-w-full shrink-0 flex-nowrap items-stretch justify-center gap-5 px-[5.333vw]"
+          aria-label={ariaLabel}
+        >
+          {items.map(renderButton)}
+        </nav>
+      </div>
+    );
+  }
+
+  if (layout === "contentScroll") {
+    return (
+      <div
+        className={`w-full overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${bg} ${className}`}
+      >
+        <nav
+          className={`profile-tab-bar flex w-max min-w-full shrink-0 flex-nowrap items-stretch justify-center gap-5 px-[5.333vw] ${bg}`}
           aria-label={ariaLabel}
         >
           {items.map(renderButton)}
