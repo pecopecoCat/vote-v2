@@ -3,6 +3,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Z_INDEX } from "../lib/zIndex";
+import { DESKTOP_MQ, MODAL_DESKTOP_PANEL_CLASS } from "./modal/constants";
+import { ModalCloseButton } from "./modal/ModalCloseButton";
+import { ModalCloseRightHeader, ModalTitleHeader } from "./modal/ModalHeaders";
 
 type BottomSheetRounded = "sheet" | "card";
 
@@ -28,36 +31,7 @@ export type BottomSheetProps = {
 };
 
 export function BottomSheetCloseButton({ onClose }: { onClose: () => void }) {
-  return (
-    <button
-      type="button"
-      className="flex h-10 w-10 items-center justify-center"
-      aria-label="閉じる"
-      onClick={onClose}
-    >
-      <img src="/icons/icon_close.svg" alt="" className="icon-close-responsive" width={14} height={14} />
-    </button>
-  );
-}
-
-function BottomSheetTitleHeader({ title, onClose }: { title: string; onClose: () => void }) {
-  return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
-      <div />
-      <span className="text-lg font-bold text-gray-900">{title}</span>
-      <div className="flex justify-end">
-        <BottomSheetCloseButton onClose={onClose} />
-      </div>
-    </div>
-  );
-}
-
-function BottomSheetCloseRightHeader({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="mx-auto flex max-w-lg items-center justify-end px-4 pb-3">
-      <BottomSheetCloseButton onClose={onClose} />
-    </div>
-  );
+  return <ModalCloseButton onClose={onClose} />;
 }
 
 export default function BottomSheet({
@@ -78,6 +52,15 @@ export default function BottomSheet({
   panelClassName = "",
 }: BottomSheetProps) {
   const [keyboardInsetPx, setKeyboardInsetPx] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia(DESKTOP_MQ);
+    const apply = () => setIsDesktop(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -98,7 +81,7 @@ export default function BottomSheet({
   }, [open]);
 
   useEffect(() => {
-    if (!open || !trackKeyboard) return;
+    if (!open || !trackKeyboard || isDesktop) return;
     const vv = window.visualViewport;
     if (!vv) return;
 
@@ -122,24 +105,25 @@ export default function BottomSheet({
       window.removeEventListener("orientationchange", update);
       setKeyboardInsetPx(0);
     };
-  }, [open, trackKeyboard]);
+  }, [open, trackKeyboard, isDesktop]);
 
   if (!open) return null;
 
-  const roundedClass =
+  const mobileRoundedClass =
     rounded === "card"
       ? "rounded-t-2xl shadow-[0_-2px_10px_rgba(0,0,0,0.08)]"
       : "rounded-t-[30px] shadow-lg";
 
-  const panelPadding = safeAreaBottom ? "pb-[env(safe-area-inset-bottom)]" : "";
+  const panelPadding = safeAreaBottom ? "max-md:pb-[env(safe-area-inset-bottom)]" : "";
   const fontClass = fontBold ? "font-bold" : "";
+  const desktopCenterClass = MODAL_DESKTOP_PANEL_CLASS;
 
   const resolvedHeader =
     header ??
     (headerVariant === "title" && title ? (
-      <BottomSheetTitleHeader title={title} onClose={onClose} />
+      <ModalTitleHeader title={title} onClose={onClose} />
     ) : headerVariant === "close-right" ? (
-      <BottomSheetCloseRightHeader onClose={onClose} />
+      <ModalCloseRightHeader onClose={onClose} title={ariaLabel ?? title} />
     ) : null);
 
   const content = (
@@ -151,11 +135,11 @@ export default function BottomSheet({
         onClick={onClose}
       />
       <div
-        className={`fixed inset-x-0 bottom-0 max-h-[85vh] overflow-hidden bg-white ${roundedClass} ${fontClass} ${panelPadding} ${panelClassName}`}
+        className={`fixed inset-x-0 bottom-0 max-h-[85vh] overflow-hidden bg-white ${mobileRoundedClass} ${desktopCenterClass} ${fontClass} ${panelPadding} ${panelClassName}`}
         style={{
           zIndex: panelZIndex,
-          bottom: trackKeyboard ? keyboardInsetPx : undefined,
-          transition: trackKeyboard ? "bottom 160ms ease-out" : undefined,
+          bottom: trackKeyboard && !isDesktop ? keyboardInsetPx : undefined,
+          transition: trackKeyboard && !isDesktop ? "bottom 160ms ease-out" : undefined,
         }}
         role="dialog"
         aria-modal="true"

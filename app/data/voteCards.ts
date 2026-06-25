@@ -820,6 +820,18 @@ export const voteCardsData: VoteCardData[] = [
   },
 ];
 
+/** シードカードに安定 id を付与した一覧（モジュール内キャッシュ） */
+const SEED_CARDS_WITH_ID: VoteCardData[] = voteCardsData.map((c, i) => ({
+  ...c,
+  id: `seed-${i}`,
+}));
+
+/** 作成VOTE + シードVOTE の結合一覧（seed 配列の再生成を避ける） */
+export function buildAllVoteCards(createdVotesForTimeline: VoteCardData[]): VoteCardData[] {
+  if (createdVotesForTimeline.length === 0) return SEED_CARDS_WITH_ID;
+  return [...createdVotesForTimeline, ...SEED_CARDS_WITH_ID];
+}
+
 /** 旧デモ用「⚠️パパ閲覧注意」シード（現在は未使用） */
 export const SEED_PAPA_WARNING_CARD_COUNT = 0;
 

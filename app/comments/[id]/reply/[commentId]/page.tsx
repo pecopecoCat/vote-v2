@@ -6,10 +6,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "../../../../components/AppHeader";
 import Button from "../../../../components/Button";
+import CardModerationModals from "../../../../components/CardModerationModals";
 import CommentInputModal from "../../../../components/CommentInputModal";
 import CommentOptionsModal from "../../../../components/CommentOptionsModal";
 import ReportViolationModal from "../../../../components/ReportViolationModal";
+import { CommentsVoteFeed } from "../../../../components/comments/CommentsVoteFeed";
+import { CommentsVoteFeedRail } from "../../../../components/comments/CommentsVoteFeedRail";
 import { useAuthState } from "../../../../hooks/useAuthState";
+import { useCardModerationFlow } from "../../../../hooks/useCardModerationFlow";
+import { useCommentsVoteFeed } from "../../../../hooks/useCommentsVoteFeed";
 import { useCurrentUser } from "../../../../hooks/useCurrentUser";
 import { resolveVoteCardByStableId } from "../../../../lib/resolveVoteCardByStableId";
 import { CommentAvatar, CommentBody } from "../../../../components/CommentThreadGroup";
@@ -44,14 +49,20 @@ export default function CommentReplyThreadPage() {
     () => resolveVoteCardByStableId(id, createdVotesForTimeline),
     [id, createdVotesForTimeline]
   );
+  const moderation = useCardModerationFlow();
+  const { hasVoteFeed, feedProps, onHideFeedCard } = useCommentsVoteFeed({
+    card,
+    cardId: id,
+    moderation,
+  });
   const auth = useAuthState();
   const currentUser = useCurrentUser(auth);
+  const isLoggedIn = auth.isLoggedIn;
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => getCommentIdsLikedByCurrentUser(stableId));
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
   const [commentMenuTarget, setCommentMenuTarget] = useState<VoteComment | null>(null);
   const [reportCardId, setReportCardId] = useState<string | null>(null);
-  const isLoggedIn = auth.isLoggedIn;
   const commentsDisabled = card?.commentsDisabled === true;
   const canPostByVote = activity.userSelectedOption != null;
   const canOpenPostModal = !commentsDisabled && (!isLoggedIn || canPostByVote);
@@ -74,11 +85,14 @@ export default function CommentReplyThreadPage() {
       .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
   }, [activity.comments, parent]);
 
-  const currentCard = {
-    countA: activity.countA ?? 0,
-    countB: activity.countB ?? 0,
-    comments: activity.comments ?? [],
-  };
+  const currentCard = useMemo(
+    () => ({
+      countA: activity.countA ?? 0,
+      countB: activity.countB ?? 0,
+      comments: activity.comments ?? [],
+    }),
+    [activity.countA, activity.countB, activity.comments]
+  );
 
   const handleCommentSubmit = (
     cardId: string,
@@ -128,51 +142,94 @@ export default function CommentReplyThreadPage() {
     : parent.user.iconUrl;
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-[120px]">
+    <div className="min-h-screen bg-[#F1F1F1] pb-[120px] md:pb-24">
       <AppHeader type="title" title={headerTitle} backHref={`/comments/${id}`} />
 
-      <main>
-        <section className="border-b border-[#DADADA] bg-white px-[5.333vw] pb-4 pt-4">
-          <div className="flex items-end gap-3">
-            <div className="flex min-h-[72px] w-10 shrink-0 flex-col items-center self-stretch">
-              <div className="min-h-[20px] w-px flex-1 bg-[#DADADA]" aria-hidden />
-              <CommentAvatar comment={parent} />
+      <main className="comments-page mx-auto max-w-lg px-[5.333vw] py-4 md:max-w-none md:px-6 md:py-6">
+        <div className="comments-page__layout">
+          <div className="comments-page__center min-w-0">
+            <div className="comments-page__comments -mx-[5.333vw] overflow-hidden border-t border-[#DADADA]">
+              <section className="bg-white px-[5.333vw] pb-4 pt-4 md:px-6">
+                <div className="flex items-end gap-3">
+                  <div className="flex min-h-[72px] w-10 shrink-0 flex-col items-center self-stretch">
+                    <div className="min-h-[20px] w-px flex-1 bg-[#DADADA]" aria-hidden />
+                    <CommentAvatar comment={parent} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <CommentBody
+                      comment={parent}
+                      onLike={() => addCommentLike(stableId, parent.id, currentCard)}
+                      isLikedByMe={likedCommentIds.includes(parent.id)}
+                      replyCountOverride={0}
+                      onCommentMore={() => setCommentMenuTarget(parent)}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <div className="flex items-center border-b border-[#DADADA] bg-[var(--color-bg)] px-[5.333vw] py-3 md:px-6">
+                <h2 className="text-base font-bold text-[#191919]">リプライ</h2>
+              </div>
+
+              <div className="bg-white">
+                {replies.length === 0 ? (
+                  <div className="px-[5.333vw] py-10 text-center md:px-6">
+                    <p className="text-sm text-[#787878]">まだリプライはありません。</p>
+                  </div>
+                ) : (
+                  replies.map((r) => (
+                    <div key={r.id} className="flex gap-3 border-b border-[#DADADA] px-[5.333vw] py-4 md:px-6">
+                      <CommentAvatar comment={r} />
+                      <CommentBody
+                        comment={r}
+                        onLike={() => addCommentLike(stableId, r.id, currentCard)}
+                        isLikedByMe={likedCommentIds.includes(r.id)}
+                        replyCountOverride={0}
+                        onCommentMore={() => setCommentMenuTarget(r)}
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <CommentBody
-                comment={parent}
-                onLike={() => addCommentLike(stableId, parent.id, currentCard)}
-                isLikedByMe={likedCommentIds.includes(parent.id)}
-                replyCountOverride={0}
-                onCommentMore={() => setCommentMenuTarget(parent)}
-              />
+
+            <div className="comments-page__post-bar fixed inset-x-0 bottom-14 z-30 bg-transparent px-4 pb-4 md:static md:inset-auto md:bottom-auto md:z-auto md:mt-4 md:px-0 md:pb-0">
+              <div className="mx-auto max-w-lg md:mx-0 md:max-w-none">
+                <Button
+                  type="button"
+                  variant="yellowPill"
+                  className={commentsDisabled ? "disabled:text-gray-600" : ""}
+                  onClick={() => {
+                    if (commentsDisabled) return;
+                    if (!isLoggedIn) {
+                      router.push(
+                        `/profile/login?returnTo=${encodeURIComponent(`/comments/${id}/reply/${commentId}`)}`
+                      );
+                      return;
+                    }
+                    if (!canPostByVote) return;
+                    setReplyingToCommentId(null);
+                    setIsReplyModalOpen(true);
+                  }}
+                  disabled={commentsDisabled || !canOpenPostModal}
+                >
+                  {commentsDisabled
+                    ? "このVOTEはコメントを受け付けていません。"
+                    : !isLoggedIn
+                      ? "ログインするとリプライできるよ！"
+                      : canPostByVote
+                        ? "リプライする"
+                        : "投票するとリプライできます"}
+                </Button>
+              </div>
             </div>
           </div>
-        </section>
 
-        <div className="flex items-center border-b border-[#DADADA] bg-[var(--color-bg)] px-[5.333vw] py-3">
-          <h2 className="text-base font-bold text-[#191919]">リプライ</h2>
-        </div>
-
-        <div className="bg-white">
-          {replies.length === 0 ? (
-            <div className="px-[5.333vw] py-10 text-center">
-              <p className="text-sm text-[#787878]">まだリプライはありません。</p>
-            </div>
-          ) : (
-            replies.map((r) => (
-              <div key={r.id} className="flex gap-3 border-b border-[#DADADA] px-[5.333vw] py-4">
-                <CommentAvatar comment={r} />
-                <CommentBody
-                  comment={r}
-                  onLike={() => addCommentLike(stableId, r.id, currentCard)}
-                  isLikedByMe={likedCommentIds.includes(r.id)}
-                  replyCountOverride={0}
-                  onCommentMore={() => setCommentMenuTarget(r)}
-                />
-              </div>
-            ))
-          )}
+          {hasVoteFeed && feedProps ? (
+            <CommentsVoteFeedRail>
+              <CommentsVoteFeed {...feedProps} />
+            </CommentsVoteFeedRail>
+          ) : null}
         </div>
       </main>
 
@@ -194,36 +251,6 @@ export default function CommentReplyThreadPage() {
         onCancelReply={replyingToCommentId ? () => setReplyingToCommentId(null) : undefined}
       />
 
-      <div className="fixed inset-x-0 bottom-0 z-30 bg-transparent px-4 pb-4">
-        <div className="mx-auto max-w-lg">
-          <Button
-            type="button"
-            variant="yellowPill"
-            className={commentsDisabled ? "disabled:text-gray-600" : ""}
-            onClick={() => {
-              if (commentsDisabled) return;
-              if (!isLoggedIn) {
-                router.push(
-                  `/profile/login?returnTo=${encodeURIComponent(`/comments/${id}/reply/${commentId}`)}`
-                );
-                return;
-              }
-              if (!canPostByVote) return;
-              setIsReplyModalOpen(true);
-            }}
-            disabled={commentsDisabled || !canOpenPostModal}
-          >
-            {commentsDisabled
-              ? "このVOTEはコメントを受け付けていません。"
-              : !isLoggedIn
-                ? "ログインするとリプライできるよ！"
-                : canPostByVote
-                  ? "リプライする"
-                  : "投票するとリプライできます"}
-          </Button>
-        </div>
-      </div>
-
       {commentMenuTarget != null && (
         <CommentOptionsModal
           showDelete={isCommentAuthoredByCurrentUser(commentMenuTarget.user?.name, {
@@ -234,11 +261,7 @@ export default function CommentReplyThreadPage() {
           onDelete={() => {
             const t = commentMenuTarget;
             if (!t) return;
-            void sharedRemoveComment(id, t.id, {
-              countA: activity.countA ?? 0,
-              countB: activity.countB ?? 0,
-              comments: activity.comments ?? [],
-            });
+            void sharedRemoveComment(id, t.id, currentCard);
           }}
           onReport={() => setReportCardId(id)}
         />
@@ -247,6 +270,20 @@ export default function CommentReplyThreadPage() {
       {reportCardId != null && (
         <ReportViolationModal cardId={reportCardId} onClose={() => setReportCardId(null)} />
       )}
+
+      <CardModerationModals
+        cardOptionsCardId={moderation.cardOptionsCardId}
+        cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
+        reportCardId={moderation.reportCardId}
+        addToCommunityCardId={moderation.addToCommunityCardId}
+        isLoggedIn={isLoggedIn}
+        onCloseOptions={moderation.closeCardOptions}
+        onAddToCommunity={moderation.openAddToCommunity}
+        onCloseAddToCommunity={moderation.closeAddToCommunity}
+        onHideCard={onHideFeedCard}
+        onReportCard={moderation.openReport}
+        onCloseReport={moderation.closeReport}
+      />
     </div>
   );
 }

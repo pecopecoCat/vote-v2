@@ -24,7 +24,7 @@ import ShowVotedFilterBar from "./ShowVotedFilterBar";
 import EmptyStatePanel from "./EmptyStatePanel";
 import UnderlineTabBar, { type UnderlineTabItem } from "./UnderlineTabBar";
 import type { VoteCardData } from "../data/voteCards";
-import { voteCardsData, resolveStableVoteCardId, recommendedTagList } from "../data/voteCards";
+import { buildAllVoteCards, resolveStableVoteCardId, recommendedTagList } from "../data/voteCards";
 import { getMergedCounts, isCommentAuthoredByCurrentUser, type CardActivity } from "../data/voteCardActivity";
 import { useSharedData } from "../context/SharedDataContext";
 import { toggleFavoriteTag, isFavoriteTag } from "../data/favoriteTags";
@@ -379,10 +379,10 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
   );
 
   /** 注目タグ用の全カード（作成VOTE + シード） */
-  const allCardsForTags = useMemo(() => {
-    const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
-    return [...createdVotesForTimeline, ...seedWithId];
-  }, [createdVotesForTimeline]);
+  const allCardsForTags = useMemo(
+    () => buildAllVoteCards(createdVotesForTimeline),
+    [createdVotesForTimeline]
+  );
 
   useEffect(() => {
     const handler = () => setHiddenUserIds(getHiddenUserIds());
@@ -462,10 +462,10 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
   }, [query, trendingTagsByScore]);
 
   /** ハッシュタグフィルター用の全カード（作成VOTE + シード、ID付き） */
-  const allCardsForTagFilter = useMemo(() => {
-    const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: c.id ?? `seed-${i}` }));
-    return [...createdVotesForTimeline, ...seedWithId];
-  }, [createdVotesForTimeline]);
+  const allCardsForTagFilter = useMemo(
+    () => buildAllVoteCards(createdVotesForTimeline),
+    [createdVotesForTimeline]
+  );
 
   const allCardsForTagFilterFiltered = useMemo(
     () =>

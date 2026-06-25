@@ -560,13 +560,6 @@ select {
   z-index: 100;
 }
 
-@media (min-width: 768px) {
-  .collection-picker-screen {
-    left: var(--app-side-nav-width);
-    width: calc(100vw - var(--app-side-nav-width));
-  }
-}
-
 .collections-list-grid__sentinel {
   grid-column: 1 / -1;
 }
@@ -578,16 +571,41 @@ select {
   max-width: min(100%, 1680px);
 }
 
-/* みんなのコメント（PC）：カードはタイル幅・コメント帯は横いっぱい・下部VOTEはマasonry */
+/* 関連VOTEレール（SP: 中央カラム下） */
+.comments-page__vote-feed-rail-inner {
+  margin-top: 2rem;
+  border-top: 1px solid #d1d5db;
+  padding-top: 1.5rem;
+}
+
+.comments-page__vote-feed-rail .home-feed-masonry.vote-card-list {
+  --masonry-gap: min(5.333vw, 20px);
+  columns: 1;
+}
+
+/* みんなのコメント（PC）：左ナビ + 中央（可変幅・VOTE・コメント）+ 右（関連VOTE 1列） */
 @media (min-width: 768px) {
+  .comments-page__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) min(375px, 100%);
+    gap: 32px;
+    align-items: start;
+  }
+
+  .comments-page__center {
+    min-width: 0;
+    width: 100%;
+  }
+
   .comments-page__hero-wrap {
     display: flex;
     justify-content: center;
   }
 
   .comments-page__hero-tile {
-    display: inline-block;
-    width: min(375px, 100%);
+    display: block;
+    width: 100%;
+    max-width: 375px;
     min-width: 0;
     container-type: inline-size;
     container-name: home-vote-card;
@@ -599,9 +617,11 @@ select {
   }
 
   .comments-page__comments {
-    margin-left: -24px;
-    margin-right: -24px;
-    width: auto;
+    margin-left: 0;
+    margin-right: 0;
+    width: 100%;
+    border-radius: 14px;
+    overflow: hidden;
   }
 
   .comments-page__comments .comment-thread-row {
@@ -609,29 +629,38 @@ select {
     padding-right: 24px;
   }
 
-  .comments-page__vote-feed {
-    margin-left: 0;
-    margin-right: 0;
-    padding-left: 0;
-    padding-right: 0;
-    border-top-color: #d1d5db;
+  .comments-page__vote-feed-rail {
+    position: sticky;
+    top: 24px;
+    align-self: start;
+    width: min(375px, 100%);
+    max-height: calc(100dvh - 48px);
+  }
+
+  .comments-page__vote-feed-rail-inner {
+    margin-top: 0;
+    border-top: none;
+    padding-top: 0;
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
   }
 
   .comments-page__post-bar {
-    right: 24px;
-    bottom: 24px;
-    left: auto;
-    width: auto;
-    max-width: min(320px, calc(100vw - var(--app-side-nav-width) - 48px));
+    position: static;
+    width: 100%;
+    max-width: none;
     padding: 0;
   }
 
   .comments-page__post-bar .btn-yellow-3d {
-    width: auto;
-    min-width: 200px;
+    width: 100%;
+    min-width: 0;
     padding-left: 2rem;
     padding-right: 2rem;
   }
+
 }
 
 .collections-category-section {

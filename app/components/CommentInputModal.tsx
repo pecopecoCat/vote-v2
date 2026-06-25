@@ -106,7 +106,7 @@ export default function CommentInputModal({
       trackKeyboard
       header={
         <>
-          <div className="px-5 pt-3">
+          <div className="px-5 pt-3 md:hidden">
             <div className="mx-auto h-1.5 w-12 rounded-full bg-gray-200" aria-hidden />
           </div>
           <div className="relative flex items-center justify-center border-b border-[#DADADA] px-5 py-4">

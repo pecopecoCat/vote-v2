@@ -18,7 +18,7 @@ import FeedTabs from "./components/FeedTabs";
 import type { FeedTabId } from "./components/FeedTabs";
 import type { VoteCardData } from "./data/voteCards";
 import {
-  voteCardsData,
+  buildAllVoteCards,
   resolveStableVoteCardId,
   recommendedTagList,
 } from "./data/voteCards";
@@ -314,10 +314,10 @@ function HomeContent() {
     [pathname, router, searchParamsKey]
   );
 
-  const allCards = useMemo(() => {
-    const seedWithId = voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` }));
-    return [...createdVotesForTimeline, ...seedWithId];
-  }, [createdVotesForTimeline]);
+  const allCards = useMemo(
+    () => buildAllVoteCards(createdVotesForTimeline),
+    [createdVotesForTimeline]
+  );
 
   /** 非表示にしたユーザー・カードを除外 */
   const allCardsFiltered = useMemo(

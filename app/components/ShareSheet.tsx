@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { showAppToast } from "../lib/appToast";
 import BottomSheet from "./BottomSheet";
+import { ModalCloseRightHeader, ModalTitleHeader } from "./modal";
 import { Z_INDEX } from "../lib/zIndex";
 
 function LinkIcon({ className }: { className?: string }) {
@@ -87,39 +88,16 @@ export default function ShareSheet({
       safeAreaBottom={!isVoteCard}
       rounded={isVoteCard ? "sheet" : "card"}
       fontBold={isVoteCard}
-      panelClassName={isVoteCard ? "pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]" : "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3"}
+      panelClassName={
+        isVoteCard
+          ? "max-md:pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]"
+          : "max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3"
+      }
       header={
         isVoteCard ? (
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
-            <div />
-            <h2 className="text-lg font-bold text-gray-900">{title}</h2>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="flex h-10 w-10 items-center justify-center text-[var(--color-select-b)] transition-opacity hover:opacity-80"
-                aria-label="閉じる"
-                onClick={onClose}
-              >
-                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          <ModalTitleHeader title={title} onClose={onClose} />
         ) : (
-          <div className="mx-auto flex max-w-lg items-center justify-end px-3 pb-2">
-            <span className="sr-only">{title}</span>
-            <button
-              type="button"
-              className="flex h-10 w-10 items-center justify-center text-[var(--color-select-b)] transition-opacity hover:opacity-80"
-              aria-label="閉じる"
-              onClick={onClose}
-            >
-              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
+          <ModalCloseRightHeader title={title} onClose={onClose} />
         )
       }
       headerVariant="none"

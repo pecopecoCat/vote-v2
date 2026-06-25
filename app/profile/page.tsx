@@ -7,7 +7,7 @@ import VoteCard from "../components/VoteCard";
 import TagSearchLink from "../components/TagSearchLink";
 import { VoteCardList, VoteCardMasonryTile } from "../components/VoteCardList";
 import { getCreatedVotes, deleteCreatedVote, getCreatedVotesUpdatedEventName } from "../data/createdVotes";
-import { voteCardsData, resolveStableVoteCardId } from "../data/voteCards";
+import { buildAllVoteCards, resolveStableVoteCardId } from "../data/voteCards";
 import {
   addCommentLike,
   COMMENT_LIKES_BY_ME_UPDATED_EVENT,
@@ -425,15 +425,10 @@ function ProfileContent() {
     return createdVotesRaw;
   }, [createdVotesRaw, myVoteSortOrder]);
 
-  const seedCards = useMemo(
-    () => voteCardsData.map((c, i) => ({ ...c, id: `seed-${i}` })),
-    []
-  );
-
   /** 投票・Bookmark・コメントタブ用（全ユーザーの作ったVOTE＋シード） */
   const allCards = useMemo(
-    () => [...createdVotesForTimeline, ...seedCards],
-    [createdVotesForTimeline, seedCards]
+    () => buildAllVoteCards(createdVotesForTimeline),
+    [createdVotesForTimeline]
   );
 
   /** 非表示にしたユーザー・カードを除外 */

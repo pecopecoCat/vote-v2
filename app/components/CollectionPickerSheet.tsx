@@ -263,29 +263,65 @@ export function CollectionPickerScreen({
 
   const isContained = scope === "contained";
 
+  if (isContained) {
+    return (
+      <div
+        className="absolute inset-0 z-[100] flex flex-col bg-[#F1F1F1]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="collection-picker-title"
+      >
+        <AppHeader
+          type="title"
+          title={title}
+          onBack={onClose}
+          right={
+            <button
+              type="button"
+              className="text-sm font-bold text-[#0779F1]"
+              aria-label="完了"
+              onClick={onClose}
+            >
+              完了
+            </button>
+          }
+        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={`${isContained ? "absolute" : "collection-picker-screen fixed"} inset-0 z-[100] flex flex-col bg-[#F1F1F1]`}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="collection-picker-title"
-    >
-      <AppHeader
-        type="title"
-        title={title}
-        onBack={onClose}
-        right={
-          <button
-            type="button"
-            className="text-sm font-bold text-[#0779F1]"
-            aria-label="完了"
-            onClick={onClose}
-          >
-            完了
-          </button>
-        }
+    <div className="fixed inset-0 z-[100]" role="presentation">
+      <button
+        type="button"
+        className="absolute inset-0 hidden bg-black/50 md:block"
+        aria-label="閉じる"
+        onClick={onClose}
       />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+      <div
+        className="collection-picker-screen fixed inset-0 z-10 flex flex-col bg-[#F1F1F1] md:inset-auto md:left-1/2 md:top-1/2 md:max-h-[min(900px,90dvh)] md:w-[min(480px,calc(100vw-32px))] md:-translate-x-1/2 md:-translate-y-1/2 md:overflow-hidden md:rounded-2xl md:shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="collection-picker-title"
+      >
+        <AppHeader
+          type="title"
+          title={title}
+          onBack={onClose}
+          right={
+            <button
+              type="button"
+              className="text-sm font-bold text-[#0779F1]"
+              aria-label="完了"
+              onClick={onClose}
+            >
+              完了
+            </button>
+          }
+        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+      </div>
     </div>
   );
 }

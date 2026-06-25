@@ -1,6 +1,7 @@
 "use client";
 
-import BottomSheet from "./BottomSheet";
+import { useMemo } from "react";
+import { OptionsMenuModal, type OptionsMenuItem } from "./modal";
 
 export interface CollectionOptionsModalProps {
   /** メンバー限定コレクションのとき true */
@@ -25,60 +26,45 @@ export default function CollectionOptionsModal({
   onEdit,
   onDelete,
 }: CollectionOptionsModalProps) {
-  return (
-    <BottomSheet
-      open
-      onClose={onClose}
-      headerVariant="close-right"
-      rounded="card"
-      safeAreaBottom
-      panelClassName="pt-4"
-    >
-      <ul className="divide-y divide-gray-100 border-t border-gray-100">
-        {showShare && onShare ? (
-          <li>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 px-4 py-4 text-left text-sm font-bold text-gray-900 transition-colors hover:bg-gray-50 active:bg-gray-50"
-              onClick={() => {
-                onClose();
-                onShare();
-              }}
-            >
-              <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />
-              シェアする
-            </button>
-          </li>
-        ) : null}
-        {!hideEdit ? (
-          <li>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-gray-900 active:bg-gray-50"
-              onClick={() => {
-                onClose();
-                onEdit();
-              }}
-            >
-              <img src="/icons/icon_setting.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={20} />
-              設定を変更
-            </button>
-          </li>
-        ) : null}
-        <li>
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-gray-900 active:bg-gray-50"
-            onClick={() => {
-              onDelete();
-              onClose();
-            }}
-          >
-            <img src="/icons/icon_trash.svg" alt="" className="h-[18px] w-[18px] shrink-0" width={18} height={18} />
-            {deleteLabel}
-          </button>
-        </li>
-      </ul>
-    </BottomSheet>
-  );
+  const items = useMemo(() => {
+    const list: OptionsMenuItem[] = [];
+
+    if (showShare && onShare) {
+      list.push({
+        key: "share",
+        label: "シェアする",
+        icon: <img src="/icons/icon_share.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={21} />,
+        onClick: () => {
+          onClose();
+          onShare();
+        },
+      });
+    }
+
+    if (!hideEdit) {
+      list.push({
+        key: "edit",
+        label: "設定を変更",
+        icon: <img src="/icons/icon_setting.svg" alt="" className="h-5 w-5 shrink-0" width={20} height={20} />,
+        onClick: () => {
+          onClose();
+          onEdit();
+        },
+      });
+    }
+
+    list.push({
+      key: "delete",
+      label: deleteLabel,
+      icon: <img src="/icons/icon_trash.svg" alt="" className="h-[18px] w-[18px] shrink-0" width={18} height={18} />,
+      onClick: () => {
+        onDelete();
+        onClose();
+      },
+    });
+
+    return list;
+  }, [showShare, onShare, hideEdit, deleteLabel, onClose, onEdit, onDelete]);
+
+  return <OptionsMenuModal open items={items} onClose={onClose} ariaLabel="コレクションメニュー" />;
 }
