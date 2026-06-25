@@ -15,7 +15,7 @@ import {
   upsertLocalJoinProfileFromAuth,
 } from "./collectionVoteActivity";
 import { removeLocalCommentsForCollection } from "./voteCardActivity";
-import { addBookmark, removeBookmark } from "./bookmarks";
+import { removeBookmark } from "./bookmarks";
 import { showAppToast } from "../lib/appToast";
 import { invalidateCollectionsIndexCache } from "../lib/fetchCollectionsIndex";
 import { getSeedCardIdsByTag } from "./voteCards";
@@ -738,7 +738,7 @@ export function getAllBookmarkedCardIds(): string[] {
 
 type CollectionMutationOpts = { skipApiSync?: boolean; skipRemotePush?: boolean };
 
-/** カードをコレクションに追加（Bookmarkにも登録する） */
+/** カードをコレクションに追加 */
 export function addCardToCollection(
   collectionId: string,
   cardId: string,
@@ -750,7 +750,6 @@ export function addCardToCollection(
   if (!col || col.cardIds.includes(cardId)) return;
   col.cardIds.push(cardId);
   save(userId, cols, opts?.skipRemotePush ? { skipRemotePush: true } : undefined);
-  addBookmark(cardId);
   if (
     !opts?.skipApiSync &&
     !col.joinedParticipation &&
@@ -771,7 +770,7 @@ export function removeCardFromCollection(collectionId: string, cardId: string): 
   if (!col.joinedParticipation && (col.visibility === "public" || col.visibility === "member")) syncCollectionToApi(col);
 }
 
-/** コレクションに含まれるかトグル（追加時はBookmarkにも登録） */
+/** コレクションに含まれるかトグル */
 export function toggleCardInCollection(collectionId: string, cardId: string): void {
   const userId = getCurrentActivityUserId();
   const cols = load(userId);
@@ -781,7 +780,6 @@ export function toggleCardInCollection(collectionId: string, cardId: string): vo
     col.cardIds = col.cardIds.filter((id) => id !== cardId);
   } else {
     col.cardIds.push(cardId);
-    addBookmark(cardId);
   }
   save(userId, cols);
   if (!col.joinedParticipation && (col.visibility === "public" || col.visibility === "member")) syncCollectionToApi(col);
@@ -814,7 +812,6 @@ export async function addCardToRemotePublicCollection(
       return false;
     }
     invalidateCollectionsIndexCache();
-    addBookmark(cardId);
     return true;
   } catch {
     showAppToast("コレクションへの追加に失敗しました。", "error");

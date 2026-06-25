@@ -24,8 +24,15 @@ const SERVER_SNAPSHOT: ContributableCollectionsSnapshot = {
   ownedVersion: 0,
 };
 
-function emit(): void {
+let cachedSnapshot: ContributableCollectionsSnapshot = SERVER_SNAPSHOT;
+
+function publishSnapshot(): void {
+  cachedSnapshot = { remoteRows, loading, ownedVersion };
   listeners.forEach((listener) => listener());
+}
+
+function emit(): void {
+  publishSnapshot();
 }
 
 function bumpOwned(): void {
@@ -34,7 +41,7 @@ function bumpOwned(): void {
 }
 
 export function getContributableCollectionsSnapshot(): ContributableCollectionsSnapshot {
-  return { remoteRows, loading, ownedVersion };
+  return cachedSnapshot;
 }
 
 export function subscribeContributableCollections(listener: () => void): () => void {
@@ -50,13 +57,13 @@ export async function refreshContributableRemote(force = false): Promise<void> {
   if (fetchPromise) return fetchPromise;
   fetchPromise = (async () => {
     loading = true;
-    emit();
+    publishSnapshot();
     try {
       remoteRows = await fetchCollectionsIndex(force);
     } finally {
       loading = false;
       fetchPromise = null;
-      emit();
+      publishSnapshot();
     }
   })();
   return fetchPromise;

@@ -506,7 +506,7 @@ function VoteCard({
               <img
                 src="/icons/icon_addCollection.svg"
                 alt=""
-                className="vote-card-footer-icon-graphic"
+                className="vote-card-footer-icon-graphic vote-card-footer-icon-collection"
               />
             </VoteCardFooterIconBox>
           </button>
