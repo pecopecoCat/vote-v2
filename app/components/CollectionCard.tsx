@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import Link from "next/link";
-import { getCollectionGradientClass } from "../data/search";
+import { getCollectionGradientClass, getCollectionGradientStyle } from "../data/search";
 import type { CollectionGradient } from "../data/search";
 
 export interface CollectionCardProps {
@@ -46,6 +46,7 @@ function CollectionCard({
   listPage = false,
 }: CollectionCardProps) {
   const gradientClass = getCollectionGradientClass(gradient);
+  const gradientStyle = getCollectionGradientStyle(gradient);
   const isBlackBlock = titleVariant === "blackBlock" || timelineBanner || feedTile;
   /** 検索の人気コレ：全面グラデ＋左は黒ラベル（白字）＋右はピン（仕様画像どおり） */
   const popularBlackBlock = popularBanner && !timelineBanner && !listPage;
@@ -54,17 +55,18 @@ function CollectionCard({
 
   const content = (
     <article
+      style={feedTile ? gradientStyle : undefined}
       className={`relative w-full ${
         listPage
           ? `collection-card-list-page flex min-h-[72px] items-center justify-between gap-3 overflow-hidden rounded-[10px] bg-gradient-to-r ${gradientClass} px-5 py-5 sm:min-h-[88px]`
           : popularGradientRow
           ? `overflow-visible rounded-[10px] flex items-center bg-gradient-to-r ${gradientClass} p-[20px] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.16)]`
           : feedTile
-            ? "overflow-hidden rounded-[10px]"
+            ? "collection-card-feed-tile flex flex-col justify-center overflow-hidden px-4 py-4 md:py-[31px]"
             : `overflow-hidden rounded-[18px]`
       } ${
         feedTile
-          ? "min-h-[88px] px-4 py-4 md:min-h-[118px] md:py-[31px]"
+          ? ""
           : timelineBanner
             ? "h-[260px] min-h-[260px] px-5 py-5"
             : popularGradientRow || listPage
@@ -75,9 +77,11 @@ function CollectionCard({
           ? ""
           : isBlackBlock && !timelineBanner && !feedTile
             ? "bg-gradient-to-br from-[#c2410c] via-orange-500 to-[#fde047] px-5 py-12"
-            : isBlackBlock && (timelineBanner || feedTile)
+            : isBlackBlock && timelineBanner
               ? `bg-gradient-to-r ${gradientClass} flex flex-col justify-center`
-              : isBlackBlock
+              : isBlackBlock && feedTile
+                ? ""
+                : isBlackBlock
                 ? "bg-gradient-to-br from-[#c2410c] via-orange-500 to-[#fde047] px-5 py-12"
                 : `bg-gradient-to-r ${gradientClass} px-5 py-4`
       } ${!timelineBanner && !feedTile && !popularGradientRow && !listPage ? "flex items-center" : ""}`}
@@ -102,10 +106,14 @@ function CollectionCard({
         />
       )}
       {isBlackBlock ? (
-        <div className="w-full rounded-none bg-black px-4 py-3 text-left">
+        <div
+          className={`w-full rounded-none bg-black px-4 text-left ${
+            feedTile ? "py-[42px]" : "py-3"
+          }`}
+        >
           <p
             className={`whitespace-pre-line font-bold leading-snug text-[#ffffff] ${
-              feedTile ? "text-base md:text-lg" : timelineBanner ? "text-[26px]" : "text-[28px]"
+              feedTile ? "text-lg md:text-xl" : timelineBanner ? "text-[26px]" : "text-[28px]"
             }`}
           >
             {title}

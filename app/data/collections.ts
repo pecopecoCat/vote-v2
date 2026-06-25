@@ -17,6 +17,7 @@ import {
 import { removeLocalCommentsForCollection } from "./voteCardActivity";
 import { addBookmark, removeBookmark } from "./bookmarks";
 import { showAppToast } from "../lib/appToast";
+import { invalidateCollectionsIndexCache } from "../lib/fetchCollectionsIndex";
 import { getSeedCardIdsByTag } from "./voteCards";
 import { DEFAULT_RYO_AVATAR_URL } from "./avatarUrls";
 
@@ -784,6 +785,73 @@ export function toggleCardInCollection(collectionId: string, cardId: string): vo
   }
   save(userId, cols);
   if (!col.joinedParticipation && (col.visibility === "public" || col.visibility === "member")) syncCollectionToApi(col);
+}
+
+/** 他人の公開コレクションへ VOTE を追加（KV 更新） */
+export async function addCardToRemotePublicCollection(
+  collectionId: string,
+  cardId: string
+): Promise<boolean> {
+  const userId = getCurrentActivityUserId();
+  try {
+    const res = await fetch(`/api/collection/${encodeURIComponent(collectionId)}/cards`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, cardId, action: "add" }),
+    });
+    if (!res.ok) {
+      let message = "コレクションへの追加に失敗しました。";
+      if (res.status === 403) message = "このコレクションには追加できません。";
+      try {
+        const data = (await res.json()) as { error?: string };
+        if (typeof data?.error === "string" && data.error.length > 0 && data.error !== "FORBIDDEN") {
+          message = data.error;
+        }
+      } catch {
+        /* ignore */
+      }
+      showAppToast(message, "error");
+      return false;
+    }
+    invalidateCollectionsIndexCache();
+    addBookmark(cardId);
+    return true;
+  } catch {
+    showAppToast("コレクションへの追加に失敗しました。", "error");
+    return false;
+  }
+}
+
+/** 自分のコレクション or 他人の公開コレへ VOTE を追加 */
+export async function addCardToContributableCollection(
+  collectionId: string,
+  cardId: string
+): Promise<boolean> {
+  const userId = getCurrentActivityUserId();
+  const cols = load(userId);
+  const localCol = cols.find((c) => c.id === collectionId && !c.joinedParticipation);
+  if (localCol) {
+    addCardToCollection(collectionId, cardId);
+    return true;
+  }
+  return addCardToRemotePublicCollection(collectionId, cardId);
+}
+
+/** 追加可能コレクションでのトグル（他人公開は追加のみ、削除は作成者のみ） */
+export async function toggleCardInContributableCollection(
+  collectionId: string,
+  cardId: string,
+  meta: { isOwned: boolean; containsCard: boolean; canAdd: boolean; canRemove: boolean }
+): Promise<boolean> {
+  if (meta.isOwned) {
+    toggleCardInCollection(collectionId, cardId);
+    return true;
+  }
+  if (meta.containsCard) {
+    return false;
+  }
+  if (!meta.canAdd) return false;
+  return addCardToRemotePublicCollection(collectionId, cardId);
 }
 
 /** 新規コレクション作成（現在ユーザーが作る。名前必須） */

@@ -1,103 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useMemo, Suspense } from "react";
+import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AppHeader from "../../components/AppHeader";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
-import { getCollections, addCardToCollection } from "../../data/collections";
-import { getAuth, getCurrentActivityUserId } from "../../data/auth";
-import { CARD_BACKGROUND_IMAGES, recommendedTagList } from "../../data/voteCards";
-import { useSharedData } from "../../context/SharedDataContext";
-import { addDraft, getDraftById } from "../../data/drafts";
-import { PENDING_VOTE_CREATED_TOAST_KEY, showAppToast } from "../../lib/appToast";
-import { compressImageFile } from "../../lib/compressImageFile";
-
-const QUESTION_MAX = 80;
-const OPTION_MAX = 30; // A/Bの回答の文字数上限（画像の「00文字以内」はここで表示）
-
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: 10 }, (_, i) => CURRENT_YEAR + i);
-const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
-const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
-
-function OptionAnswerImageControl({
-  side,
-  imageUrl,
-  fileInputRef,
-  onSelect,
-  onRemove,
-  busy = false,
-}: {
-  side: "A" | "B";
-  imageUrl?: string;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  onSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemove: () => void;
-  busy?: boolean;
-}) {
-  const label = side === "A" ? "A" : "B";
-  return (
-    <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        aria-label={`${label}の画像を選択`}
-        onChange={onSelect}
-        disabled={busy}
-      />
-      {imageUrl ? (
-        <div className="absolute right-5 top-1/2 z-10 -translate-y-1/2">
-          <div className="relative h-10 w-10">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => !busy && fileInputRef.current?.click()}
-              className="flex h-10 w-10 cursor-pointer overflow-hidden rounded-[10px] hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
-              aria-label={`${label}の画像を変更`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imageUrl}
-                alt=""
-                className="h-full w-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-            </button>
-            <button
-              type="button"
-              onClick={onRemove}
-              className="absolute -right-1 -top-1 z-20 flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-white bg-[#333333] text-[10px] font-bold leading-none text-white shadow-sm hover:bg-[#191919]"
-              aria-label={`${label}の画像を削除`}
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => !busy && fileInputRef.current?.click()}
-          className="absolute right-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] bg-[#D9D9D9] hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
-          aria-label={`${label}の画像を設定`}
-        >
-          <span
-            className="block h-[17.5px] w-5 shrink-0 pointer-events-none"
-            style={{
-              backgroundColor: "#787878",
-              mask: "url(/icons/icon_photo.svg) no-repeat center/contain",
-              WebkitMask: "url(/icons/icon_photo.svg) no-repeat center/contain",
-            }}
-          />
-        </button>
-      )}
-    </>
-  );
-}
+import { createOwnedCollectionFromSettings } from "../../data/collections";
+import CollectionPickerSheet from "../../components/CollectionPickerSheet";
+import CollectionSettingsModal from "../../components/CollectionSettingsModal";
+import CreateQuestionStep from "../CreateQuestionStep";
+import CreateVoteFormHeader from "./CreateVoteFormHeader";
+import { QUESTION_MAX } from "./createVoteFormConstants";
+import { useCreateVoteForm } from "./useCreateVoteForm";
+import VoteFormBackgroundPicker from "./VoteFormBackgroundPicker";
+import VoteFormOptionField from "./VoteFormOptionField";
+import VoteFormPeriodSection from "./VoteFormPeriodSection";
+import VoteFormTagsSection from "./VoteFormTagsSection";
 
 function CreateVoteFormContent({
   variant = "page",
@@ -108,590 +26,150 @@ function CreateVoteFormContent({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { addCreatedVote: sharedAddCreatedVote } = useSharedData();
   const qFromUrl = searchParams.get("q") ?? "";
   const draftIdFromUrl = searchParams.get("draft") ?? "";
-  const draftLoadedRef = useRef(false);
-
-  const [question, setQuestion] = useState(qFromUrl);
-  const [optionA, setOptionA] = useState("");
-  const [optionB, setOptionB] = useState("");
-  const [optionAImageUrl, setOptionAImageUrl] = useState<string | undefined>(undefined);
-  const [optionBImageUrl, setOptionBImageUrl] = useState<string | undefined>(undefined);
-  const fileInputARef = useRef<HTMLInputElement>(null);
-  const fileInputBRef = useRef<HTMLInputElement>(null);
-  const [imageCompressingSide, setImageCompressingSide] = useState<"A" | "B" | null>(null);
-  const [reason, setReason] = useState("");
-  const [noComments, setNoComments] = useState(false);
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedBackgroundUrl, setSelectedBackgroundUrl] = useState<string>(
-    CARD_BACKGROUND_IMAGES[0]
-  );
-  const [selectedCollectionId, setSelectedCollectionId] = useState("");
-  const [collectionOpen, setCollectionOpen] = useState(false);
-  const [visibility, setVisibility] = useState<"public" | "private">("public");
-  const [useVotePeriod, setUseVotePeriod] = useState(false);
-
-  const [startYear, setStartYear] = useState(CURRENT_YEAR);
-  const [startMonth, setStartMonth] = useState(new Date().getMonth() + 1);
-  const [startDay, setStartDay] = useState(new Date().getDate());
-  const [endYear, setEndYear] = useState(CURRENT_YEAR);
-  const [endMonth, setEndMonth] = useState(new Date().getMonth() + 1);
-  const [endDay, setEndDay] = useState(() => {
-    const d = new Date();
-    const end = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7);
-    return end.getDate();
-  });
-
-  const [collections, setCollections] = useState<{ id: string; name: string }[]>([]);
-  useEffect(() => {
-    setCollections(getCollections());
-  }, []);
-
-  useEffect(() => {
-    if (!draftLoadedRef.current && qFromUrl) setQuestion(qFromUrl);
-  }, [qFromUrl]);
-
-  // 下書きIDで開いたとき：保存済みの全入力を復元
-  useEffect(() => {
-    if (!draftIdFromUrl) return;
-    const d = getDraftById(draftIdFromUrl);
-    if (!d) return;
-    const data = d.data;
-    draftLoadedRef.current = true;
-    setQuestion(data.question ?? "");
-    setOptionA(data.optionA ?? "");
-    setOptionB(data.optionB ?? "");
-    setOptionAImageUrl(data.optionAImageUrl || undefined);
-    setOptionBImageUrl(data.optionBImageUrl || undefined);
-    setReason(data.reason ?? "");
-    setNoComments(Boolean(data.noComments));
-    setTags(Array.isArray(data.tags) ? data.tags : []);
-    setTagInput("");
-    if (typeof data.selectedBackgroundUrl === "string" && data.selectedBackgroundUrl.length > 0) {
-      setSelectedBackgroundUrl(data.selectedBackgroundUrl);
-    }
-    setSelectedCollectionId(data.selectedCollectionId ?? "");
-    setVisibility(data.visibility === "private" ? "private" : "public");
-    setUseVotePeriod(Boolean(data.useVotePeriod));
-    if (typeof data.startYear === "number") setStartYear(data.startYear);
-    if (typeof data.startMonth === "number") setStartMonth(data.startMonth);
-    if (typeof data.startDay === "number") setStartDay(data.startDay);
-    if (typeof data.endYear === "number") setEndYear(data.endYear);
-    if (typeof data.endMonth === "number") setEndMonth(data.endMonth);
-    if (typeof data.endDay === "number") setEndDay(data.endDay);
-  }, [draftIdFromUrl]);
-
-  /** ログイン後のみVOTEを作成可能。ログイン後はこの画面へ戻す */
-  useEffect(() => {
-    if (!getAuth().isLoggedIn) {
-      const returnPath = "/create/form" + (qFromUrl ? "?q=" + encodeURIComponent(qFromUrl) : "");
-      router.replace("/profile?returnTo=" + encodeURIComponent(returnPath));
-    }
-  }, [router, qFromUrl]);
-
-  const canSubmit =
-    question.trim().length > 0 &&
-    question.length <= QUESTION_MAX &&
-    optionA.trim().length > 0 &&
-    optionB.trim().length > 0;
-
-  const handleSubmit = useCallback(() => {
-    if (!canSubmit || isSubmitting) return;
-    if (!getAuth().isLoggedIn) return;
-    setIsSubmitting(true);
-    const now = new Date().toISOString();
-    const tagList = tags.length > 0 ? tags : undefined;
-    const periodStart = useVotePeriod
-      ? new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0).toISOString()
-      : undefined;
-    const periodEnd = useVotePeriod
-      ? new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999).toISOString()
-      : undefined;
-    const userId = getCurrentActivityUserId();
-    const card = {
-      id: `created-${Date.now()}`,
-      patternType: "yellow-loops" as const,
-      backgroundImageUrl: selectedBackgroundUrl,
-      question: question.trim(),
-      optionA: optionA.trim(),
-      optionB: optionB.trim(),
-      countA: 0,
-      countB: 0,
-      commentCount: 0,
-      tags: tagList,
-      readMoreText: reason.trim() ? reason.trim() : undefined,
-      createdAt: now,
-      visibility,
-      optionAImageUrl: optionAImageUrl || undefined,
-      optionBImageUrl: optionBImageUrl || undefined,
-      periodStart,
-      periodEnd,
-      createdByUserId: userId || undefined,
-      commentsDisabled: noComments ? true : undefined,
-    };
-    void sharedAddCreatedVote(card)
-      .then(() => {
-        if (selectedCollectionId.trim()) {
-          addCardToCollection(selectedCollectionId.trim(), card.id);
-        }
-        try {
-          sessionStorage.setItem(PENDING_VOTE_CREATED_TOAST_KEY, "1");
-        } catch {
-          /* ignore quota / private mode */
-        }
-        router.push("/?tab=new");
-      })
-      .catch((e) => {
-        const msg = e instanceof Error ? e.message : "サーバーへの保存に失敗しました。";
-        showAppToast(msg, "error");
-      })
-      .finally(() => setIsSubmitting(false));
-  }, [
-    canSubmit,
-    sharedAddCreatedVote,
-    router,
-    question,
-    optionA,
-    optionB,
-    optionAImageUrl,
-    optionBImageUrl,
-    reason,
-    tags,
-    selectedBackgroundUrl,
-    visibility,
-    isSubmitting,
-    useVotePeriod,
-    startYear,
-    startMonth,
-    startDay,
-    endYear,
-    endMonth,
-    endDay,
-    selectedCollectionId,
-    noComments,
-  ]);
-
-  const handleSaveDraftAndGoToDrafts = useCallback(() => {
-    addDraft({
-      question,
-      optionA,
-      optionB,
-      optionAImageUrl,
-      optionBImageUrl,
-      reason,
-      noComments,
-      tags,
-      selectedBackgroundUrl,
-      selectedCollectionId,
-      visibility,
-      useVotePeriod,
-      startYear,
-      startMonth,
-      startDay,
-      endYear,
-      endMonth,
-      endDay,
-    });
-    router.push("/drafts");
-  }, [
-    question,
-    optionA,
-    optionB,
-    optionAImageUrl,
-    optionBImageUrl,
-    reason,
-    noComments,
-    tags,
-    selectedBackgroundUrl,
-    selectedCollectionId,
-    visibility,
-    useVotePeriod,
-    startYear,
-    startMonth,
-    startDay,
-    endYear,
-    endMonth,
-    endDay,
-    router,
-  ]);
-
-  const handleImageSelect = useCallback((side: "A" | "B", e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setImageCompressingSide(side);
-    void compressImageFile(file)
-      .then((dataUrl) => {
-        if (side === "A") setOptionAImageUrl(dataUrl);
-        else setOptionBImageUrl(dataUrl);
-      })
-      .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "画像の処理に失敗しました。";
-        showAppToast(msg, "error");
-      })
-      .finally(() => setImageCompressingSide(null));
-  }, []);
-
-  const handleImageRemove = useCallback((side: "A" | "B") => {
-    if (side === "A") setOptionAImageUrl(undefined);
-    else setOptionBImageUrl(undefined);
-  }, []);
-
   const isModal = variant === "modal";
+
+  const form = useCreateVoteForm({ qFromUrl, draftIdFromUrl });
+
+  if (isModal && form.showQuestionStep) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col bg-[#F1F1F1]">
+        <AppHeader
+          type="title"
+          title="質問を入力"
+          onBack={() => form.setShowQuestionStep(false)}
+        />
+        <CreateQuestionStep
+          embedded
+          initialQuestion={form.question}
+          onDecide={(q) => {
+            form.setQuestion(q);
+            form.setShowQuestionStep(false);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
       className={
         isModal
-          ? "flex min-h-0 flex-1 flex-col bg-[#F1F1F1]"
+          ? "relative flex min-h-0 flex-1 flex-col bg-[#F1F1F1]"
           : "min-h-screen bg-[#F1F1F1] pb-[50px]"
       }
     >
-      {isModal ? (
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <button
-            type="button"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100"
-            aria-label="閉じる"
-            onClick={onClose}
-          >
-            <img src="/icons/icon_close.svg" alt="" className="h-3.5 w-3.5" width={14} height={14} />
-          </button>
-          <h1 className="min-w-0 flex-1 truncate text-center text-base font-bold text-gray-900">
-            VOTEを作成
-          </h1>
-          <button
-            type="button"
-            onClick={handleSaveDraftAndGoToDrafts}
-            className="shrink-0 whitespace-nowrap rounded-[10px] border-2 border-[#FFE100] bg-white px-3 py-2 text-sm font-bold text-gray-900"
-          >
-            下書き
-          </button>
-        </div>
-      ) : (
-        <AppHeader
-          type="title"
-          title="VOTEを作成"
-          right={
-            <button
-              type="button"
-              onClick={handleSaveDraftAndGoToDrafts}
-              className="whitespace-nowrap rounded-[10px] border-2 border-[#FFE100] bg-white px-3 py-2.5 text-sm font-bold text-gray-900"
-            >
-              下書き
-            </button>
-          }
-        />
-      )}
+      <CreateVoteFormHeader
+        variant={variant}
+        onClose={onClose}
+        onSaveDraft={form.handleSaveDraftAndGoToDrafts}
+      />
 
       <main
         className={`mx-auto w-full flex-1 space-y-[30px] pt-4 ${
           isModal ? "max-w-none overflow-y-auto px-4 pb-4" : "max-w-lg px-[5.333vw] pb-28"
         }`}
       >
-        {/* 2択の質問（80文字）* - タップで質問入力画面へ */}
         <section>
           <h2 className="mb-1 text-sm font-bold text-gray-900">
             2択の質問（80文字） <span className="text-red-600">*</span>
           </h2>
           <button
             type="button"
-            onClick={() =>
-              router.push(`/create?q=${encodeURIComponent(question)}`)
-            }
+            onClick={() => {
+              if (isModal) {
+                form.setShowQuestionStep(true);
+                return;
+              }
+              router.push(`/create?q=${encodeURIComponent(form.question)}`);
+            }}
             className="flex min-h-[80px] w-full flex-col items-start rounded-xl bg-white p-5 text-left shadow-none outline-none"
           >
             <span
               className={`min-h-[52px] w-full resize-none text-sm outline-none placeholder:text-gray-400 ${
-                question ? "text-gray-900" : "text-gray-400"
+                form.question ? "text-gray-900" : "text-gray-400"
               }`}
             >
-              {question || "例) 朝ご飯は、"}
+              {form.question || "例) 朝ご飯は、"}
             </span>
           </button>
-          <p className={`mt-1 text-xs ${question.length > QUESTION_MAX ? "text-red-600" : "text-gray-500"}`}>
-            {question.length}/{QUESTION_MAX}
+          <p
+            className={`mt-1 text-xs ${form.question.length > QUESTION_MAX ? "text-red-600" : "text-gray-500"}`}
+          >
+            {form.question.length}/{QUESTION_MAX}
           </p>
         </section>
 
-        {/* Aの回答（00文字以内）* + 画像設定 */}
-        <section>
-          <h2 className="mb-1 text-sm font-bold text-gray-900">
-            Aの回答（{OPTION_MAX}文字以内） <span className="text-red-600">*</span>
-          </h2>
-          <div className="relative rounded-xl bg-white p-5 pr-[60px]">
-            <input
-              type="text"
-              value={optionA}
-              onChange={(e) => setOptionA(e.target.value.slice(0, OPTION_MAX))}
-              placeholder="例) パン"
-              className="w-full border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
-            />
-            <OptionAnswerImageControl
-              side="A"
-              imageUrl={optionAImageUrl}
-              fileInputRef={fileInputARef}
-              onSelect={(e) => handleImageSelect("A", e)}
-              onRemove={() => handleImageRemove("A")}
-              busy={imageCompressingSide === "A"}
-            />
-          </div>
-        </section>
+        <VoteFormOptionField
+          side="A"
+          label="Aの回答"
+          placeholder="例) パン"
+          value={form.optionA}
+          onChange={form.setOptionA}
+          imageUrl={form.optionAImageUrl}
+          onImageSelect={(e) => form.handleImageSelect("A", e)}
+          onImageRemove={() => form.handleImageRemove("A")}
+          imageBusy={form.imageCompressingSide === "A"}
+        />
 
-        {/* Bの回答（00文字以内）* + 画像設定 */}
-        <section>
-          <h2 className="mb-1 text-sm font-bold text-gray-900">
-            Bの回答（{OPTION_MAX}文字以内） <span className="text-red-600">*</span>
-          </h2>
-          <div className="relative rounded-xl bg-white p-5 pr-[60px]">
-            <input
-              type="text"
-              value={optionB}
-              onChange={(e) => setOptionB(e.target.value.slice(0, OPTION_MAX))}
-              placeholder="例) パン"
-              className="w-full border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
-            />
-            <OptionAnswerImageControl
-              side="B"
-              imageUrl={optionBImageUrl}
-              fileInputRef={fileInputBRef}
-              onSelect={(e) => handleImageSelect("B", e)}
-              onRemove={() => handleImageRemove("B")}
-              busy={imageCompressingSide === "B"}
-            />
-          </div>
-        </section>
+        <VoteFormOptionField
+          side="B"
+          label="Bの回答"
+          placeholder="例) パン"
+          value={form.optionB}
+          onChange={form.setOptionB}
+          imageUrl={form.optionBImageUrl}
+          onImageSelect={(e) => form.handleImageSelect("B", e)}
+          onImageRemove={() => form.handleImageRemove("B")}
+          imageBusy={form.imageCompressingSide === "B"}
+        />
 
-        {/* 質問の理由（他と同様に白背景ボックス外・入力下にCheckbox） */}
         <section>
           <h2 className="mb-1 text-sm font-bold text-gray-900">質問の理由</h2>
           <div className="rounded-xl bg-white p-5">
             <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              value={form.reason}
+              onChange={(e) => form.setReason(e.target.value)}
               placeholder="例) 家族でパンvsご飯にわかれます。世の中のみんながどっち派か教えて。決着つけたい。"
               className="min-h-[80px] w-full resize-none border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
             />
           </div>
           <div className="mt-[10px]">
-            <Checkbox
-              checked={noComments}
-              onChange={setNoComments}
-              label="コメントを求めない"
-            />
+            <Checkbox checked={form.noComments} onChange={form.setNoComments} label="コメントを求めない" />
           </div>
         </section>
 
-        {/* タグ付け（候補を下に表示→選択 or 入力を完了で新規タグ） */}
+        <VoteFormTagsSection
+          tags={form.tags}
+          onTagsChange={form.setTags}
+          tagInput={form.tagInput}
+          onTagInputChange={form.setTagInput}
+        />
+
+        <VoteFormBackgroundPicker
+          selectedUrl={form.selectedBackgroundUrl}
+          onSelect={form.setSelectedBackgroundUrl}
+        />
+
+        <VoteFormPeriodSection
+          useVotePeriod={form.useVotePeriod}
+          onUseVotePeriodChange={form.setUseVotePeriod}
+          startYear={form.startYear}
+          startMonth={form.startMonth}
+          startDay={form.startDay}
+          endYear={form.endYear}
+          endMonth={form.endMonth}
+          endDay={form.endDay}
+          onStartYearChange={form.setStartYear}
+          onStartMonthChange={form.setStartMonth}
+          onStartDayChange={form.setStartDay}
+          onEndYearChange={form.setEndYear}
+          onEndMonthChange={form.setEndMonth}
+          onEndDayChange={form.setEndDay}
+        />
+
         <section>
-          <h2 className="mb-2 text-sm font-bold text-gray-900">タグ付け</h2>
-          <div className="relative rounded-xl bg-white p-5">
-            {tags.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 rounded-full bg-gray-200 px-3 py-1.5 text-sm text-gray-900"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => setTags((prev) => prev.filter((t) => t !== tag))}
-                      className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-300 hover:text-gray-700"
-                      aria-label={`${tag} を削除`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <MagnifyIcon className="h-5 w-5 shrink-0 text-gray-400" />
-              <input
-                type="text"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const word = tagInput.trim();
-                    if (word) {
-                      if (!tags.includes(word)) setTags((prev) => [...prev, word]);
-                      setTagInput("");
-                    }
-                  }
-                }}
-                placeholder="タグを検索または入力"
-                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
-              />
-            </div>
-            {tagInput.trim() && (
-              <ul className="absolute left-5 right-5 top-full z-10 mt-1 max-h-48 overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
-                {recommendedTagList
-                  .filter((t) => !tags.includes(t) && t.toLowerCase().includes(tagInput.trim().toLowerCase()))
-                  .slice(0, 10)
-                  .map((tag) => (
-                    <li key={tag}>
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm text-gray-900 hover:bg-gray-50"
-                        onClick={() => {
-                          if (!tags.includes(tag)) {
-                            setTags((prev) => [...prev, tag]);
-                            setTagInput("");
-                          }
-                        }}
-                      >
-                        #{tag}
-                      </button>
-                    </li>
-                  ))}
-                {tagInput.trim() &&
-                  !recommendedTagList.includes(tagInput.trim()) &&
-                  !tags.includes(tagInput.trim()) && (
-                    <li className="border-t border-gray-100">
-                      <button
-                        type="button"
-                        className="flex w-full items-center px-4 py-2.5 text-left text-sm text-gray-900 hover:bg-gray-50"
-                        onClick={() => {
-                          setTags((prev) => [...prev, tagInput.trim()]);
-                          setTagInput("");
-                        }}
-                      >
-                        「{tagInput.trim()}」を新規タグで追加
-                      </button>
-                    </li>
-                  )}
-              </ul>
-            )}
-          </div>
-        </section>
-
-        {/* 背景デザイン（画像から選択）・黄縁2倍・内側白縁・チェックはみ出しOK・シャドウ画像参考・画像切れ防止 */}
-        <section>
-          <h2 className="mb-2 text-sm font-bold text-gray-900">背景デザイン</h2>
-          <div className="flex gap-1.5 overflow-x-auto pb-2 pr-2 pt-2">
-            {CARD_BACKGROUND_IMAGES.map((url) => (
-              <button
-                key={url}
-                type="button"
-                onClick={() => setSelectedBackgroundUrl(url)}
-                className={`relative h-14 w-14 shrink-0 overflow-visible rounded-full ${
-                  selectedBackgroundUrl === url
-                    ? "border-[6px] border-[#FFE100] ring-2 ring-inset ring-white shadow-[0_2px_2px_0_rgba(0,0,0,0.08)]"
-                    : "border-[6px] border-transparent"
-                }`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={url}
-                  alt=""
-                  className="h-full w-full rounded-full object-contain"
-                  loading="lazy"
-                  decoding="async"
-                />
-                {selectedBackgroundUrl === url && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black shadow-[0_2px_2px_0_rgba(0,0,0,0.08)]">
-                    <CheckIcon className="h-3 w-3 text-white" />
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* 投票期間（チェックで設定するか選択・年・月・日） */}
-        <section>
-          <h2 className="mb-2 text-sm font-bold text-gray-900">投票期間</h2>
-          <div className="mb-3">
-            <Checkbox
-              checked={useVotePeriod}
-              onChange={setUseVotePeriod}
-              label="投票期間を設定する"
-            />
-          </div>
-          {useVotePeriod && (
-          <div className="space-y-3 rounded-xl bg-white p-4">
-            <div>
-              <p className="mb-1 text-xs text-gray-600">開始期間</p>
-              <div className="flex flex-wrap items-center gap-1">
-                <select
-                  value={startYear}
-                  onChange={(e) => setStartYear(Number(e.target.value))}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900"
-                >
-                  {YEARS.map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-                <span className="text-sm text-gray-500">年</span>
-                <select
-                  value={startMonth}
-                  onChange={(e) => setStartMonth(Number(e.target.value))}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900"
-                >
-                  {MONTHS.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-                <span className="text-sm text-gray-500">月</span>
-                <select
-                  value={startDay}
-                  onChange={(e) => setStartDay(Number(e.target.value))}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900"
-                >
-                  {DAYS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-                <span className="text-sm text-gray-500">日</span>
-              </div>
-            </div>
-            <div>
-              <p className="mb-1 text-xs text-gray-600">終了期間</p>
-              <div className="flex flex-wrap items-center gap-1">
-                <select
-                  value={endYear}
-                  onChange={(e) => setEndYear(Number(e.target.value))}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900"
-                >
-                  {YEARS.map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-                <span className="text-sm text-gray-500">年</span>
-                <select
-                  value={endMonth}
-                  onChange={(e) => setEndMonth(Number(e.target.value))}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900"
-                >
-                  {MONTHS.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-                <span className="text-sm text-gray-500">月</span>
-                <select
-                  value={endDay}
-                  onChange={(e) => setEndDay(Number(e.target.value))}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900"
-                >
-                  {DAYS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-                <span className="text-sm text-gray-500">日</span>
-              </div>
-            </div>
-          </div>
-          )}
-        </section>
-
-        {/* コレクション（自分のコレクションをプルダウン・画像デザイン・黄丸に矢印アイコン） */}
-        <section className="relative">
           <h2 className="mb-1 flex items-center gap-1 text-sm font-bold text-gray-900">
             コレクション
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs text-gray-600">
@@ -700,61 +178,53 @@ function CreateVoteFormContent({
           </h2>
           <button
             type="button"
-            onClick={() => setCollectionOpen((o) => !o)}
+            onClick={() => form.setCollectionPickerOpen(true)}
             className="flex w-full items-center rounded-[9999px] border border-gray-200 bg-white px-4 py-3 text-left"
           >
             <span
-              className={`min-w-0 flex-1 text-sm ${selectedCollectionId ? "text-gray-900" : "text-gray-400"}`}
+              className={`min-w-0 flex-1 text-sm ${form.selectedCollectionLabel ? "text-gray-900" : "text-gray-400"}`}
             >
-              {selectedCollectionId
-                ? collections.find((c) => c.id === selectedCollectionId)?.name ?? "選択中"
-                : "追加したいコレクションを選択"}
+              {form.selectedCollectionLabel ?? "追加したいコレクションを選択"}
             </span>
             <span className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFE100]">
-              <img
-                src="/icons/icon_b_arrow.svg"
-                alt=""
-                className={`h-1.5 w-2 transition-transform ${collectionOpen ? "rotate-180" : ""}`}
-                width={8}
-                height={6}
-              />
+              <img src="/icons/icon_b_arrow.svg" alt="" className="h-1.5 w-2" width={8} height={6} />
             </span>
           </button>
-          {collectionOpen && (
-            <>
-              <div
-                className={`fixed inset-0 ${isModal ? "z-[80]" : "z-30"}`}
-                aria-hidden
-                onClick={() => setCollectionOpen(false)}
-              />
-              <ul
-                className={`absolute left-0 right-0 top-full mt-1 max-h-48 overflow-auto rounded-[20px] border border-gray-200 bg-white py-1 shadow-lg ${
-                  isModal ? "z-[90]" : "z-40"
-                }`}
-              >
-                {collections.length === 0 ? (
-                  <li className="px-4 py-3 text-sm text-gray-500">コレクションがありません</li>
-                ) : (
-                  collections.map((col) => (
-                    <li key={col.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCollectionId(col.id);
-                          setCollectionOpen(false);
-                        }}
-                        className="w-full px-4 py-3 text-left text-sm text-gray-900 hover:bg-gray-50"
-                      >
-                        {col.name}
-                      </button>
-                    </li>
-                  ))
-                )}
-              </ul>
-            </>
-          )}
         </section>
       </main>
+
+      <CollectionPickerSheet
+        open={form.collectionPickerOpen}
+        onClose={() => form.setCollectionPickerOpen(false)}
+        title="コレクションを選ぶ"
+        scope={isModal ? "contained" : "viewport"}
+        mode="select"
+        selectedIds={form.selectedCollectionIds}
+        onSelectedIdsChange={form.setSelectedCollectionIds}
+        onCreateNew={() => {
+          form.setCollectionPickerOpen(false);
+          form.setShowCollectionSettingsModal(true);
+        }}
+      />
+
+      {form.showCollectionSettingsModal ? (
+        <CollectionSettingsModal
+          onClose={() => form.setShowCollectionSettingsModal(false)}
+          onSave={async (name, gradient, visibility, category, coverImageUrl) => {
+            const created = await createOwnedCollectionFromSettings(name, {
+              gradient,
+              visibility,
+              category,
+              coverImageUrl,
+            });
+            form.setSelectedCollectionIds((prev) =>
+              prev.includes(created.id) ? prev : [...prev, created.id]
+            );
+            form.setShowCollectionSettingsModal(false);
+            form.setCollectionPickerOpen(true);
+          }}
+        />
+      ) : null}
 
       <div
         className={
@@ -763,11 +233,15 @@ function CreateVoteFormContent({
             : "fixed bottom-14 left-0 right-0 z-20 mx-auto max-w-lg px-[5.333vw] pb-2 pt-2"
         }
       >
-        <Button variant="createVote" type="button" onClick={handleSubmit} disabled={!canSubmit || isSubmitting}>
-          {isSubmitting ? "作成中..." : "VOTEを作成"}
+        <Button
+          variant="createVote"
+          type="button"
+          onClick={form.handleSubmit}
+          disabled={!form.canSubmit || form.isSubmitting}
+        >
+          {form.isSubmitting ? "作成中..." : "VOTEを作成"}
         </Button>
       </div>
-
     </div>
   );
 }
@@ -780,32 +254,16 @@ export default function CreateVoteFormContentWithSuspense({
   onClose?: () => void;
 }) {
   return (
-    <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center bg-[#F1F1F1] text-sm text-gray-500">読み込み中...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-[200px] items-center justify-center bg-[#F1F1F1] text-sm text-gray-500">
+          読み込み中...
+        </div>
+      }
+    >
       <CreateVoteFormContent variant={variant} onClose={onClose} />
     </Suspense>
   );
 }
 
 export { CreateVoteFormContent };
-
-function MagnifyIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-      />
-    </svg>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-    </svg>
-  );
-}
-

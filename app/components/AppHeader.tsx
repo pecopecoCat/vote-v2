@@ -37,6 +37,8 @@ export interface AppHeaderTitleProps {
   title: string;
   /** 履歴が無いときのフォールバック先（未指定は /） */
   backHref?: string;
+  /** 戻るボタンで router ではなくこちらを優先 */
+  onBack?: () => void;
   /** 右側のボタン（例: 下書きリンク） */
   right?: React.ReactNode;
 }
@@ -107,10 +109,10 @@ export default function AppHeader(props: AppHeaderProps) {
   }
 
   if (props.type === "title") {
-    const { title, right, backHref } = props;
+    const { title, right, backHref, onBack } = props;
     return (
       <header className={`sticky top-0 z-50 relative flex ${HEADER_HEIGHT} items-center bg-[#FFE100] pl-2.5 pr-[5.333vw] shadow-sm`} aria-label={title}>
-        {renderBackButton(backHref)}
+        {renderBackButton(backHref, onBack)}
         <h1 className="absolute left-1/2 top-1/2 min-w-0 max-w-[calc(100%-5.5rem)] -translate-x-1/2 -translate-y-1/2 truncate px-2 text-center text-base font-bold text-gray-900">
           {title}
         </h1>

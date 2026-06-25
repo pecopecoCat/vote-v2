@@ -19,6 +19,10 @@ export type CollectionsIndexRow = {
 let cache: { at: number; rows: CollectionsIndexRow[] } | null = null;
 const TTL_MS = 60_000;
 
+export function invalidateCollectionsIndexCache(): void {
+  cache = null;
+}
+
 function normalizeRow(raw: unknown): CollectionsIndexRow | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;

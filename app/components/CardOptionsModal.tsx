@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, type ReactNode } from "react";
+import BottomSheet from "./BottomSheet";
 
 export interface CardOptionsModalProps {
   cardId: string | null;
@@ -75,51 +76,23 @@ export default function CardOptionsModal({
   if (cardId == null || items.length === 0) return null;
 
   return (
-    <>
-      <div
-        className="fixed inset-0 z-[60] bg-black/50"
-        aria-hidden
-        onClick={onClose}
-      />
-      <div className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
-          <div />
-          <span className="text-lg font-bold text-gray-900">メニュー</span>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="flex h-10 w-10 items-center justify-center"
-              aria-label="閉じる"
-              onClick={onClose}
-            >
-              <img
-                src="/icons/icon_close.svg"
-                alt=""
-                className="icon-close-responsive"
-                width={14}
-                height={14}
-              />
-            </button>
-          </div>
-        </div>
-        <div className="px-5 py-2">
-          <ul className="divide-y divide-gray-100">
-            {items.map((item) => (
-              <li key={item.label}>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 py-4 text-left text-gray-900 transition-colors hover:bg-gray-50"
-                  onClick={item.onClick}
-                >
-                  {item.icon}
-                  <span className="card-options-modal-item-label text-sm text-gray-900">{item.label}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+    <BottomSheet open title="メニュー" onClose={onClose}>
+      <div className="px-5 py-2">
+        <ul className="divide-y divide-gray-100">
+          {items.map((item) => (
+            <li key={item.label}>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 py-4 text-left text-gray-900 transition-colors hover:bg-gray-50"
+                onClick={item.onClick}
+              >
+                {item.icon}
+                <span className="card-options-modal-item-label text-sm text-gray-900">{item.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
-    </>
+    </BottomSheet>
   );
 }
-

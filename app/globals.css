@@ -422,6 +422,19 @@ select {
   box-shadow: var(--vote-card-outer-shadow);
 }
 
+/* HOME フィード：コレクションタイル（VOTE CARD と同じ R・シャドウ・最小高さ） */
+.collection-card-feed-tile {
+  border-radius: var(--vote-card-outer-radius);
+  box-shadow: var(--vote-card-outer-shadow);
+  min-height: 118px;
+}
+
+@media (min-width: 768px) {
+  .collection-card-feed-tile {
+    min-height: 148px;
+  }
+}
+
 /* 角丸クリップ用（外枠は overflow:visible のままシャドウを出す） */
 .vote-card-outer__inner {
   overflow: hidden;
@@ -522,6 +535,17 @@ select {
 
 .home-feed-masonry__tile--full {
   column-span: all;
+}
+
+.collection-picker-screen {
+  z-index: 100;
+}
+
+@media (min-width: 768px) {
+  .collection-picker-screen {
+    left: var(--app-side-nav-width);
+    width: calc(100vw - var(--app-side-nav-width));
+  }
 }
 
 .collections-list-grid__sentinel {

@@ -18,6 +18,7 @@ export interface DraftData {
   tags?: string[];
   selectedBackgroundUrl?: string;
   selectedCollectionId?: string;
+  selectedCollectionIds?: string[];
   visibility?: DraftVisibility;
   useVotePeriod?: boolean;
   startYear?: number;
@@ -67,6 +68,9 @@ function normalizeDraft(raw: unknown): DraftItem | null {
         tags: Array.isArray(dataObj.tags) ? (dataObj.tags.filter((t): t is string => typeof t === "string") as string[]) : undefined,
         selectedBackgroundUrl: typeof dataObj.selectedBackgroundUrl === "string" ? dataObj.selectedBackgroundUrl : undefined,
         selectedCollectionId: typeof dataObj.selectedCollectionId === "string" ? dataObj.selectedCollectionId : undefined,
+        selectedCollectionIds: Array.isArray(dataObj.selectedCollectionIds)
+          ? dataObj.selectedCollectionIds.filter((t): t is string => typeof t === "string")
+          : undefined,
         visibility: dataObj.visibility === "private" ? "private" : dataObj.visibility === "public" ? "public" : undefined,
         useVotePeriod: typeof dataObj.useVotePeriod === "boolean" ? dataObj.useVotePeriod : undefined,
         startYear: typeof dataObj.startYear === "number" ? dataObj.startYear : undefined,
@@ -147,6 +151,9 @@ export function addDraft(data: DraftData): void {
       tags: Array.isArray(data.tags) ? data.tags.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim()) : [],
       selectedBackgroundUrl: typeof data.selectedBackgroundUrl === "string" ? data.selectedBackgroundUrl : undefined,
       selectedCollectionId: typeof data.selectedCollectionId === "string" ? data.selectedCollectionId : undefined,
+      selectedCollectionIds: Array.isArray(data.selectedCollectionIds)
+        ? data.selectedCollectionIds.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim())
+        : undefined,
       visibility: data.visibility === "private" ? "private" : "public",
       useVotePeriod: Boolean(data.useVotePeriod),
       startYear: typeof data.startYear === "number" ? data.startYear : undefined,

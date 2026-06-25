@@ -99,9 +99,9 @@ export default function CollectionSettingsModal({
 
   const node = (
     <>
-      <div className="fixed inset-0 z-[100] bg-black/50" aria-hidden onClick={onClose} />
+      <div className="fixed inset-0 z-[120] bg-black/50" aria-hidden onClick={onClose} />
       <div
-        className="fixed left-1/2 top-1/2 z-[110] w-[calc(100%-40px)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-5 shadow-xl"
+        className="fixed left-1/2 top-1/2 z-[130] w-[calc(100%-40px)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-5 shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="collection-settings-title"

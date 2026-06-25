@@ -2,6 +2,7 @@
 
 import { addHiddenTag } from "../data/hiddenTags";
 import { addFavoriteTag, removeFavoriteTag } from "../data/favoriteTags";
+import BottomSheet from "./BottomSheet";
 
 /** 注目タグ用：興味がない・お気に入りに追加 / お気に入りタグ用：お気に入り解除 */
 export type TagMenuVariant = "trending" | "favorite";
@@ -66,61 +67,34 @@ export default function TagMenuModal({
   const items = variant === "trending" ? trendingItems : favoriteItems;
 
   return (
-    <>
-      <div
-        className="fixed inset-0 z-[60] bg-black/50"
-        aria-hidden
-        onClick={onClose}
-      />
-      <div className="fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-hidden rounded-t-[30px] bg-white font-bold shadow-lg">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-gray-100 px-5 py-3">
-          <div />
-          <span className="text-lg font-bold text-gray-900">メニュー</span>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="flex h-10 w-10 items-center justify-center"
-              aria-label="閉じる"
-              onClick={onClose}
-            >
-              <img
-                src="/icons/icon_close.svg"
-                alt=""
-                className="icon-close-responsive"
-                width={14}
-                height={14}
-              />
-            </button>
-          </div>
-        </div>
-        <div className="px-5 py-2">
-          <ul className="divide-y divide-gray-100">
-            {items.map((item) => (
-              <li key={item.label}>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 py-4 text-left text-gray-900 transition-colors hover:bg-gray-50"
-                  onClick={item.onClick}
-                >
-                  <img
-                    src={item.icon}
-                    alt=""
-                    className="h-5 w-5 shrink-0"
-                    width={22}
-                    height={22}
-                  />
-                  <span className="flex flex-col items-start text-sm">
-                    <span>{item.label}</span>
-                    {item.subLabel != null && (
-                      <span className="text-xs font-bold text-gray-500">{item.subLabel}</span>
-                    )}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+    <BottomSheet open title="メニュー" onClose={onClose}>
+      <div className="px-5 py-2">
+        <ul className="divide-y divide-gray-100">
+          {items.map((item) => (
+            <li key={item.label}>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 py-4 text-left text-gray-900 transition-colors hover:bg-gray-50"
+                onClick={item.onClick}
+              >
+                <img
+                  src={item.icon}
+                  alt=""
+                  className="h-5 w-5 shrink-0"
+                  width={22}
+                  height={22}
+                />
+                <span className="flex flex-col items-start text-sm">
+                  <span>{item.label}</span>
+                  {item.subLabel != null && (
+                    <span className="text-xs font-bold text-gray-500">{item.subLabel}</span>
+                  )}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
-    </>
+    </BottomSheet>
   );
 }
