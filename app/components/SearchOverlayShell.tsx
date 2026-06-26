@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { navigateBack } from "../lib/navigateBack";
 import { SearchPanelWithSuspense } from "./SearchPanel";
 
 const DESKTOP_MQ = "(min-width: 768px)";
@@ -22,7 +21,6 @@ export default function SearchOverlayShell({ mode = "intercept" }: SearchOverlay
   const [closing, setClosing] = useState(false);
 
   const isSearchRoute = pathname.startsWith("/search");
-  const isInterceptActive = mode === "intercept" && isSearchRoute;
 
   useEffect(() => {
     const mq = window.matchMedia(DESKTOP_MQ);
@@ -32,8 +30,17 @@ export default function SearchOverlayShell({ mode = "intercept" }: SearchOverlay
     return () => mq.removeEventListener("change", apply);
   }, []);
 
+  /** 開閉アニメ・body スクロールロック（ルート遷移で状態をリセット） */
   useEffect(() => {
-    if (mode === "intercept" && !isSearchRoute) return;
+    if (mode === "intercept" && !isSearchRoute) {
+      setClosing(false);
+      setEntered(false);
+      document.body.style.overflow = "";
+      return;
+    }
+
+    setClosing(false);
+    setEntered(false);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const id = requestAnimationFrame(() => {
@@ -43,12 +50,6 @@ export default function SearchOverlayShell({ mode = "intercept" }: SearchOverlay
       cancelAnimationFrame(id);
       document.body.style.overflow = prev;
     };
-  }, [isInterceptActive, isSearchRoute, mode]);
-
-  useEffect(() => {
-    if (mode === "intercept" && !isSearchRoute) {
-      document.body.style.overflow = "";
-    }
   }, [isSearchRoute, mode]);
 
   const close = useCallback(() => {
@@ -56,14 +57,19 @@ export default function SearchOverlayShell({ mode = "intercept" }: SearchOverlay
     setClosing(true);
     setEntered(false);
     document.body.style.overflow = "";
+    const duration = isDesktop ? 220 : 300;
     window.setTimeout(() => {
       if (mode === "intercept") {
-        navigateBack(router, { fallbackHref: "/" });
+        // replaceState 併用時は back() だけでは URL / Next の @modal が残ることがある
+        router.replace("/", { scroll: false });
       } else {
         router.push("/");
       }
-    }, isDesktop ? 220 : 300);
+    }, duration);
   }, [closing, isDesktop, mode, router]);
+
+  const inert = closing;
+  const overlayInertClass = inert ? " pointer-events-none [&_*]:pointer-events-none" : "";
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -86,7 +92,7 @@ export default function SearchOverlayShell({ mode = "intercept" }: SearchOverlay
   if (isDesktop) {
     return (
       <div
-        className={`fixed inset-0 z-[60]${closing ? " pointer-events-none" : ""}`}
+        className={`fixed inset-0 z-[60]${overlayInertClass}`}
         role="dialog"
         aria-modal="true"
         aria-label="検索"
@@ -94,7 +100,7 @@ export default function SearchOverlayShell({ mode = "intercept" }: SearchOverlay
         <button
           type="button"
           className={`absolute inset-0 bg-black/50 transition-opacity duration-200 ${
-            entered && !closing ? "opacity-100" : "opacity-0"
+            entered && !closing ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
           aria-label="閉じる"
           onClick={close}
@@ -112,7 +118,7 @@ export default function SearchOverlayShell({ mode = "intercept" }: SearchOverlay
 
   return (
     <div
-      className={`fixed inset-0 z-[60] overflow-hidden${closing ? " pointer-events-none" : ""}`}
+      className={`fixed inset-0 z-[60] overflow-hidden${overlayInertClass}`}
       role="dialog"
       aria-modal="true"
       aria-label="検索"

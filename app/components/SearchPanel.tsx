@@ -633,7 +633,7 @@ function SearchPanelInner({ presentation = "page", layout = "default", onClose }
     <div
       className={
         isModalLayout
-          ? "flex h-full min-h-0 flex-col overflow-hidden bg-white"
+          ? "search-modal-panel flex h-full min-h-0 flex-col overflow-hidden bg-white"
           : isOverlay
             ? `flex min-h-0 flex-1 flex-col overflow-y-auto ${isTagFilterView ? "bg-[#F1F1F1]" : "bg-white"}`
             : `min-h-screen pb-[50px] ${isTagFilterView ? "bg-[#F1F1F1]" : "bg-white"}`
@@ -662,7 +662,7 @@ function SearchPanelInner({ presentation = "page", layout = "default", onClose }
       {isTagFilterView && (
         <>
           <ShowVotedFilterBar
-            className={`sticky top-[64px] z-10 bg-[#F1F1F1] py-3${isModalLayout ? " px-5" : " px-[5.333vw]"}`}
+            className={`sticky ${isModalLayout ? "top-0" : "top-[64px]"} z-10 bg-[#F1F1F1] py-3${isModalLayout ? " px-5" : " px-[5.333vw]"}`}
             sortOrder={tagListSortOrder}
             onSortOrderChange={setTagListSortOrder}
             showVoted={showVoted}
@@ -677,7 +677,7 @@ function SearchPanelInner({ presentation = "page", layout = "default", onClose }
                 : "home-feed-main mx-auto px-[5.333vw] pb-[50px] pt-6 sm:px-6"
             }
           >
-            <VoteCardList masonry>
+            <VoteCardList className={isModalLayout ? "px-4" : ""} masonry>
               {cardsToShow.length === 0 ? (
                 <VoteCardMasonryTile fullWidth>
                 <EmptyStatePanel>
@@ -712,7 +712,10 @@ function SearchPanelInner({ presentation = "page", layout = "default", onClose }
                 })
               )}
               <VoteCardMasonryTile fullWidth>
-              <RecommendedTags tags={tagFilterRecommendedTags} />
+              <RecommendedTags
+                tags={tagFilterRecommendedTags}
+                className={isModalLayout ? "!mx-0 [&>div]:!px-0" : undefined}
+              />
               </VoteCardMasonryTile>
               {randomCollectionForTimeline ? (
                 <VoteCardMasonryTile fullWidth>

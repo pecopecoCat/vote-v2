@@ -564,6 +564,11 @@ select {
   grid-column: 1 / -1;
 }
 
+.search-modal-panel .home-feed-masonry.vote-card-list {
+  --masonry-gap: 12px;
+  columns: 1;
+}
+
 .home-feed-main,
 .collections-list-main,
 .comments-page {
