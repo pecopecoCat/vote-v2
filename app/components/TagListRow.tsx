@@ -16,15 +16,17 @@ export interface TagListRowProps {
   count: number;
   variant: TagMenuVariant;
   onMenuClick?: (tag: string, variant: TagMenuVariant) => void;
+  className?: string;
 }
 
 /** 検索：注目タグ / お気に入りタグの1行 */
-export default function TagListRow({ tag, count, variant, onMenuClick }: TagListRowProps) {
+export default function TagListRow({ tag, count, variant, onMenuClick, className = "" }: TagListRowProps) {
+  const extra = className ? ` ${className}` : "";
   return (
     <Link
       href={`/search?tag=${encodeURIComponent(tag)}`}
       prefetch={false}
-      className="flex items-center gap-2 border-b border-gray-100 py-3 last:border-b-0"
+      className={`flex items-center gap-2 border-b border-gray-100 py-3 last:border-b-0${extra}`}
     >
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-gray-900">{tag}</p>

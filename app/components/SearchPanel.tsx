@@ -14,6 +14,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "./AppHeader";
 import CollectionCard from "./CollectionCard";
+import CollectionBrowseRow from "./CollectionBrowseRow";
 import RecommendedTags from "./RecommendedTags";
 import VoteCard from "./VoteCard";
 import { VoteCardList, VoteCardMasonryTile } from "./VoteCardList";
@@ -29,7 +30,7 @@ import { getMergedCounts, isCommentAuthoredByCurrentUser, type CardActivity } fr
 import { useSharedData } from "../context/SharedDataContext";
 import { toggleFavoriteTag, isFavoriteTag } from "../data/favoriteTags";
 import { isHiddenTag } from "../data/hiddenTags";
-import { getOtherUsersCollections, isCollectionPinnable } from "../data/collections";
+import { getOtherUsersCollections, type Collection } from "../data/collections";
 import { isCardBookmarked } from "../data/bookmarks";
 import { getCurrentActivityUserId } from "../data/auth";
 import { useAuthState } from "../hooks/useAuthState";
@@ -56,12 +57,12 @@ import {
   searchCollections,
   searchVoteCardsByKeyword,
   type CollectionGradient,
-  type PopularCollection,
 } from "../data/search";
 import { perfMeasure } from "../lib/perf";
 import { buildVoteCardProps } from "../lib/buildVoteCardProps";
 import { resolveCardBackgroundUrl } from "../lib/resolveCardBackgroundUrl";
 import { sortCollectionsByPinned } from "../lib/sortCollectionsByPinned";
+import { getCollectionThumbnailUrl } from "../lib/getCollectionThumbnailUrl";
 
 /** タグでフィルター（tag 指定時）、新着順／古い順でソート */
 function filterCardsByTag(
@@ -97,11 +98,13 @@ function parseSearchTabFromUrl(tab: string | null): SearchTabId {
 
 export type SearchPanelProps = {
   presentation?: "page" | "overlay";
+  layout?: "default" | "modal";
   onClose?: () => void;
 };
 
-function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) {
+function SearchPanelInner({ presentation = "page", layout = "default", onClose }: SearchPanelProps) {
   const isOverlay = presentation === "overlay";
+  const isModalLayout = layout === "modal";
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -345,33 +348,34 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
   const isSearching = query.length > 0;
   const showSearchTabs = !isTagFilterView && committedVoteQuery.length === 0;
 
-  /** 人気コレ（デモ）＋自分・他人の登録コレクション名の部分一致 */
+  /** 自分・他人の登録コレクション名の部分一致 */
   const matchedCollectionsRaw = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [] as PopularCollection[];
+    if (!q) return [] as Collection[];
     const seen = new Set<string>();
-    const out: PopularCollection[] = [];
+    const out: Collection[] = [];
     const other = getOtherUsersCollections();
     const mine = collections.filter((c) => c.visibility !== "member");
     for (const c of [...other, ...mine]) {
       if (!c.name.toLowerCase().includes(q)) continue;
       if (seen.has(c.id)) continue;
       seen.add(c.id);
-      out.push({
-        id: c.id,
-        title: c.name,
-        gradient: (c.gradient ?? "orange-yellow") as CollectionGradient,
-        showPin: isCollectionPinnable(c.visibility) && pinnedCollectionIds.includes(c.id),
-        voteScore: 0,
-      });
+      out.push(c);
     }
     for (const p of searchCollections(query)) {
       if (seen.has(p.id)) continue;
       seen.add(p.id);
-      out.push(p);
+      out.push({
+        id: p.id,
+        name: p.title,
+        color: "#E5E7EB",
+        gradient: p.gradient,
+        visibility: "public",
+        cardIds: [],
+      });
     }
     return out;
-  }, [query, collections, pinnedCollectionIds]);
+  }, [query, collections]);
   /** 検索時コレクション：ピン留めを上に表示 */
   const matchedCollections = useMemo(
     () => sortCollectionsByPinned(matchedCollectionsRaw, pinnedCollectionIds),
@@ -619,12 +623,20 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
     return () => obs.disconnect();
   }, [committedVoteQuery, matchedVoteCardsFull.length, voteSearchVisibleCount]);
 
+  const listRowInset = isModalLayout ? "px-5" : "";
+  const sectionInset = isModalLayout ? "" : "px-[5.333vw]";
+  const overlayMainClass = isModalLayout
+    ? "home-feed-main mx-auto w-full max-w-none flex-1 bg-white pb-[env(safe-area-inset-bottom,0px)]"
+    : "home-feed-main mx-auto flex-1 bg-white pb-[env(safe-area-inset-bottom,0px)] sm:px-6";
+
   return (
     <div
       className={
-        isOverlay
-          ? `flex min-h-0 flex-1 flex-col overflow-y-auto ${isTagFilterView ? "bg-[#F1F1F1]" : "bg-white"}`
-          : `min-h-screen pb-[50px] ${isTagFilterView ? "bg-[#F1F1F1]" : "bg-white"}`
+        isModalLayout
+          ? "flex h-full min-h-0 flex-col overflow-hidden bg-white"
+          : isOverlay
+            ? `flex min-h-0 flex-1 flex-col overflow-y-auto ${isTagFilterView ? "bg-[#F1F1F1]" : "bg-white"}`
+            : `min-h-screen pb-[50px] ${isTagFilterView ? "bg-[#F1F1F1]" : "bg-white"}`
       }
     >
       {/* 虫眼鏡で開いた時→(2)検索 / ハッシュタグタップで開いた時→(3)ハッシュタグ */}
@@ -641,13 +653,16 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
           },
           isFavorite: isFavoriteTag(searchValue.trim()),
         })}
+        {...(isModalLayout ? { className: "!px-3" } : {})}
       />
+
+      <div className={isModalLayout ? "min-h-0 flex-1 overflow-y-auto overscroll-contain" : "contents"}>
 
       {/* ハッシュタグから開いたとき：従来のカード一覧（新着順・投票済みを表示） */}
       {isTagFilterView && (
         <>
           <ShowVotedFilterBar
-            className="sticky top-[64px] z-10 bg-[#F1F1F1] px-[5.333vw] py-3"
+            className={`sticky top-[64px] z-10 bg-[#F1F1F1] py-3${isModalLayout ? " px-5" : " px-[5.333vw]"}`}
             sortOrder={tagListSortOrder}
             onSortOrderChange={setTagListSortOrder}
             showVoted={showVoted}
@@ -656,7 +671,9 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
           <main
             className={
               isOverlay
-                ? "home-feed-main mx-auto flex-1 px-[5.333vw] pb-[env(safe-area-inset-bottom,0px)] pt-6 sm:px-6"
+                ? isModalLayout
+                  ? "home-feed-main mx-auto w-full max-w-none flex-1 px-0 pb-[env(safe-area-inset-bottom,0px)] pt-6"
+                  : "home-feed-main mx-auto flex-1 px-[5.333vw] pb-[env(safe-area-inset-bottom,0px)] pt-6 sm:px-6"
                 : "home-feed-main mx-auto px-[5.333vw] pb-[50px] pt-6 sm:px-6"
             }
           >
@@ -734,20 +751,14 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
             </>
           )}
 
-          <main
-            className={
-              isOverlay
-                ? "home-feed-main mx-auto flex-1 bg-white pb-[env(safe-area-inset-bottom,0px)] sm:px-6"
-                : "home-feed-main mx-auto bg-white pb-[50px] sm:px-6"
-            }
-          >
+          <main className={isOverlay ? overlayMainClass : "home-feed-main mx-auto bg-white pb-[50px] sm:px-6"}>
         {!isSearching ? (
           <>
             <section
               className={`border-b border-gray-200 pt-2.5${activeTab === "trending" ? "" : " hidden"}`}
               aria-hidden={activeTab !== "trending"}
             >
-              <div className="px-[5.333vw]">
+              <div className={sectionInset || undefined}>
                 {displayedTrendingTags.length === 0 ? (
                   <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
                 ) : (
@@ -758,6 +769,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
                         tag={t.tag}
                         count={t.count}
                         variant="trending"
+                        className={listRowInset}
                         onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
                       />
                     ))}
@@ -773,7 +785,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
               className={`border-b border-gray-200 pt-2.5${activeTab === "favorite" ? "" : " hidden"}`}
               aria-hidden={activeTab !== "favorite"}
             >
-              <div className="px-[5.333vw]">
+              <div className={sectionInset || undefined}>
                 {!isLoggedIn ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <p className="text-sm text-gray-700">
@@ -802,6 +814,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
                         tag={tag}
                         count={count}
                         variant="favorite"
+                        className={listRowInset}
                         onMenuClick={(t, variant) => setTagMenu({ tag: t, variant })}
                       />
                     ))
@@ -816,7 +829,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
                 {/* 検索時：1回目 Enter 後（同一キーワードで再 Enter で VOTE 結果へ） */}
                 <section className="border-b border-gray-200">
                   <SectionHeader>「{query}」が含まれるタグ</SectionHeader>
-                  <div className="px-[5.333vw]">
+                  <div className={sectionInset || undefined}>
                     {matchedTags.length === 0 ? (
                       <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
                     ) : (
@@ -826,6 +839,7 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
                           tag={t.tag}
                           count={t.count}
                           variant="trending"
+                          className={listRowInset}
                           onMenuClick={(tag, variant) => setTagMenu({ tag, variant })}
                         />
                       ))
@@ -835,30 +849,28 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
 
                 <section>
                   <SectionHeader>コレクション</SectionHeader>
-                  <div className="flex flex-col gap-3 px-[5.333vw] pt-4 pb-5">
-                    {matchedCollections.length === 0 ? (
-                      <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
-                    ) : (
-                      matchedCollections.map((col) => (
-                        <CollectionCard
-                          key={col.id}
-                          id={col.id}
-                          title={col.title}
-                          gradient={col.gradient}
-                          showPin={col.showPin}
-                          popularBanner
-                          href={`/collection/${col.id}`}
-                        />
-                      ))
-                    )}
-                  </div>
+                  {matchedCollections.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-gray-500">検索候補がありません。</p>
+                  ) : (
+                    <ul className="divide-y divide-[#E8E8E8] bg-white">
+                      {matchedCollections.map((col) => (
+                        <li key={col.id}>
+                          <CollectionBrowseRow
+                            collection={col}
+                            thumbnailUrl={getCollectionThumbnailUrl(col, createdVotesForTimeline)}
+                            href={`/collection/${col.id}`}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </section>
               </>
             ) : (
               /* 2回目 Enter 後：一致する VOTE のみ（URL は vote=1） */
               <section className="border-b border-gray-200">
                 <SectionHeader>「{committedVoteQuery}」に一致するVOTE</SectionHeader>
-                <VoteCardList className="px-[5.333vw] py-4 sm:px-6" masonry>
+                <VoteCardList className={isModalLayout ? "px-4 py-4" : "px-[5.333vw] py-4 sm:px-6"} masonry>
                   {matchedVoteCardsFull.length === 0 ? (
                     <VoteCardMasonryTile fullWidth>
                     <p className="py-6 text-center text-sm text-gray-500">一致するVOTEはありません。</p>
@@ -907,6 +919,8 @@ function SearchPanelInner({ presentation = "page", onClose }: SearchPanelProps) 
         </>
       )}
 
+      </div>
+
       <CardModerationModals
         cardOptionsCardId={moderation.cardOptionsCardId}
         cardOptionsIsOwnCard={moderation.cardOptionsIsOwnCard}
@@ -951,7 +965,7 @@ export function SearchPanelWithSuspense(props: SearchPanelProps) {
   return (
     <Suspense
       fallback={
-        <div className="flex flex-1 items-center justify-center bg-white text-sm text-gray-500">
+        <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-white text-sm text-gray-500">
           読み込み中…
         </div>
       }

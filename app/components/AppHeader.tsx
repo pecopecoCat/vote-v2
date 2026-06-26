@@ -17,6 +17,7 @@ export interface AppHeaderSearchProps {
   backHref?: string;
   /** 指定時は戻るボタンでこちらを優先（検索オーバーレイの閉じる等） */
   onBack?: () => void;
+  className?: string;
 }
 
 export interface AppHeaderHashtagProps {
@@ -30,6 +31,7 @@ export interface AppHeaderHashtagProps {
   onFavoriteClick?: (tag: string) => void;
   /** 現在のタグがお気に入りか（ハートを塗りつぶし表示） */
   isFavorite?: boolean;
+  className?: string;
 }
 
 export interface AppHeaderTitleProps {
@@ -132,10 +134,11 @@ export default function AppHeader(props: AppHeaderProps) {
     (props.type === "search" || props.type === "hashtag") && props.backHref?.trim()
       ? props.backHref.trim()
       : undefined;
+  const headerExtra = "className" in props && props.className ? ` ${props.className}` : "";
 
   return (
     <header
-      className={`sticky top-0 z-50 flex ${HEADER_HEIGHT} items-center gap-2 bg-[#FFE100] py-3 pl-2.5 pr-[5.333vw] shadow-sm`}
+      className={`sticky top-0 z-50 flex ${HEADER_HEIGHT} items-center gap-2 bg-[#FFE100] py-3 pl-2.5 pr-[5.333vw] shadow-sm${headerExtra}`}
       aria-label={isSearch ? "検索" : "ハッシュタグ"}
     >
       {renderBackButton(backFallback, props.onBack)}
