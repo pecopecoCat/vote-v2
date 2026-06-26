@@ -252,6 +252,19 @@ type CollectionPickerScreenProps = {
   scope?: "viewport" | "contained";
 };
 
+function CollectionPickerDoneButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button
+      type="button"
+      className="rounded-full bg-white px-3.5 py-1.5 text-sm font-bold text-[#191919] transition-opacity hover:opacity-90 active:opacity-95"
+      aria-label="完了"
+      onClick={onClose}
+    >
+      完了
+    </button>
+  );
+}
+
 export function CollectionPickerScreen({
   open,
   onClose,
@@ -275,16 +288,8 @@ export function CollectionPickerScreen({
           type="title"
           title={title}
           onBack={onClose}
-          right={
-            <button
-              type="button"
-              className="text-sm font-bold text-[#0779F1]"
-              aria-label="完了"
-              onClick={onClose}
-            >
-              完了
-            </button>
-          }
+          className="!pr-2.5"
+          right={<CollectionPickerDoneButton onClose={onClose} />}
         />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
       </div>
@@ -309,16 +314,8 @@ export function CollectionPickerScreen({
           type="title"
           title={title}
           onBack={onClose}
-          right={
-            <button
-              type="button"
-              className="text-sm font-bold text-[#0779F1]"
-              aria-label="完了"
-              onClick={onClose}
-            >
-              完了
-            </button>
-          }
+          className="!pr-2.5"
+          right={<CollectionPickerDoneButton onClose={onClose} />}
         />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
       </div>
