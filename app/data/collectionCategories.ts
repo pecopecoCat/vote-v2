@@ -106,7 +106,7 @@ export type CollectionListSection = {
   collections: Collection[];
 };
 
-/** ピン留め＋カテゴリ別にグループ化（ピン留めはカテゴリに重複表示しない） */
+/** ピン留め＋フラット一覧（アニメ・漫画特化のためカテゴリ別グループは使わない） */
 export function groupCollectionsForListPage(
   collections: Collection[],
   pinnedCollectionIds: string[]
@@ -115,23 +115,12 @@ export function groupCollectionsForListPage(
   const pinned = collections.filter((c) => pinnedSet.has(c.id));
   const unpinned = collections.filter((c) => !pinnedSet.has(c.id));
 
-  const byCategory = new Map<CollectionCategory, Collection[]>();
-  for (const col of unpinned) {
-    const cat = resolveCollectionCategory(col);
-    const list = byCategory.get(cat) ?? [];
-    list.push(col);
-    byCategory.set(cat, list);
-  }
-
   const sections: CollectionListSection[] = [];
   if (pinned.length > 0) {
     sections.push({ id: "pinned", title: "ピン留め", collections: pinned });
   }
-  for (const { id, label } of COLLECTION_CATEGORY_OPTIONS) {
-    const list = byCategory.get(id);
-    if (list && list.length > 0) {
-      sections.push({ id, title: label, collections: list });
-    }
+  if (unpinned.length > 0) {
+    sections.push({ id: "all", title: "", collections: unpinned });
   }
   return sections;
 }

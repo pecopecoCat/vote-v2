@@ -3,7 +3,7 @@ import {
   type Collection,
   type CollectionVisibility,
 } from "../data/collections";
-import { COLLECTION_CATEGORY_OPTIONS, type CollectionCategory } from "../data/collectionCategories";
+import type { CollectionCategory } from "../data/collectionCategories";
 import type { CollectionGradient } from "../data/search";
 import type { CollectionsIndexRow } from "./fetchCollectionsIndex";
 import { isCollectionVoteCardRemoveEnabled } from "./collectionVoteCardMutation";
@@ -137,9 +137,7 @@ export function filterContributableForPicker(rows: ContributableCollection[]): C
 export function matchesContributableQuery(row: ContributableCollection, rawQuery: string): boolean {
   const q = normalizeSearchText(rawQuery);
   if (!q) return true;
-  const categoryLabel =
-    COLLECTION_CATEGORY_OPTIONS.find((c) => c.id === row.category)?.label ?? "";
-  const tokens = [row.name, categoryLabel, row.category ?? ""].map(normalizeSearchText);
+  const tokens = [row.name].map(normalizeSearchText);
   return tokens.some((token) => token.length > 0 && token.includes(q));
 }
 

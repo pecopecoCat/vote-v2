@@ -7,7 +7,6 @@ import {
   getCollectionsUpdatedEventName,
   toggleCardInContributableCollection,
 } from "../data/collections";
-import type { CollectionCategory } from "../data/collectionCategories";
 import { type CollectionGradient } from "../data/search";
 import { useSharedData } from "../context/SharedDataContext";
 import { showAppToast } from "../lib/appToast";
@@ -69,13 +68,11 @@ export default function AddToCommunityModal({
     name: string,
     gradient: CollectionGradient,
     visibility: "public" | "private" | "member",
-    category: CollectionCategory,
     coverImageUrl?: string
   ) => {
     await createOwnedCollectionFromSettings(name, {
       gradient,
       visibility,
-      category,
       coverImageUrl,
       cardId: cardId ?? undefined,
     });

@@ -7,7 +7,7 @@
  */
 
 import { normalizeCardIdKey } from "../lib/normalize";
-import { getAuth, getCurrentActivityUserId } from "./auth";
+import { DEMO_USER_IDS, getAuth, getCurrentActivityUserId, type DemoUserId } from "./auth";
 
 /** コメント1件：コメントしたユーザー・日付・テキスト・いいね数・返信先 */
 export interface VoteComment {
@@ -321,8 +321,10 @@ export function addComment(
   const global = loadGlobal();
   const current = global[cardId] ?? { countA: 0, countB: 0, comments: [] };
   const comments = Array.isArray(current.comments) ? current.comments : [];
+  const authorUserId = getCurrentActivityUserId();
   const newComment: VoteComment = {
     id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    ...(DEMO_USER_IDS.includes(authorUserId as DemoUserId) ? { userId: authorUserId } : {}),
     user: comment.user,
     ...(typeof collectionId === "string" && collectionId.length > 0 ? { collectionId } : {}),
     date: new Date().toISOString(),

@@ -3,11 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Collection, CollectionVisibility } from "../data/collections";
-import {
-  COLLECTION_CATEGORY_OPTIONS,
-  resolveCollectionCategory,
-  type CollectionCategory,
-} from "../data/collectionCategories";
+import { COLLECTION_VISIBILITY_LABEL } from "../data/collectionCategories";
 import { type CollectionGradient } from "../data/search";
 import { compressImageFile } from "../lib/compressImageFile";
 import { showAppToast } from "../lib/appToast";
@@ -23,7 +19,6 @@ export interface CollectionSettingsModalProps {
     name: string,
     gradient: CollectionGradient,
     visibility: CollectionVisibility,
-    category: CollectionCategory,
     coverImageUrl?: string
   ) => void | Promise<void>;
   editingCollection?: Collection | null;
@@ -42,9 +37,6 @@ export default function CollectionSettingsModal({
     const v = editingCollection?.visibility ?? "public";
     return v === "private" ? "public" : v;
   });
-  const [category, setCategory] = useState<CollectionCategory>(
-    editingCollection ? resolveCollectionCategory(editingCollection) : "other"
-  );
   const [coverImageUrl, setCoverImageUrl] = useState<string | undefined>(
     editingCollection?.coverImageUrl
   );
@@ -59,12 +51,10 @@ export default function CollectionSettingsModal({
       setName(editingCollection.name);
       const v = editingCollection.visibility;
       setVisibility(v === "private" ? "public" : v);
-      setCategory(resolveCollectionCategory(editingCollection));
       setCoverImageUrl(editingCollection.coverImageUrl);
     } else {
       setName("");
       setVisibility("public");
-      setCategory("other");
       setCoverImageUrl(undefined);
     }
   }, [editingCollection]);
@@ -90,7 +80,7 @@ export default function CollectionSettingsModal({
     const gradient: CollectionGradient = editingCollection?.gradient ?? "blue-cyan";
     setSaving(true);
     try {
-      await onSave(trimmed, gradient, visibility, category, coverImageUrl ?? "");
+      await onSave(trimmed, gradient, visibility, coverImageUrl ?? "");
       onClose();
     } finally {
       setSaving(false);
@@ -186,29 +176,6 @@ export default function CollectionSettingsModal({
                   ×
                 </button>
               ) : null}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-900">カテゴリ</label>
-            <div className="flex flex-wrap gap-2">
-              {COLLECTION_CATEGORY_OPTIONS.map((opt) => {
-                const selected = category === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setCategory(opt.id)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
-                      selected
-                        ? "bg-[#FFE100] text-[#191919]"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
             </div>
           </div>
 

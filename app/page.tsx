@@ -578,10 +578,10 @@ function HomeContent() {
       <Link
         href="/search"
         prefetch
-        className="fixed bottom-[calc(3.5rem+12px+env(safe-area-inset-bottom,0px))] right-[5.333vw] z-20 flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#191919] shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-opacity active:opacity-80"
+        className="fixed bottom-[calc(3.5rem+12px+env(safe-area-inset-bottom,0px))] right-[5.333vw] z-20 flex h-14 w-14 items-center justify-center rounded-full bg-[#191919] shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-opacity active:opacity-80"
         aria-label="検索"
       >
-        <img src="/icons/n_search.svg" alt="" className="h-[22px] w-[18px]" width={18} height={22} aria-hidden />
+        <span className="home-search-fab__icon" aria-hidden />
       </Link>
 
       <CardModerationModals

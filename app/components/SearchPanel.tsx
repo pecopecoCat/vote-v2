@@ -625,6 +625,21 @@ function SearchPanelInner({ presentation = "page", layout = "default", onClose }
 
   const listRowInset = isModalLayout ? "px-5" : "";
   const sectionInset = isModalLayout ? "" : "px-[5.333vw]";
+  const useSplitScroll = isModalLayout || (isOverlay && isTagFilterView);
+  const tagFilterBarInset = isModalLayout ? " px-5" : " px-[5.333vw]";
+  const tagFilterBar = isTagFilterView ? (
+    <ShowVotedFilterBar
+      className={
+        useSplitScroll
+          ? `shrink-0 bg-[#F1F1F1] py-3${tagFilterBarInset}`
+          : `sticky top-[64px] z-40 bg-[#F1F1F1] py-3${tagFilterBarInset}`
+      }
+      sortOrder={tagListSortOrder}
+      onSortOrderChange={setTagListSortOrder}
+      showVoted={showVoted}
+      onShowVotedChange={handleShowVotedChange}
+    />
+  ) : null;
   const overlayMainClass = isModalLayout
     ? "home-feed-main mx-auto w-full max-w-none flex-1 bg-white pb-[env(safe-area-inset-bottom,0px)]"
     : "home-feed-main mx-auto flex-1 bg-white pb-[env(safe-area-inset-bottom,0px)] sm:px-6";
@@ -632,8 +647,12 @@ function SearchPanelInner({ presentation = "page", layout = "default", onClose }
   return (
     <div
       className={
-        isModalLayout
-          ? "search-modal-panel flex h-full min-h-0 flex-col overflow-hidden bg-white"
+        useSplitScroll
+          ? [
+              "flex h-full min-h-0 flex-col overflow-hidden",
+              isTagFilterView ? "bg-[#F1F1F1]" : "bg-white",
+              isModalLayout ? "search-modal-panel" : "search-tag-filter-panel",
+            ].join(" ")
           : isOverlay
             ? `flex min-h-0 flex-1 flex-col overflow-y-auto ${isTagFilterView ? "bg-[#F1F1F1]" : "bg-white"}`
             : `min-h-screen pb-[50px] ${isTagFilterView ? "bg-[#F1F1F1]" : "bg-white"}`
@@ -656,18 +675,14 @@ function SearchPanelInner({ presentation = "page", layout = "default", onClose }
         {...(isModalLayout ? { className: "!px-3" } : {})}
       />
 
-      <div className={isModalLayout ? "min-h-0 flex-1 overflow-y-auto overscroll-contain" : "contents"}>
+      {useSplitScroll ? tagFilterBar : null}
+
+      <div className={useSplitScroll ? "min-h-0 flex-1 overflow-y-auto overscroll-contain" : "contents"}>
 
       {/* ハッシュタグから開いたとき：従来のカード一覧（新着順・投票済みを表示） */}
       {isTagFilterView && (
         <>
-          <ShowVotedFilterBar
-            className={`sticky ${isModalLayout ? "top-0" : "top-[64px]"} z-10 bg-[#F1F1F1] py-3${isModalLayout ? " px-5" : " px-[5.333vw]"}`}
-            sortOrder={tagListSortOrder}
-            onSortOrderChange={setTagListSortOrder}
-            showVoted={showVoted}
-            onShowVotedChange={handleShowVotedChange}
-          />
+          {!useSplitScroll ? tagFilterBar : null}
           <main
             className={
               isOverlay
@@ -677,7 +692,7 @@ function SearchPanelInner({ presentation = "page", layout = "default", onClose }
                 : "home-feed-main mx-auto px-[5.333vw] pb-[50px] pt-6 sm:px-6"
             }
           >
-            <VoteCardList className={isModalLayout ? "px-4" : ""} masonry>
+            <VoteCardList className={useSplitScroll ? "px-4" : ""} masonry>
               {cardsToShow.length === 0 ? (
                 <VoteCardMasonryTile fullWidth>
                 <EmptyStatePanel>
@@ -714,7 +729,7 @@ function SearchPanelInner({ presentation = "page", layout = "default", onClose }
               <VoteCardMasonryTile fullWidth>
               <RecommendedTags
                 tags={tagFilterRecommendedTags}
-                className={isModalLayout ? "!mx-0 [&>div]:!px-0" : undefined}
+                className={useSplitScroll ? "!mx-0 [&>div]:!px-0" : undefined}
               />
               </VoteCardMasonryTile>
               {randomCollectionForTimeline ? (

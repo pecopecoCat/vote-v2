@@ -37,6 +37,7 @@ import { useCommentsVoteFeed } from "../../hooks/useCommentsVoteFeed";
 import { useCommentedCardIdSet } from "../../hooks/useCommentedCardIdSet";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { useCardModerationFlow } from "../../hooks/useCardModerationFlow";
+import { resolveCommentUserDisplay } from "../../lib/resolveCommentUserDisplay";
 
 export default function CommentsPage() {
   const params = useParams();
@@ -204,6 +205,12 @@ export default function CommentsPage() {
     setIsCommentModalOpen(true);
   };
 
+  const replyTargetDisplay = useMemo(() => {
+    if (!replyingToCommentId) return null;
+    const target = activity.comments.find((c) => c.id === replyingToCommentId);
+    return target ? resolveCommentUserDisplay(target) : null;
+  }, [activity.comments, replyingToCommentId]);
+
   const waitingForCreatedCard =
     id.startsWith("created-") && !card && !activityBootstrapDone;
 
@@ -235,7 +242,7 @@ export default function CommentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-[120px] md:pb-24">
+    <div className="comments-page-shell min-h-screen bg-[#F1F1F1] pb-[120px] md:pb-24">
       <AppHeader type="title" title="みんなのコメント" />
 
       <main className="comments-page mx-auto max-w-lg px-[5.333vw] py-4 md:max-w-none md:px-6 md:py-6">
@@ -359,12 +366,8 @@ export default function CommentsPage() {
         currentUser={currentUser.type === "sns" ? { name: currentUser.name ?? "自分", iconUrl: currentUser.iconUrl } : undefined}
         showLoginButton={!isLoggedIn}
         loginReturnTo={`/comments/${id}`}
-        replyToUserName={
-          replyingToCommentId ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.name : undefined
-        }
-        replyToUserIconUrl={
-          replyingToCommentId ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.iconUrl : undefined
-        }
+        replyToUserName={replyTargetDisplay?.name}
+        replyToUserIconUrl={replyTargetDisplay?.iconUrl}
         onCancelReply={() => setReplyingToCommentId(null)}
       />
 

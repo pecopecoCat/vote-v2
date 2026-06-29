@@ -4,18 +4,13 @@ import Link from "next/link";
 import { memo } from "react";
 import type { Collection } from "../data/collections";
 import {
-  COLLECTION_CATEGORY_OPTIONS,
   COLLECTION_VISIBILITY_LABEL,
-  resolveCollectionCategory,
 } from "../data/collectionCategories";
 import { getCollectionGradientStyle } from "../data/search";
 
 export function formatCollectionBrowseMeta(collection: Collection): string {
   const parts: string[] = [];
   parts.push(COLLECTION_VISIBILITY_LABEL[collection.visibility]);
-  const category = resolveCollectionCategory(collection);
-  const categoryLabel = COLLECTION_CATEGORY_OPTIONS.find((c) => c.id === category)?.label;
-  if (categoryLabel) parts.push(categoryLabel);
   parts.push(`${collection.cardIds.length}件`);
   return parts.join(" · ");
 }

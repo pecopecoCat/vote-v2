@@ -28,6 +28,7 @@ import {
 } from "../../../../data/voteCardActivity";
 import { useSharedData } from "../../../../context/SharedDataContext";
 import { normalizeCardIdKey } from "../../../../lib/normalize";
+import { resolveCommentUserDisplay } from "../../../../lib/resolveCommentUserDisplay";
 
 export default function CommentReplyThreadPage() {
   const params = useParams();
@@ -133,16 +134,17 @@ export default function CommentReplyThreadPage() {
     );
   }
 
-  const headerTitle = `${parent.user.name}へのリプライ`;
-  const replyTargetName = replyingToCommentId
-    ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.name
-    : parent.user.name;
-  const replyTargetIconUrl = replyingToCommentId
-    ? activity.comments.find((c) => c.id === replyingToCommentId)?.user.iconUrl
-    : parent.user.iconUrl;
+  const parentDisplay = resolveCommentUserDisplay(parent);
+  const headerTitle = `${parentDisplay.name}へのリプライ`;
+  const replyTargetComment = replyingToCommentId
+    ? activity.comments.find((c) => c.id === replyingToCommentId) ?? parent
+    : parent;
+  const replyTargetDisplay = resolveCommentUserDisplay(replyTargetComment);
+  const replyTargetName = replyTargetDisplay.name;
+  const replyTargetIconUrl = replyTargetDisplay.iconUrl;
 
   return (
-    <div className="min-h-screen bg-[#F1F1F1] pb-[120px] md:pb-24">
+    <div className="comments-page-shell min-h-screen bg-[#F1F1F1] pb-[120px] md:pb-24">
       <AppHeader type="title" title={headerTitle} backHref={`/comments/${id}`} />
 
       <main className="comments-page mx-auto max-w-lg px-[5.333vw] py-4 md:max-w-none md:px-6 md:py-6">

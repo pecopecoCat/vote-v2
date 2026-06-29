@@ -3,7 +3,6 @@
 import { Suspense, useCallback, useMemo } from "react";
 import AppHeader from "../components/AppHeader";
 import CollectionTilesRow from "../components/CollectionTilesRow";
-import { groupCollectionsForListPage } from "../data/collectionCategories";
 import {
   getOtherUsersCollections,
   updateCollection,
@@ -17,7 +16,6 @@ import { useEnsureCollectionsHydrated } from "../hooks/useEnsureCollectionsHydra
 import { useLocalCollections } from "../hooks/useLocalCollections";
 import { useSearchCollectionsWarm } from "../hooks/useSearchCollectionsWarm";
 import { getCollectionThumbnailUrl } from "../lib/getCollectionThumbnailUrl";
-import { sortCollectionsByPinned } from "../lib/sortCollectionsByPinned";
 
 function CollectionsLoading() {
   return (
@@ -71,13 +69,17 @@ function CollectionsContent() {
       seen.add(c.id);
       return true;
     });
-    return sortCollectionsByPinned(combined, pinnedCollectionIds);
+    return combined;
   }, [collections, pinnedCollectionIds, remotePopularCollections]);
 
-  const sections = useMemo(
-    () => groupCollectionsForListPage(collectionsForList, pinnedCollectionIds),
-    [collectionsForList, pinnedCollectionIds]
-  );
+  const { pinnedCollections, unpinnedCollections } = useMemo(() => {
+    const pinnedSet = new Set(pinnedCollectionIds);
+    const pinned = pinnedCollectionIds
+      .map((id) => collectionsForList.find((c) => c.id === id))
+      .filter((c): c is Collection => c != null);
+    const unpinned = collectionsForList.filter((c) => !pinnedSet.has(c.id));
+    return { pinnedCollections: pinned, unpinnedCollections: unpinned };
+  }, [collectionsForList, pinnedCollectionIds]);
 
   const thumbnailById = useMemo(() => {
     const map = new Map<string, string | null>();
@@ -93,11 +95,10 @@ function CollectionsContent() {
       name: string,
       gradient: CollectionGradient,
       visibility: Collection["visibility"],
-      category: Collection["category"],
       coverImageUrl?: string
     ) => {
       if (!editing) return;
-      updateCollection(editing.id, { name, gradient, visibility, category, coverImageUrl });
+      updateCollection(editing.id, { name, gradient, visibility, coverImageUrl });
       refreshCollections();
     },
     [refreshCollections]
@@ -118,12 +119,12 @@ function CollectionsContent() {
               : "コレクションはありません。"}
           </p>
         ) : (
-          <div className="flex flex-col gap-6">
-            {sections.map((section) => (
-              <section key={section.id} className="collections-category-section">
-                <h2 className="collections-category-title">{section.title}</h2>
+          <div className="flex flex-col gap-8">
+            {pinnedCollections.length > 0 ? (
+              <section className="collections-list-section">
+                <h2 className="collections-list-section-title">ピン留め</h2>
                 <CollectionTilesRow
-                  collections={section.collections}
+                  collections={pinnedCollections}
                   thumbnailById={thumbnailById}
                   localCollections={collections}
                   activityUserId={activityUserId}
@@ -134,7 +135,22 @@ function CollectionsContent() {
                   onSettingsSave={handleSettingsSave}
                 />
               </section>
-            ))}
+            ) : null}
+            {unpinnedCollections.length > 0 ? (
+              <section className="collections-list-section">
+                <CollectionTilesRow
+                  collections={unpinnedCollections}
+                  thumbnailById={thumbnailById}
+                  localCollections={collections}
+                  activityUserId={activityUserId}
+                  pinnedCollectionIds={pinnedCollectionIds}
+                  menuFilter="owned"
+                  showPin
+                  onRefresh={refreshCollections}
+                  onSettingsSave={handleSettingsSave}
+                />
+              </section>
+            ) : null}
           </div>
         )}
       </main>

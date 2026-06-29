@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import AppHeader from "./AppHeader";
-import { COLLECTION_CATEGORY_OPTIONS, COLLECTION_VISIBILITY_LABEL } from "../data/collectionCategories";
+import { COLLECTION_VISIBILITY_LABEL } from "../data/collectionCategories";
 import { getCollectionGradientStyle } from "../data/search";
 import { useSharedData } from "../context/SharedDataContext";
 import {
@@ -64,10 +64,6 @@ function collectionMeta(row: ContributableCollection): string {
   if (row.disabledReason) return row.disabledReason;
   const parts: string[] = [];
   parts.push(COLLECTION_VISIBILITY_LABEL[row.visibility]);
-  if (row.category) {
-    const label = COLLECTION_CATEGORY_OPTIONS.find((c) => c.id === row.category)?.label;
-    if (label) parts.push(label);
-  }
   parts.push(`${row.cardIds.length}件`);
   return parts.join(" · ");
 }

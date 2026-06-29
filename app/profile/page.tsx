@@ -899,20 +899,18 @@ function ProfileContent() {
                   activityUserId={getCurrentActivityUserId()}
                   menuFilter="library"
                   onRefresh={() => setCollections(getCollections())}
-                  onSettingsSave={async (editing, name, gradient, visibility, category, coverImageUrl) => {
+                  onSettingsSave={async (editing, name, gradient, visibility, coverImageUrl) => {
                     if (editing) {
                       updateCollection(editing.id, {
                         name,
                         gradient,
                         visibility,
-                        category,
                         coverImageUrl,
                       });
                     } else {
                       await createOwnedCollectionFromSettings(name, {
                         gradient,
                         visibility,
-                        category,
                         coverImageUrl,
                       });
                     }

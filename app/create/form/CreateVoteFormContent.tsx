@@ -215,11 +215,10 @@ function CreateVoteFormContent({
       {isCollectionVoteCardAddEnabled() && form.showCollectionSettingsModal ? (
         <CollectionSettingsModal
           onClose={() => form.setShowCollectionSettingsModal(false)}
-          onSave={async (name, gradient, visibility, category, coverImageUrl) => {
+          onSave={async (name, gradient, visibility, coverImageUrl) => {
             const created = await createOwnedCollectionFromSettings(name, {
               gradient,
               visibility,
-              category,
               coverImageUrl,
             });
             form.setSelectedCollectionIds((prev) =>

@@ -564,7 +564,8 @@ select {
   grid-column: 1 / -1;
 }
 
-.search-modal-panel .home-feed-masonry.vote-card-list {
+.search-modal-panel .home-feed-masonry.vote-card-list,
+.search-tag-filter-panel .home-feed-masonry.vote-card-list {
   --masonry-gap: 12px;
   columns: 1;
 }
@@ -588,12 +589,21 @@ select {
   columns: 1;
 }
 
-/* みんなのコメント（PC）：左ナビ + 中央（可変幅・VOTE・コメント）+ 右（関連VOTE 1列） */
+/* みんなのコメント（PC）：左ナビ + 中央（コメント・主エリア）+ 右（関連VOTE・375px＝カード基準幅） */
 @media (min-width: 768px) {
+  body:has(.comments-page-shell) {
+    --app-side-nav-width: min(280px, max(160px, calc(100vw / 10 * 2)));
+  }
+
+  body:has(.comments-page-shell) .comments-page {
+    max-width: none;
+    width: 100%;
+  }
+
   .comments-page__layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) min(375px, 100%);
-    gap: 32px;
+    grid-template-columns: minmax(0, 1fr) 375px;
+    gap: clamp(20px, 2.5vw, 40px);
     align-items: start;
   }
 
@@ -625,7 +635,7 @@ select {
     margin-left: 0;
     margin-right: 0;
     width: 100%;
-    border-radius: 14px;
+    border-radius: 0;
     overflow: hidden;
   }
 
@@ -638,8 +648,19 @@ select {
     position: sticky;
     top: 24px;
     align-self: start;
-    width: min(375px, 100%);
+    width: 375px;
+    max-width: 375px;
+    min-width: 0;
     max-height: calc(100dvh - 48px);
+  }
+
+  .comments-page__vote-feed-rail .home-feed-masonry.vote-card-list {
+    --masonry-gap: min(5.333vw, 20px);
+    columns: 1;
+  }
+
+  .comments-page__vote-feed-rail .home-feed-masonry__tile .vote-card-outer {
+    --vote-u: min(100cqw, 375px);
   }
 
   .comments-page__vote-feed-rail-inner {
@@ -647,6 +668,7 @@ select {
     border-top: none;
     padding-top: 0;
     max-height: calc(100dvh - 48px);
+    overflow-x: visible;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-right: 4px;
@@ -668,6 +690,52 @@ select {
 
 }
 
+.collections-list-section {
+  min-width: 0;
+}
+
+.collections-list-section-title {
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #191919;
+}
+
+/* コレクション一覧：横スライドのタイル行（画面端までスクロール） */
+.collections-scroll-row,
+.collections-category-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+  margin-left: -5.333vw;
+  margin-right: -5.333vw;
+  padding-left: 5.333vw;
+  padding-right: 5.333vw;
+}
+
+@media (min-width: 640px) {
+  .collections-scroll-row,
+  .collections-category-row {
+    margin-left: -1.5rem;
+    margin-right: -1.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+.collections-scroll-row::-webkit-scrollbar,
+.collections-category-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* @deprecated カテゴリ廃止前のクラス名（互換） */
 .collections-category-section {
   min-width: 0;
 }
@@ -678,28 +746,6 @@ select {
   font-weight: 700;
   line-height: 1.4;
   color: #191919;
-}
-
-.collections-category-row {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-  padding-bottom: 2px;
-  margin-right: -5.333vw;
-}
-
-@media (min-width: 640px) {
-  .collections-category-row {
-    margin-right: -1.5rem;
-  }
-}
-
-.collections-category-row::-webkit-scrollbar {
-  display: none;
 }
 
 .collection-list-tile {
@@ -713,6 +759,16 @@ select {
     flex-basis: 156px;
     width: 156px;
   }
+}
+
+/* HOME 右下：絞り込み検索 FAB */
+.home-search-fab__icon {
+  display: block;
+  width: 18px;
+  height: 22px;
+  background-color: #FFE100;
+  mask: url(/icons/n_search.svg) no-repeat center / contain;
+  -webkit-mask: url(/icons/n_search.svg) no-repeat center / contain;
 }
 
 /* 回答欄ドロップシャドウ：Y1 #000000 25%（既存のシャドウと併用） */

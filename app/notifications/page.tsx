@@ -10,6 +10,7 @@ import {
 } from "../data/notifications";
 import { markAnnouncementsAsRead } from "../data/announcementReadState";
 import { getAuth, getAuthUpdatedEventName, getCurrentActivityUserId } from "../data/auth";
+import { resolveCommentUserDisplay } from "../lib/resolveCommentUserDisplay";
 import { getCreatedVotes } from "../data/createdVotes";
 import {
   getAllActivity,
@@ -114,6 +115,7 @@ function buildUserActivityItems(opts?: {
     const others = a.comments.filter((c) => !c.parentId && !isMyComment(c, currentUserName));
     if (others.length === 0) return;
     const latest = others[others.length - 1];
+    const latestDisplay = resolveCommentUserDisplay(latest);
     items.push({
       type: "comment_on_mine",
       cardId,
@@ -121,8 +123,8 @@ function buildUserActivityItems(opts?: {
       date: latest.date ? formatDate(latest.date) : "",
       dateIso: latest.date ?? undefined,
       questionPreview: getQuestion(cardId, created) || undefined,
-      actorName: latest.user?.name,
-      actorIconUrl: latest.user?.iconUrl,
+      actorName: latestDisplay.name,
+      actorIconUrl: latestDisplay.iconUrl,
       commentPreview: latest.text,
       // コメント保存時に記録したA/B。未記録の既存コメントは "A" を表示
       actorVote: latest.userVoteOption ?? "A",
@@ -139,6 +141,7 @@ function buildUserActivityItems(opts?: {
     a.comments
       .filter((c) => c.parentId && myCommentIds.has(c.parentId))
       .forEach((reply) => {
+        const replyDisplay = resolveCommentUserDisplay(reply);
         items.push({
           type: "reply_to_my_comment",
           cardId,
@@ -146,8 +149,8 @@ function buildUserActivityItems(opts?: {
           date: reply.date ? formatDate(reply.date) : "",
           dateIso: reply.date ?? undefined,
           questionPreview: getQuestion(cardId, created) || undefined,
-          actorName: reply.user?.name,
-          actorIconUrl: reply.user?.iconUrl,
+          actorName: replyDisplay.name,
+          actorIconUrl: replyDisplay.iconUrl,
           commentPreview: reply.text,
           actorVote: reply.userVoteOption ?? "A",
         });

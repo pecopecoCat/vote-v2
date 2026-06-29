@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import type { VoteComment } from "../data/voteCardActivity";
+import { useCommentUserDisplay } from "../hooks/useCommentUserDisplay";
 import { formatCommentDate } from "../lib/formatCommentDate";
 
 /** 下端基準の拡大（矢印・丸みを相対的に大きく。ラッパーでクリップ） */
@@ -33,11 +34,12 @@ function MoreIcon({ className }: { className?: string }) {
 
 export function CommentAvatar({ comment }: { comment: VoteComment }) {
   const voteOpt = comment.userVoteOption;
+  const displayUser = useCommentUserDisplay(comment);
   return (
     <div className="relative h-10 w-10 shrink-0">
       <span className="flex h-10 w-10 overflow-hidden rounded-full bg-[#E8E8E8]">
         <img
-          src={comment.user.iconUrl ?? "/default-avatar.png"}
+          src={displayUser.iconUrl}
           alt=""
           className="h-full w-full object-cover"
           loading="lazy"
@@ -94,6 +96,7 @@ export function CommentBody({
   onCommentMore?: () => void;
 }) {
   const router = useRouter();
+  const displayUser = useCommentUserDisplay(comment);
   const replyCount = replyCountOverride ?? comment.replyCount ?? 0;
   const likeCountRaw = comment.likeCount ?? 0;
   /** 自分のいいね済みと集計のズレ時（リロード直後など）でも 0 表示＋赤アイコンにならないよう補正 */
@@ -123,7 +126,7 @@ export function CommentBody({
       aria-label={navigable ? "リプライ画面へ" : undefined}
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
-        <p className="text-[14px] font-bold text-[#191919]">{comment.user.name}</p>
+        <p className="text-[14px] font-bold text-[#191919]">{displayUser.name}</p>
         {dateLabel ? (
           <time
             dateTime={comment.date}

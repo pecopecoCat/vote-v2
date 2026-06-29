@@ -12,7 +12,6 @@ import {
   togglePinnedCollection,
   type Collection,
 } from "../data/collections";
-import type { CollectionCategory } from "../data/collectionCategories";
 import type { CollectionGradient } from "../data/search";
 import {
   getCollectionMenuModalProps,
@@ -41,7 +40,6 @@ export type CollectionTilesRowProps = {
     name: string,
     gradient: CollectionGradient,
     visibility: Collection["visibility"],
-    category: CollectionCategory,
     coverImageUrl?: string
   ) => void | Promise<void>;
   className?: string;
@@ -61,7 +59,7 @@ const CollectionTilesRow = forwardRef<CollectionTilesRowHandle, CollectionTilesR
       onRefresh,
       onDeleted,
       onSettingsSave,
-      className = "collections-category-row",
+      className = "collections-scroll-row",
     },
     ref
   ) {
@@ -175,13 +173,12 @@ const CollectionTilesRow = forwardRef<CollectionTilesRowHandle, CollectionTilesR
               setShowSettings(false);
               setEditingCollection(null);
             }}
-            onSave={async (name, gradient, visibility, category, coverImageUrl) => {
+            onSave={async (name, gradient, visibility, coverImageUrl) => {
               await onSettingsSave(
                 editingCollection,
                 name,
                 gradient,
                 visibility,
-                category,
                 coverImageUrl
               );
               setShowSettings(false);
